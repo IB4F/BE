@@ -1,0 +1,35 @@
+# Ignore Visual Studio files
+.vs/
+.vs2019/
+.vs2017/
+.vs2015/
+
+# Ignore build output directories
+bin/
+obj/
+
+# Ignore temporary files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore Rider files (if applicable)
+.idea/
+
+# Ignore node_modules (if you have Node.js dependencies)
+node_modules/
+
+# Ignore package files for .NET projects
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Ignore logs
+*.log
+
+# Ignore IDE-specific files (VSCode, JetBrains, etc.)
+.vscode/
+
+# Ignore GitHub-related files (optional)
+.github/
