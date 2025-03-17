@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using TeachingBACKEND.Domain.Enums;
+﻿using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Domain.Entities
 {
@@ -33,5 +32,10 @@ namespace TeachingBACKEND.Domain.Entities
         public string? Profession { get; set; }
         public string? City { get; set; }
         public string? PostalCode { get; set; }
+
+
+        //Reset Password
+        public Guid? PasswordResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
     }
 }

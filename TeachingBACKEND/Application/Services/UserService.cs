@@ -143,9 +143,6 @@ namespace TeachingBACKEND.Application.Services
                 School = school.School
             };
         }
-
-
-
         public async Task<string> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
@@ -187,26 +184,59 @@ namespace TeachingBACKEND.Application.Services
         }
 
 
+        public async Task<string> RequestPasswordReset(string email)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if(user == null)
+            {
+                return "No account found with this email.";
+            }
+
+
+            var resetToken = Guid.NewGuid();
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+
+            await _context.SaveChangesAsync();
+
+            //Send Email
+            await _notificationService.SendPasswordResetEmail(email, resetToken);
+
+            return "Password reset email sent successfully.";
+        }
+
+        public async Task<string> ResetPassword(Guid token, string newPassword)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == token && u.PasswordResetTokenExpiry > DateTime.UtcNow);
+            if(user == null)
+            {
+                return "Invalid or expired token";
+            }
+
+            user.PasswordHash = HashPassword(newPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+             
+            await _context.SaveChangesAsync();
+            return "Password reset successfully.";
+        }
 
 
         public async Task<User> GetUserByEmail(string email)
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
         }
-
         public async Task<User> GetUserById(Guid Id)
         {
            var user =  await _context.Users.FirstOrDefaultAsync(u => u.Id == Id);
             if (user == null) throw new Exception("User not found");
             return user;
         }
-
         public async Task UpdateUser(User user)
         {
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
-
         public string GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();

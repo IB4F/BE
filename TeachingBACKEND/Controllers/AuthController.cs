@@ -59,8 +59,6 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
-
-
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromQuery] Guid token)
         {
@@ -71,7 +69,6 @@ namespace TeachingBACKEND.Controllers
             }
             return BadRequest(new { message = result });
         }
-
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO model)
@@ -88,7 +85,6 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUserById(Guid id)
         {
@@ -103,7 +99,6 @@ namespace TeachingBACKEND.Controllers
                 return NotFound(new { error = ex.Message });
             }
         }
-
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(Guid id, [FromBody] User updatedUser)
@@ -128,6 +123,32 @@ namespace TeachingBACKEND.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+        }
+
+
+        //Request password reset(step 1)
+        [HttpPost("request-reset")]
+        public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordDTO model)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await _userService.RequestPasswordReset(model.Email);
+            if (string.IsNullOrEmpty(result)) return NotFound("User with the specified email does not exist.");
+
+            return Ok("Password reset link has been sent to your email.");
+        }
+
+
+        //Reset Password(step 2)
+        [HttpPost("reset")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await _userService.ResetPassword(model.Token, model.NewPassword);
+            if (string.IsNullOrEmpty(result)) return BadRequest("Invalid token or the token has expired");
+
+            return Ok("Password has been successfully reset");
         }
 
     }
