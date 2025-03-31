@@ -37,5 +37,10 @@ namespace TeachingBACKEND.Domain.Entities
         //Reset Password
         public Guid? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }
+
+
+        //Refresh Token
+        public Guid RefreshToken { get; set; }
+        public DateTime RefreshTokenExpiry { get; set; }
     }
 }

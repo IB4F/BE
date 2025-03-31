@@ -25,23 +25,18 @@ namespace TeachingBACKEND.Application.Services
             _jwtSecret = configuration["Jwt:SecretKey"];
         }
 
-
         public string HashPassword(string password)
         {
             return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
         }
-
-
         public Guid GenerateVerificationToken()
         {
             return Guid.NewGuid();
         }
-
         public bool VerifyPassword(string password, string hashedPassword)
         {
             return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
         }
-
         public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
         {
             var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
@@ -96,9 +91,6 @@ namespace TeachingBACKEND.Application.Services
                 School = student.School
             };
         }
-
-
-
         public async Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model)
         {
             var existingSchool = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
@@ -112,7 +104,7 @@ namespace TeachingBACKEND.Application.Services
             var school = new User
             {
                 Email = model.Email,
-                PasswordHash = HashPassword(model.Password),
+                //PasswordHash = HashPassword(model.Password),
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.FirstName,
@@ -143,10 +135,10 @@ namespace TeachingBACKEND.Application.Services
                 School = school.School
             };
         }
-        public async Task<string> Login(LoginDTO model)
+        public async Task<LoginResponseDTO> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
-            if(user == null || !VerifyPassword(model.Password, user.PasswordHash))
+            if (user == null || !VerifyPassword(model.Password, user.PasswordHash))
             {
                 throw new Exception("Invalid email or password");
             }
@@ -156,10 +148,20 @@ namespace TeachingBACKEND.Application.Services
                 throw new Exception("Email is not verified! Please check your inbox.");
             }
 
-            return GenerateJwtToken(user);
+            var accessToken = GenerateJwtToken(user);
+            var refreshToken = GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+
+            await _context.SaveChangesAsync();
+
+            return new LoginResponseDTO
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+            };
         }
-
-
         public async Task<string> VerifyEmail(Guid? token)
         {
             if (!token.HasValue)
@@ -182,8 +184,6 @@ namespace TeachingBACKEND.Application.Services
 
             return "Email verified successfully.";
         }
-
-
         public async Task<string> RequestPasswordReset(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -204,7 +204,6 @@ namespace TeachingBACKEND.Application.Services
 
             return "Password reset email sent successfully.";
         }
-
         public async Task<string> ResetPassword(Guid token, string newPassword)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == token && u.PasswordResetTokenExpiry > DateTime.UtcNow);
@@ -220,8 +219,6 @@ namespace TeachingBACKEND.Application.Services
             await _context.SaveChangesAsync();
             return "Password reset successfully.";
         }
-
-
         public async Task<User> GetUserByEmail(string email)
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
@@ -259,5 +256,37 @@ namespace TeachingBACKEND.Application.Services
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
+        public Guid GenerateRefreshToken()
+        {
+            var randomBytes = new byte[16];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(randomBytes);
+            }
+            return new Guid(randomBytes);
+        }
+
+
+        public async Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password)
+        {
+            var school = await _context.Users.FirstOrDefaultAsync(u =>
+               u.Id == schoolId &&
+               u.Role == UserRole.School &&
+               u.ApprovalStatus == ApprovalStatus.Approved &&
+               u.IsEmailVerified);
+
+            if (school == null)
+                return "School is not eligible to set a password.";
+
+            if (!string.IsNullOrEmpty(school.PasswordHash))
+                return "Password has already been set.";
+
+
+            school.PasswordHash = HashPassword(password);
+            await _context.SaveChangesAsync();
+
+            return "Password set successfully";
+        }
+
     }
 }

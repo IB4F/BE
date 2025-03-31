@@ -75,8 +75,8 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                string token = await _userService.Login(model);
-                return Ok(new {Token = token});
+                LoginResponseDTO response = await _userService.Login(model);
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -149,6 +149,15 @@ namespace TeachingBACKEND.Controllers
             if (string.IsNullOrEmpty(result)) return BadRequest("Invalid token or the token has expired");
 
             return Ok("Password has been successfully reset");
+        }
+
+
+        [HttpPost("schools/set-password")]
+        public async Task<IActionResult> SetSchoolPassword([FromBody] SetPasswordDTO model)
+        {
+            var result = await _userService.GeneratePasswordForApprovedSchool(model.SchoolId, model.Password);
+            return Ok(new {message = result});
+
         }
 
     }

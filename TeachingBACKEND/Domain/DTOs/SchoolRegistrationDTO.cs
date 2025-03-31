@@ -25,7 +25,5 @@ namespace TeachingBACKEND.Domain.DTOs
         [Required, StringLength(100)]
         public string School { get; set; }
 
-        [Required, MinLength(6)]
-        public string Password { get; set; }
     }
 }
