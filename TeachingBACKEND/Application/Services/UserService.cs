@@ -9,6 +9,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -24,7 +25,6 @@ namespace TeachingBACKEND.Application.Services
             _notificationService = notificationService;
             _jwtSecret = configuration["Jwt:SecretKey"];
         }
-
         public string HashPassword(string password)
         {
             return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
@@ -265,8 +265,6 @@ namespace TeachingBACKEND.Application.Services
             }
             return new Guid(randomBytes);
         }
-
-
         public async Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password)
         {
             var school = await _context.Users.FirstOrDefaultAsync(u =>
@@ -288,5 +286,19 @@ namespace TeachingBACKEND.Application.Services
             return "Password set successfully";
         }
 
+        public async Task<string> Logout(Guid userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            user.RefreshToken = Guid.Empty;
+            user.RefreshTokenExpiry = DateTime.MinValue;
+
+            await _context.SaveChangesAsync();
+
+            return "User successfully logged out.";
+        }
+        
     }
 }

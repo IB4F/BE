@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
@@ -63,9 +64,9 @@ namespace TeachingBACKEND.Controllers
         public async Task<IActionResult> VerifyEmail([FromQuery] Guid token)
         {
             var result = await _userService.VerifyEmail(token);
-            if(result == "Email verified successfully.")
+            if (result == "Email verified successfully.")
             {
-                return Ok(new {message = result});
+                return Ok(new { message = result });
             }
             return BadRequest(new { message = result });
         }
@@ -81,7 +82,7 @@ namespace TeachingBACKEND.Controllers
             catch (Exception ex)
             {
 
-                return BadRequest(new {Message = ex.Message});  
+                return BadRequest(new { Message = ex.Message });
             }
         }
 
@@ -130,7 +131,7 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("request-reset")]
         public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordDTO model)
         {
-            if(!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await _userService.RequestPasswordReset(model.Email);
             if (string.IsNullOrEmpty(result)) return NotFound("User with the specified email does not exist.");
@@ -156,8 +157,19 @@ namespace TeachingBACKEND.Controllers
         public async Task<IActionResult> SetSchoolPassword([FromBody] SetPasswordDTO model)
         {
             var result = await _userService.GeneratePasswordForApprovedSchool(model.SchoolId, model.Password);
-            return Ok(new {message = result});
+            return Ok(new { message = result });
 
+        }
+
+
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            // read userId from JWT
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var msg = await _userService.Logout(userId);
+            return Ok(new { message = msg });
         }
 
     }
