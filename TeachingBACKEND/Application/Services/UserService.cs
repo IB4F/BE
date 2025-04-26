@@ -380,6 +380,25 @@ namespace TeachingBACKEND.Application.Services
             return new Guid(randomBytes);
         }
 
+        public async Task<StudentRegistrationDTO> GetUserDetails(Guid userId)
+        {
+            var dto = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => new StudentRegistrationDTO
+                {
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Email = u.Email,
+                    DateOfBirth = u.DateOfBirth.GetValueOrDefault(),
+                    School = u.School,
+                    CurrentClass = u.CurrentClass
+                })
+                .FirstOrDefaultAsync();
+
+            if (dto == null)
+                throw new Exception("User not found");
+            return dto;
+        }
 
     }
 }

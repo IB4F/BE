@@ -192,5 +192,22 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
+
+        [HttpGet("{id:guid}")]
+        
+        public async Task<ActionResult<StudentRegistrationDTO>> Get(Guid id)
+        {
+            try
+            {
+                var dto = await _userService.GetUserDetails(id);
+                return Ok(dto);
+            }
+            catch (Exception ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+
     }
 }
