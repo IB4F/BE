@@ -77,7 +77,11 @@ namespace TeachingBACKEND.Controllers
             try
             {
                 LoginResponseDTO response = await _userService.Login(model);
-                return Ok(response);
+                return Ok(new 
+                {
+                    Message = "Login të suksesshëm!",
+                    Data = response
+                });
             }
             catch (Exception ex)
             {
