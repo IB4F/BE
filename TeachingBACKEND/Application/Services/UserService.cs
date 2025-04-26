@@ -104,10 +104,11 @@ namespace TeachingBACKEND.Application.Services
             var school = new User
             {
                 Email = model.Email,
-                //PasswordHash = HashPassword(model.Password),
+                PasswordHash = HashPassword(model.Password),
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.FirstName,
+                //LastName
                 PhoneNumber = model.PhoneNumber,
                 Profession = model.Profession,
                 City = model.City,
@@ -119,7 +120,16 @@ namespace TeachingBACKEND.Application.Services
             };
 
             _context.Users.Add(school);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.InnerException?.Message);
+                throw;
+            }
+
 
 
             //Send verification email
@@ -256,15 +266,6 @@ namespace TeachingBACKEND.Application.Services
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
-        public Guid GenerateRefreshToken()
-        {
-            var randomBytes = new byte[16];
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(randomBytes);
-            }
-            return new Guid(randomBytes);
-        }
         public async Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password)
         {
             var school = await _context.Users.FirstOrDefaultAsync(u =>
@@ -285,7 +286,6 @@ namespace TeachingBACKEND.Application.Services
 
             return "Password set successfully";
         }
-
         public async Task<string> Logout(Guid userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -299,6 +299,87 @@ namespace TeachingBACKEND.Application.Services
 
             return "User successfully logged out.";
         }
-        
+
+        public async Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model)
+        {
+            var principal = GetPrincipalFromExpiredToken(model.AccessToken);
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                            ?? throw new SecurityTokenException("Invalid token claims");
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+
+            if (user == null
+           || user.RefreshToken != model.RefreshToken
+           || user.RefreshTokenExpiry <= DateTime.UtcNow)
+            {
+                throw new SecurityTokenException("Invalid or expired refresh token");
+            }
+
+            //generate new tokens 
+            var newAccessToken = GenerateAccessToken(principal.Claims);
+            var newRefreshToken = GenerateRefreshToken();
+
+            //persist
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            await _context.SaveChangesAsync();
+
+
+            return new LoginResponseDTO
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken,
+            };
+
+        }
+
+        //helpers
+        private ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        {
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtSecret)),
+                ValidateLifetime = false  
+            };
+
+            var handler = new JwtSecurityTokenHandler();
+            var principal = handler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+
+            if (securityToken is not JwtSecurityToken jwt
+                || !jwt.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.Ordinal))
+            {
+                throw new SecurityTokenException("Invalid token");
+            }
+
+            return principal;
+        }
+        private string GenerateAccessToken(IEnumerable<Claim> claims)
+        {
+            var key = Encoding.ASCII.GetBytes(_jwtSecret);
+            var descriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(key),
+                    SecurityAlgorithms.HmacSha256Signature
+                )
+            };
+            var token = new JwtSecurityTokenHandler().CreateToken(descriptor);
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        private Guid GenerateRefreshToken()
+        {
+            var randomBytes = new byte[16];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            return new Guid(randomBytes);
+        }
+
+
     }
 }

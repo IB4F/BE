@@ -172,5 +172,21 @@ namespace TeachingBACKEND.Controllers
             return Ok(new { message = msg });
         }
 
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDTO model)
+        {
+            try
+            {
+                var tokens = await _userService.RefreshTokenAsync(model);
+                return Ok(tokens);
+            }
+            catch (Exception ex)
+            {
+
+                return BadRequest(new {error = ex.Message});
+            }
+        }
+
     }
 }

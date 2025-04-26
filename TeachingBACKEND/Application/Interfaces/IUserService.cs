@@ -16,5 +16,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<string> RequestPasswordReset(string email);
         Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password);
         Task<string> Logout(Guid userId);
+        Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model);
     }
 }
