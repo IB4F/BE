@@ -40,6 +40,9 @@ namespace TeachingBACKEND.Controllers
 
         }
 
+
+
+
         /// <summary>
         /// Register a school
         /// </summary>
@@ -193,20 +196,23 @@ namespace TeachingBACKEND.Controllers
         }
 
 
-        [HttpGet("{id:guid}")]
-        
-        public async Task<ActionResult<StudentRegistrationDTO>> Get(Guid id)
+        [Authorize]
+        [HttpGet("me")]
+        public async Task <IActionResult> GetCurrentUser()
         {
             try
             {
-                var dto = await _userService.GetUserDetails(id);
+                var dto = await _userService.GetUserDetails(User);
                 return Ok(dto);
             }
             catch (Exception ex)
             {
-                return NotFound(new { message = ex.Message });
+                return Unauthorized(new {message = ex.Message});
+                
             }
         }
+
+
 
 
     }

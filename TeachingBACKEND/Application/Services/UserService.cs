@@ -9,7 +9,6 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
-using Microsoft.AspNetCore.Components.Forms;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -77,7 +76,7 @@ namespace TeachingBACKEND.Application.Services
 
 
             //Send verification email
-            await _notificationService.SendEmailVerification(model.Email, verificationToken);
+            //await _notificationService.SendEmailVerification(model.Email, verificationToken);
 
 
             return new UserResponseDTO
@@ -145,6 +144,8 @@ namespace TeachingBACKEND.Application.Services
                 School = school.School
             };
         }
+
+
         public async Task<LoginResponseDTO> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
@@ -380,25 +381,32 @@ namespace TeachingBACKEND.Application.Services
             return new Guid(randomBytes);
         }
 
-        public async Task<StudentRegistrationDTO> GetUserDetails(Guid userId)
+        public async Task<UserDetails> GetUserDetails(ClaimsPrincipal user)
         {
-            var dto = await _context.Users
-                .Where(u => u.Id == userId)
-                .Select(u => new StudentRegistrationDTO
-                {
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Email = u.Email,
-                    DateOfBirth = u.DateOfBirth.GetValueOrDefault(),
-                    School = u.School,
-                    CurrentClass = u.CurrentClass
-                })
-                .FirstOrDefaultAsync();
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (dto == null)
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                throw new Exception("Invalid or missing user ID in token.");
+            }
+
+            var entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (entity == null)
                 throw new Exception("User not found");
-            return dto;
+
+            return new UserDetails
+            {
+                Email = entity.Email,
+                FirstName = entity.FirstName,
+                LastName = entity.LastName,
+                CurrentClass = entity.CurrentClass,
+                School = entity.School,
+                PhoneNumber = entity.PhoneNumber,
+                Profession = entity.Profession                
+            };
         }
+
+
 
     }
 }

@@ -1,4 +1,5 @@
-﻿using TeachingBACKEND.Domain.DTOs;
+﻿using System.Security.Claims;
+using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 
 namespace TeachingBACKEND.Application.Interfaces
@@ -17,6 +18,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password);
         Task<string> Logout(Guid userId);
         Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model);
-        Task<StudentRegistrationDTO> GetUserDetails(Guid userId);
+        Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
     }
 }

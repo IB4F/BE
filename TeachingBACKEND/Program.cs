@@ -80,7 +80,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserService, UserService>();
-
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(opts => opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true);
