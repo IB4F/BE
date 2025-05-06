@@ -42,5 +42,8 @@ namespace TeachingBACKEND.Domain.Entities
         //Refresh Token
         public Guid RefreshToken { get; set; }
         public DateTime RefreshTokenExpiry { get; set; }
+
+
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>(); // Navigation
     }
 }

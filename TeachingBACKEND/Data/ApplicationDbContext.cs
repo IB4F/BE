@@ -12,6 +12,7 @@ namespace TeachingBACKEND.Data
         }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<Payment> Payments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,6 +32,14 @@ namespace TeachingBACKEND.Data
                 entity.Property(u => u.PasswordHash)
                       .IsRequired();
             });
+
+            modelBuilder.Entity<Payment>()
+           .HasOne(p => p.User)
+           .WithMany(u => u.Payments)
+           .HasForeignKey(p => p.UserId)
+           .OnDelete(DeleteBehavior.SetNull);
+
+
 
             var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111"); 
             var adminEmail = "admin@teachapp.com";

@@ -373,6 +373,7 @@ namespace TeachingBACKEND.Application.Services
             var token = new JwtSecurityTokenHandler().CreateToken(descriptor);
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
         private Guid GenerateRefreshToken()
         {
             var randomBytes = new byte[16];
@@ -405,8 +406,5 @@ namespace TeachingBACKEND.Application.Services
                 Profession = entity.Profession                
             };
         }
-
-
-
     }
 }

@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeachingBACKEND.Application.Interfaces;
-using TeachingBACKEND.Domain.Entities;
+using TeachingBACKEND.Domain.DTOs;
+using System;
 
 namespace TeachingBACKEND.Controllers
 {
@@ -21,7 +22,7 @@ namespace TeachingBACKEND.Controllers
         public async Task<IActionResult> GetAll()
         {
             var users = await _adminUserService.GetAllUsersAsync();
-            return Ok(users);
+            return Ok(users); 
         }
 
         [HttpGet("{id}")]
@@ -29,8 +30,8 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                var user = await _adminUserService.GetUserById(id);
-                return Ok(user);
+                var user = await _adminUserService.GetUserDetailsById(id);
+                return Ok(user); 
             }
             catch (Exception ex)
             {
@@ -39,19 +40,12 @@ namespace TeachingBACKEND.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] User updatedUser)
+        public async Task<IActionResult> Update(Guid id, [FromBody] AdminUserDetailsDTO dto)
         {
             try
             {
-                var user = await _adminUserService.GetUserById(id);
-                user.FirstName = updatedUser.FirstName;
-                user.LastName = updatedUser.LastName;
-                user.Role = updatedUser.Role;
-                user.ApprovalStatus = updatedUser.ApprovalStatus;
-                user.School = updatedUser.School;
-                user.City = updatedUser.City;
-
-                await _adminUserService.UpdateUser(user);
+                dto.Id = id; 
+                await _adminUserService.UpdateUser(dto);
                 return Ok("User updated successfully");
             }
             catch (Exception ex)
@@ -74,7 +68,4 @@ namespace TeachingBACKEND.Controllers
             }
         }
     }
-
-
 }
-
