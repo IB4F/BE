@@ -22,6 +22,10 @@ namespace TeachingBACKEND.Controllers
             return Ok (new {sessionId });
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         [HttpPost("webhook")]
         public async Task<IActionResult> HandleStripeWebhook()
         {
