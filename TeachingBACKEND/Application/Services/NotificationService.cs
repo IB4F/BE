@@ -2,18 +2,10 @@
 using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using TeachingBACKEND.Application.Interfaces;
 
 public class NotificationService : INotificationService
 {
-    private readonly IConfiguration _configuration;
-
-    public NotificationService(IConfiguration configuration)
-    {
-        _configuration = configuration;
-    }
-
     public async Task SendEmailVerification(string email, Guid token)
     {
         string verificationUrl = $"https://yourdomain.com/api/user/verify-email?token={token}";
@@ -34,17 +26,20 @@ public class NotificationService : INotificationService
 
     public async Task SendEmail(string email, string subject, string body)
     {
-        var fromAddress = new MailAddress(_configuration["EmailSettings:From"], "Your App");
+        var fromAddress = new MailAddress(
+            Environment.GetEnvironmentVariable("EMAIL_FROM"),
+            "Your App"
+        );
         var toAddress = new MailAddress(email);
 
         using (var smtp = new SmtpClient
         {
-            Host = _configuration["EmailSettings:SmtpServer"],
-            Port = 587,
+            Host = Environment.GetEnvironmentVariable("EMAIL_SMTP_SERVER"),
+            Port = int.Parse(Environment.GetEnvironmentVariable("EMAIL_PORT") ?? "587"),
             EnableSsl = true,
             Credentials = new NetworkCredential(
-                _configuration["EmailSettings:Username"],
-                _configuration["EmailSettings:Password"]
+                Environment.GetEnvironmentVariable("EMAIL_USERNAME"),
+                Environment.GetEnvironmentVariable("EMAIL_PASSWORD")
             )
         })
         {
@@ -52,7 +47,7 @@ public class NotificationService : INotificationService
             {
                 Subject = subject,
                 Body = body,
-                IsBodyHtml = true 
+                IsBodyHtml = true
             })
             {
                 try

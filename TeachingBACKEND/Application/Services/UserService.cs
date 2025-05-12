@@ -22,7 +22,7 @@ namespace TeachingBACKEND.Application.Services
         {
             _context = context;
             _notificationService = notificationService;
-            _jwtSecret = configuration["Jwt:SecretKey"];
+            _jwtSecret =  Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
         }
         public string HashPassword(string password)
         {

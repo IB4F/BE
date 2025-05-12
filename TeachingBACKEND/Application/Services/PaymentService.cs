@@ -20,6 +20,13 @@ namespace TeachingBACKEND.Application.Services
 
         public async Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto)
         {
+            // Get Stripe keys from environment variables
+            var stripeSecretKey = _configuration["STRIPE_SECRET_KEY"];
+            var stripePublishableKey = _configuration["STRIPE_PUBLISHABLE_KEY"];
+            var stripeWebhookSecret = _configuration["STRIPE_WEBHOOK_SECRET"];
+
+            StripeConfiguration.ApiKey = stripeSecretKey;
+
             var price = dto.RegistrationType.ToLower() switch
             {
                 "school" => 9900,   //$99
@@ -27,13 +34,12 @@ namespace TeachingBACKEND.Application.Services
                 _ => throw new Exception("Invalid registration type")
             };
 
-
             var options = new SessionCreateOptions
             {
                 PaymentMethodTypes = new List<string> { "card" },
                 Mode = "payment",
-                SuccessUrl = "https://your-frontend.com/success?session_id={CHECKOUT_SESSION_ID}",
-                CancelUrl = "https://your-frontend.com/cancel",
+                SuccessUrl = _configuration["Stripe:SuccessUrl"],
+                CancelUrl = _configuration["Stripe:CancelUrl"],
                 CustomerEmail = dto.Email,
                 LineItems = new List<SessionLineItemOptions>
             {
@@ -75,7 +81,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task HandleStripeWebhookAsync(HttpRequest request)
         {
             var json = await new StreamReader(request.Body).ReadToEndAsync();
-            var secret = _configuration["Stripe:WebhookSecret"];
+            var secret = _configuration["STRIPE_WEBHOOK_SECRET"];
 
             Event stripeEvent;
             try
@@ -102,4 +108,5 @@ namespace TeachingBACKEND.Application.Services
             }
         }
     }
+
 }
