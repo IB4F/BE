@@ -1,0 +1,19 @@
+# Ignore the secrets file
+appsettings.Secrets.json
+
+# Ignore user-specific files
+*.user
+*.suo
+
+# Build results
+bin/
+obj/
+
+# Visual Studio Code settings
+.vscode/
+
+# User secrets (optional if using dotnet user-secrets)
+secrets.json
+
+# Others
+.env
