@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
+using TeachingBACKEND.Application.Services;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
@@ -12,11 +14,13 @@ namespace TeachingBACKEND.Controllers
     {
         private readonly IUserService _userService;
         private readonly ApplicationDbContext _context;
+        private readonly IPasswordService _passwordService;
 
-        public AuthController(IUserService userService, ApplicationDbContext context)
+        public AuthController(IUserService userService, ApplicationDbContext context, IPasswordService passwordService)
         {
             _userService = userService;
             _context = context;
+            _passwordService = passwordService;
         }
 
         /// <summary>
@@ -39,9 +43,6 @@ namespace TeachingBACKEND.Controllers
             }
 
         }
-
-
-
 
         /// <summary>
         /// Register a school
@@ -66,7 +67,7 @@ namespace TeachingBACKEND.Controllers
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromQuery] Guid token)
         {
-            var result = await _userService.VerifyEmail(token);
+            var result = await _passwordService.VerifyEmail(token);
             if (result == "Email verified successfully.")
             {
                 return Ok(new { message = result });
@@ -94,6 +95,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         [HttpGet("{id}")]
+        [SwaggerOperation(Summary = "Get user by ID")]
         public async Task<IActionResult> GetUserById(Guid id)
         {
             try
@@ -109,6 +111,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         [HttpPut("{id}")]
+        [SwaggerOperation(Summary = "Update user by ID")]
         public async Task<IActionResult> UpdateUser(Guid id, [FromBody] User updatedUser)
         {
             try
@@ -136,11 +139,12 @@ namespace TeachingBACKEND.Controllers
 
         //Request password reset(step 1)
         [HttpPost("request-reset")]
+        [SwaggerOperation(Summary = "Request Password Reset Step 1")]
         public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordDTO model)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _userService.RequestPasswordReset(model.Email);
+            var result = await _passwordService.RequestPasswordReset(model.Email);
             if (string.IsNullOrEmpty(result)) return NotFound("User with the specified email does not exist.");
 
             return Ok("Password reset link has been sent to your email.");
@@ -149,11 +153,12 @@ namespace TeachingBACKEND.Controllers
 
         //Reset Password(step 2)
         [HttpPost("reset")]
+        [SwaggerOperation(Summary = "Password Reset Step 2")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _userService.ResetPassword(model.Token, model.NewPassword);
+            var result = await _passwordService.ResetPassword(model.Token, model.NewPassword);
             if (string.IsNullOrEmpty(result)) return BadRequest("Invalid token or the token has expired");
 
             return Ok("Password has been successfully reset");
@@ -163,7 +168,7 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("schools/set-password")]
         public async Task<IActionResult> SetSchoolPassword([FromBody] SetPasswordDTO model)
         {
-            var result = await _userService.GeneratePasswordForApprovedSchool(model.SchoolId, model.Password);
+            var result = await _passwordService.GeneratePasswordForApprovedSchool(model.SchoolId, model.Password);
             return Ok(new { message = result });
 
         }
@@ -185,7 +190,7 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                var tokens = await _userService.RefreshTokenAsync(model);
+                var tokens = await _passwordService.RefreshTokenAsync(model);
                 return Ok(tokens);
             }
             catch (Exception ex)
@@ -198,6 +203,7 @@ namespace TeachingBACKEND.Controllers
 
         [Authorize]
         [HttpGet("me")]
+        [SwaggerOperation(Summary = "Get Current User Details")]
         public async Task <IActionResult> GetCurrentUser()
         {
             try
@@ -211,9 +217,5 @@ namespace TeachingBACKEND.Controllers
                 
             }
         }
-
-
-
-
     }
 }

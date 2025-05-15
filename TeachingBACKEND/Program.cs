@@ -2,18 +2,30 @@ using Microsoft.EntityFrameworkCore;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Application.Services;
 using TeachingBACKEND.Data;
-
+using Serilog;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;    
+using Microsoft.OpenApi.Models;
 using System.Text;
+using DotNetEnv;
+
+Env.Load();
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.Seq("http://localhost:5341")
+    .Enrich.FromLogContext()
+    .CreateLogger();
+
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "TeachingBACKEND API", Version = "v1" });
+    c.EnableAnnotations();
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -37,13 +49,28 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-DotNetEnv.Env.Load();
 
-builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-
            .EnableSensitiveDataLogging());
+
+builder.Services
+  .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+  .AddJwtBearer(options =>
+  {
+      options.TokenValidationParameters = new TokenValidationParameters
+      {
+          ValidateIssuer = false,
+          ValidateAudience = false,
+          ValidateLifetime = true,
+          ValidateIssuerSigningKey = true,
+          IssuerSigningKey = new SymmetricSecurityKey(
+              Encoding.ASCII.GetBytes(builder.Configuration["JWT_SECRET_KEY"])
+          ),
+          ClockSkew = TimeSpan.Zero
+      };
+  });
+
 
 builder.Services.AddCors(options =>
 {
@@ -56,33 +83,15 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-builder.Services
-  .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)   
-  .AddJwtBearer(options =>
-  {
-      options.TokenValidationParameters = new TokenValidationParameters
-      {
-          ValidateIssuer = false,
-          ValidateAudience = false,
-          ValidateLifetime = true,
-          ValidateIssuerSigningKey = true,
-          IssuerSigningKey = new SymmetricSecurityKey(
-              Encoding.ASCII.GetBytes(builder.Configuration["Jwt:SecretKey"])
-          ),
-          ClockSkew = TimeSpan.Zero
-      };
-  });
-
-builder.Services.AddAuthorization();
-
-
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IDetailsService, DetailsService>();
-Stripe.StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
+builder.Services.AddScoped<IPasswordService, PasswordService>();
+
+
+Stripe.StripeConfiguration.ApiKey = builder.Configuration["STRIPE_SECRET_KEY"];
 
 
 builder.Services.AddControllers()
@@ -92,14 +101,13 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
-app.UseAuthentication();  
+app.UseAuthentication();
 app.UseAuthorization();
-
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();    
+    app.UseSwaggerUI();
 }
 
 app.MapControllers();

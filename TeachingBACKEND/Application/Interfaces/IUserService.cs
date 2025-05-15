@@ -12,12 +12,7 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<User> GetUserById(Guid Id);
         Task UpdateUser(User user);
         Task<LoginResponseDTO> Login(LoginDTO model);
-        Task<string> VerifyEmail(Guid? token);
-        Task<string> ResetPassword(Guid token, string newPassword);
-        Task<string> RequestPasswordReset(string email);
-        Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password);
         Task<string> Logout(Guid userId);
-        Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model);
         Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
     }
 }

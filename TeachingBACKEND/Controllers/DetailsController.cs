@@ -26,6 +26,7 @@ namespace TeachingBACKEND.Controllers
             return Ok(cityList);
         }
 
+
         [HttpGet("get-class")]
         public async Task<ActionResult<IEnumerable<Class>>> GetClasses()
         {
