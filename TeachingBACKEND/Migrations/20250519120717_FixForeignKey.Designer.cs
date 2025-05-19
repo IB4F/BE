@@ -12,8 +12,8 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250512142351_AddClass")]
-    partial class AddClass
+    [Migration("20250519120717_FixForeignKey")]
+    partial class FixForeignKey
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -174,6 +174,59 @@ namespace TeachingBACKEND.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.LearnHub", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClassType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LearnHubs");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LearnHubId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<double>("Progress")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LearnHubId");
+
+                    b.ToTable("Links");
+                });
+
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -218,6 +271,40 @@ namespace TeachingBACKEND.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Quizz", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsAnswered")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Options")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId");
+
+                    b.ToTable("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
@@ -306,7 +393,7 @@ namespace TeachingBACKEND.Migrations
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$XpZJm5zckY2vGEaZf4JuQOyl9ORvUYvTH1CQGV6gUweyXDYpFcMiG",
+                            PasswordHash = "$2a$12$XVlfnhqvTQVTeEebDDMqgeXKCb7uFPI6jK8JoeMilBLqPDti7N6Bq",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),
@@ -314,6 +401,17 @@ namespace TeachingBACKEND.Migrations
                             Role = 0,
                             School = "Main Admin Office"
                         });
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.HasOne("TeachingBACKEND.Domain.Entities.LearnHub", "LearnHub")
+                        .WithMany("Links")
+                        .HasForeignKey("LearnHubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LearnHub");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
@@ -324,6 +422,27 @@ namespace TeachingBACKEND.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Quizz", b =>
+                {
+                    b.HasOne("TeachingBACKEND.Domain.Entities.Link", "Link")
+                        .WithMany("Quizzes")
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Link");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.LearnHub", b =>
+                {
+                    b.Navigation("Links");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.Navigation("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>

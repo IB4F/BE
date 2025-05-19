@@ -44,7 +44,17 @@ namespace TeachingBACKEND.Data
            .HasForeignKey(p => p.UserId)
            .OnDelete(DeleteBehavior.SetNull);
 
+            modelBuilder.Entity<Link>()
+            .HasOne(link => link.LearnHub)
+            .WithMany(learnHub => learnHub.Links)
+            .HasForeignKey(link => link.LearnHubId)
+            .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Quizz>()
+                .HasOne(quizz => quizz.Link)
+                .WithMany(link => link.Quizzes)
+                .HasForeignKey(quizz => quizz.LinkId)
+                .OnDelete(DeleteBehavior.Cascade);
 
 
             modelBuilder.Entity<City>().HasData(

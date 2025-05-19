@@ -12,8 +12,8 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250512134522_SeedAlbanianCities")]
-    partial class SeedAlbanianCities
+    [Migration("20250519115247_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -97,6 +97,136 @@ namespace TeachingBACKEND.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Class", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Classes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("e3f9a8f1-9c4e-4a91-8bcb-0b6b1583d3a1"),
+                            Name = "Klasa 1"
+                        },
+                        new
+                        {
+                            Id = new Guid("a61d58b7-23f8-48f7-9778-3e048c5808a0"),
+                            Name = "Klasa 2"
+                        },
+                        new
+                        {
+                            Id = new Guid("81bce1db-4f7c-4f6f-9e59-cde56a8200b6"),
+                            Name = "Klasa 3"
+                        },
+                        new
+                        {
+                            Id = new Guid("f82a2ea4-c4c9-4895-9484-0197a299c02f"),
+                            Name = "Klasa 4"
+                        },
+                        new
+                        {
+                            Id = new Guid("10840373-f0f4-4b10-9ee0-c5a831b6cf6a"),
+                            Name = "Klasa 5"
+                        },
+                        new
+                        {
+                            Id = new Guid("7fc8018d-6310-4c1f-b878-4b3a5b0b265c"),
+                            Name = "Klasa 6"
+                        },
+                        new
+                        {
+                            Id = new Guid("8e77a87f-e42b-487a-9cde-54f648c8c457"),
+                            Name = "Klasa 7"
+                        },
+                        new
+                        {
+                            Id = new Guid("43e7b804-0e1a-4c82-9e44-6a194ee1ff63"),
+                            Name = "Klasa 8"
+                        },
+                        new
+                        {
+                            Id = new Guid("fd4b14ea-1b79-4e4c-83e0-0196c55b4bc1"),
+                            Name = "Klasa 9"
+                        },
+                        new
+                        {
+                            Id = new Guid("1c0b8bb7-9eb9-4a4d-8c4d-67de8057ae49"),
+                            Name = "Klasa 10"
+                        },
+                        new
+                        {
+                            Id = new Guid("3402fc90-d7be-420e-a980-2ff430d84838"),
+                            Name = "Klasa 11"
+                        },
+                        new
+                        {
+                            Id = new Guid("013d0df5-50ef-4269-8a12-9b4f91ef07e1"),
+                            Name = "Klasa 12"
+                        });
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.LearnHub", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClassType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LearnHubs");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LearnHubId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<double>("Progress")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LearnHubId");
+
+                    b.ToTable("Links");
+                });
+
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -141,6 +271,40 @@ namespace TeachingBACKEND.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Quizz", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsAnswered")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Options")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId");
+
+                    b.ToTable("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
@@ -229,7 +393,7 @@ namespace TeachingBACKEND.Migrations
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$6SPhwV64Lpb1/OdZIkXAH.r5/fXJJUgQsVBCCycmRW/.F5N6wA7M2",
+                            PasswordHash = "$2a$12$NGdgHR9QTdScxYW/BWASH.VG3wNEu9.c0U3KWSWSHIx5IUBFNbrYG",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),
@@ -237,6 +401,17 @@ namespace TeachingBACKEND.Migrations
                             Role = 0,
                             School = "Main Admin Office"
                         });
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.HasOne("TeachingBACKEND.Domain.Entities.LearnHub", "LearnHub")
+                        .WithMany("Links")
+                        .HasForeignKey("LearnHubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LearnHub");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
@@ -247,6 +422,27 @@ namespace TeachingBACKEND.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Quizz", b =>
+                {
+                    b.HasOne("TeachingBACKEND.Domain.Entities.Link", "Link")
+                        .WithMany("Quizzes")
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Link");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.LearnHub", b =>
+                {
+                    b.Navigation("Links");
+                });
+
+            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
+                {
+                    b.Navigation("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
