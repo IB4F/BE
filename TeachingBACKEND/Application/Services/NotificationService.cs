@@ -6,8 +6,16 @@ using TeachingBACKEND.Application.Interfaces;
 
 public class NotificationService : INotificationService
 {
+    private readonly ILogger<NotificationService> _logger;
+
+    public  NotificationService(ILogger<NotificationService> logger)
+    {
+        _logger = logger;
+    }
+
     public async Task SendEmailVerification(string email, Guid token)
     {
+        _logger.LogInformation("Starting email-verification workflow for {Email}", email);
         string verificationUrl = $"https://yourdomain.com/api/user/verify-email?token={token}";
         string subject = "Email Verification";
         string body = $"Click the link to verify your email: {verificationUrl}";
@@ -17,6 +25,7 @@ public class NotificationService : INotificationService
 
     public async Task SendPasswordResetEmail(string email, Guid resetToken)
     {
+        _logger.LogInformation("Starting password-reset workflow for {Email}", email);
         string resetLink = $"https://frontend.com/reset-password?token={resetToken}";
         string subject = "Password Reset Request";
         string body = $"Click the link to reset your password: {resetLink}";
@@ -52,11 +61,13 @@ public class NotificationService : INotificationService
             {
                 try
                 {
+                    _logger.LogInformation("Sending email to {Email}", email);
                     await smtp.SendMailAsync(message);
                     Console.WriteLine($"Email sent to {email} successfully.");
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError(ex, "Failed to send email to {Email}", email);
                     Console.WriteLine($"Email sending failed: {ex.Message}");
                     throw;
                 }

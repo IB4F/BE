@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250519110758_ChangeIntToGuid")]
+    partial class ChangeIntToGuid
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Cities", (string)null);
+                    b.ToTable("Cities");
 
                     b.HasData(
                         new
@@ -106,7 +109,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Classes", (string)null);
+                    b.ToTable("Classes");
 
                     b.HasData(
                         new
@@ -198,7 +201,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LearnHubs", (string)null);
+                    b.ToTable("LearnHubs");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
@@ -221,7 +224,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("LearnHubId");
 
-                    b.ToTable("Links", (string)null);
+                    b.ToTable("Links");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
@@ -267,7 +270,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Quizz", b =>
@@ -301,7 +304,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("LinkId");
 
-                    b.ToTable("Quizzes", (string)null);
+                    b.ToTable("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
@@ -377,7 +380,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
 
                     b.HasData(
                         new

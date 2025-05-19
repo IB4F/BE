@@ -14,8 +14,10 @@ namespace TeachingBACKEND.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Payment> Payments { get; set; }
         public DbSet<City> Cities { get; set; }
-
         public DbSet<Class> Classes { get; set; }
+        public DbSet<LearnHub> LearnHubs { get; set; }
+        public DbSet<Link> Links { get; set; }
+        public DbSet<Quizz> Quizzes {  get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -41,6 +43,8 @@ namespace TeachingBACKEND.Data
            .WithMany(u => u.Payments)
            .HasForeignKey(p => p.UserId)
            .OnDelete(DeleteBehavior.SetNull);
+
+
 
 
             modelBuilder.Entity<City>().HasData(

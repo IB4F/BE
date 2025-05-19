@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Data;

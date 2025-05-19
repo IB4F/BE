@@ -89,7 +89,7 @@ builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
-
+builder.Services.AddScoped<ILearnHubService, LearnHubService>();
 
 Stripe.StripeConfiguration.ApiKey = builder.Configuration["STRIPE_SECRET_KEY"];
 
