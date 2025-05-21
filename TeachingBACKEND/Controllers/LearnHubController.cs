@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using TeachingBACKEND.Application.Services;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
@@ -21,6 +22,7 @@ namespace TeachingBACKEND.Controllers
         //Admin: Create a new Learn Hub
         [HttpPost]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Create a new LearnHub")]
         [Route("api/admin/learnhub")]
         public async Task<IActionResult> Create([FromBody] CreateLearnHubDTO model)
         {
@@ -36,7 +38,8 @@ namespace TeachingBACKEND.Controllers
 
         // Student/Supervisor: View Learn Hub details
         [HttpGet]
-        [Authorize(Roles = "Student, Supervisor")]
+        [Authorize(Roles = "Student, Supervisor,Admin")]
+        [SwaggerOperation(Summary = "Receive a LearnHub by its ID")]
         [Route("api/learnhub/{id}")]
         public async Task<IActionResult> ViewLearnHub(Guid id)
         {
@@ -49,6 +52,7 @@ namespace TeachingBACKEND.Controllers
         // Public: View all free Learn Hubs
         [HttpGet]
         [Route("api/learnhub/free")]
+        [SwaggerOperation(Summary = "Receive all LearnHubs as a Free User")]
         public async Task<IActionResult> ViewFreeLearnHubs()
         {
             var freeLearnHubs = await _learnHubService.GetAllFreeLearnHubAsync();

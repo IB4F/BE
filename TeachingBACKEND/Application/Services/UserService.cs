@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
@@ -16,19 +17,30 @@ namespace TeachingBACKEND.Application.Services
         private readonly IPasswordService _passwordService;
         private readonly ILogger<UserService> _logger;
 
-        public UserService(ApplicationDbContext context, IConfiguration configuration, INotificationService notificationService, IPasswordService passwordService, ILogger<UserService> logger)
+        public UserService(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            INotificationService notificationService,
+            IPasswordService passwordService,
+            ILogger<UserService> logger)
         {
             _context = context;
             _notificationService = notificationService;
             _passwordService = passwordService;
             _logger = logger;
-            _jwtSecret =  Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+
+            // Stronger secret loading
+            _jwtSecret = configuration["Jwt:Secret"]
+                        ?? throw new InvalidOperationException("JWT secret is missing!");
         }
 
         public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
         {
 
             _logger.LogInformation("Registering new student: {Email}", model.Email);
+
+            if (!Regex.IsMatch(model.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$"))
+                throw new InvalidOperationException("Password does not meet complexity requirements.");
 
             var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
             if (existingStudent != null)
