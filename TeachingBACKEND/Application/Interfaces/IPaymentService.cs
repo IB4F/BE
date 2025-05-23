@@ -4,7 +4,7 @@ namespace TeachingBACKEND.Application.Interfaces
 {
     public interface IPaymentService
     {
-        Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto);
+        Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto, Guid userId);
         Task HandleStripeWebhookAsync(HttpRequest request);
     }
 }

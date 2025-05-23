@@ -29,9 +29,6 @@ namespace TeachingBACKEND.Application.Services
             _passwordService = passwordService;
             _logger = logger;
 
-            // Stronger secret loading
-            _jwtSecret = configuration["Jwt:Secret"]
-                        ?? throw new InvalidOperationException("JWT secret is missing!");
         }
 
         public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
@@ -114,7 +111,6 @@ namespace TeachingBACKEND.Application.Services
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.FirstName,
-                //LastName
                 PhoneNumber = model.PhoneNumber,
                 Profession = model.Profession,
                 City = model.City,

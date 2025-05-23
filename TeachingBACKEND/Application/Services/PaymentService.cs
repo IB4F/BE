@@ -4,7 +4,7 @@ using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
-using Microsoft.Extensions.Logging; // <-- for ILogger
+using Microsoft.Extensions.Logging;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -22,7 +22,7 @@ namespace TeachingBACKEND.Application.Services
             _logger = logger;
         }
 
-        public async Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto)
+        public async Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto, Guid userId)
         {
             _logger.LogInformation("Creating checkout session for email: {Email}, type: {Type}", dto.Email, dto.RegistrationType);
 
@@ -42,8 +42,8 @@ namespace TeachingBACKEND.Application.Services
             {
                 PaymentMethodTypes = new List<string> { "card" },
                 Mode = "payment",
-                SuccessUrl = _configuration["Stripe:SuccessUrl"],
-                CancelUrl = _configuration["Stripe:CancelUrl"],
+                SuccessUrl = _configuration["STRIPE_SUCCESS_URL"],
+                CancelUrl = _configuration["STRIPE_CANCEL_URL"],
                 CustomerEmail = dto.Email,
                 LineItems = new List<SessionLineItemOptions>
                 {
@@ -68,6 +68,7 @@ namespace TeachingBACKEND.Application.Services
 
             var payment = new Payment
             {
+                UserId = userId,
                 Email = dto.Email,
                 RegistrationType = dto.RegistrationType,
                 StripeSessionId = session.Id,

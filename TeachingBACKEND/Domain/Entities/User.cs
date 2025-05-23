@@ -20,7 +20,7 @@ namespace TeachingBACKEND.Domain.Entities
 
         // Common Fields
         public string FirstName { get; set; }
-        public string LastName { get; set; } 
+        public string? LastName { get; set; } 
 
         // Student-Specific Fields 
         public DateTime? DateOfBirth { get; set; }

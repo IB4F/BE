@@ -8,7 +8,7 @@
         public string Email { get; set; }
         public string RegistrationType { get; set; }
         public string StripeSessionId { get; set; }
-        public string StripePaymentIntentId { get; set; }
+        public string? StripePaymentIntentId { get; set; }
         public long Amount { get; set; }
         public string Currency { get; set; } = "eur";
         public string Status { get; set; } = "pending";
