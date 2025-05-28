@@ -26,6 +26,7 @@ namespace TeachingBACKEND.Controllers
         /// <summary>
         /// Register a student
         /// </summary>
+        [AllowAnonymous]
         [HttpPost("register-student")]
         public async Task<IActionResult> RegisterStudent([FromBody] StudentRegistrationDTO model)
         {
@@ -47,6 +48,7 @@ namespace TeachingBACKEND.Controllers
         /// <summary>
         /// Register a school
         /// </summary>
+        [AllowAnonymous]
         [HttpPost("register-school")]
         public async Task<IActionResult> RegisterSchool([FromBody] SchoolRegistrationDTO model)
         {
@@ -64,6 +66,8 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
+
+        [AllowAnonymous]
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromQuery] Guid token)
         {
@@ -75,6 +79,8 @@ namespace TeachingBACKEND.Controllers
             return BadRequest(new { message = result });
         }
 
+
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO model)
         {
@@ -93,6 +99,7 @@ namespace TeachingBACKEND.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
+
 
         [HttpGet("{id}")]
         [SwaggerOperation(Summary = "Get user by ID")]

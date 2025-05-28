@@ -1,70 +1,199 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 
-namespace TeachingBACKEND.Application.Services
+public class LearnHubService : ILearnHubService
 {
-    public interface ILearnHubService
+    private readonly ApplicationDbContext _context;
+
+    public LearnHubService(ApplicationDbContext context)
     {
-        Task<LearnHub> GetLearnHubByIdAsync(Guid id);
-        Task<List<LearnHub>> GetAllFreeLearnHubAsync();
-        Task<LearnHub> CreateLearnHubAsync(CreateLearnHubDTO learnHubDto);
+        _context = context;
     }
 
+    // ----------------------------
+    // LearnHub CRUD
+    // ----------------------------
 
-    public class LearnHubService : ILearnHubService
+    public async Task<Guid> PostLearnHub(LearnHubCreateDTO dto)
     {
-        private readonly ApplicationDbContext _context;
-        public LearnHubService(ApplicationDbContext context)
+        if (dto == null)
         {
-            _context = context;
+            throw new Exception("DTO is null");
         }
 
-        public async Task<LearnHub> GetLearnHubByIdAsync(Guid id)
+        var postLearnHub = new LearnHub
         {
-            return await _context.LearnHubs
-                .Include(lh => lh.Links)
-                .ThenInclude(link => link.Quizzes)
-                .FirstOrDefaultAsync(lh => lh.Id == id);
-        }
+            Title = dto.Title,
+            Description = dto.Description,
+            Subject = dto.Subject,
+            ClassType = dto.ClassType,
+            IsFree = dto.IsFree,
+        };
+
+        _context.LearnHubs.Add(postLearnHub);
+        await _context.SaveChangesAsync();
+        return postLearnHub.Id;
+    }
+    public async Task<List<LearnHub>> GetLearnHubs()
+    {
+        return await _context.LearnHubs.ToListAsync();
+    }
+    public async Task<LearnHub> GetSingleLearnHub(Guid id)
+    {
+        var learnHub = await _context.LearnHubs.FindAsync(id);
+        return learnHub;
+    }
+    public async Task<LearnHub> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
+    {
+        var learnHub = await _context.LearnHubs.FindAsync(id);
+        if (learnHub == null)
+            throw new Exception("LearnHub not found");
+
+        learnHub.Title = dto.Title;
+        learnHub.Description = dto.Description;
+        learnHub.Subject = dto.Subject;
+        learnHub.ClassType = dto.ClassType;
+        learnHub.IsFree = dto.IsFree;
+
+        await _context.SaveChangesAsync();
+        return learnHub;
+    }
+    public async Task DeleteLearnHub(Guid id)
+    {
+        var learnHub = await _context.LearnHubs.FindAsync(id);
+        if (learnHub == null)
+            throw new Exception("LearnHub not found");
+
+        _context.LearnHubs.Remove(learnHub);
+        await _context.SaveChangesAsync();
+    }
+
+    // ----------------------------
+    // Link CRUD
+    // ----------------------------
+
+    public async Task<Guid> PostLink(Guid learnHubId, CreateLinkDTO dto)
+    {
+        var learnHub = await _context.LearnHubs.FindAsync(learnHubId);
+        if (learnHub == null)
+            throw new Exception("LearnHub not found");
 
 
-        public async Task<List<LearnHub>> GetAllFreeLearnHubAsync()
+        var newLink = new Link
         {
-            return await _context.LearnHubs.Where(lh => lh.IsFree).ToListAsync();
-        }
+            LearnHubId = learnHubId,
+            Title = dto.Title,
+            Progress = dto.Progress,
+        };
 
-        public async Task<LearnHub> CreateLearnHubAsync(CreateLearnHubDTO learnHubDto)
+        _context.Links.Add(newLink);
+        await _context.SaveChangesAsync();
+        return newLink.Id;
+    }
+    public async Task<List<Link>> GetAllLinksAsync()
+    {
+        return await _context.Links.ToListAsync();
+    }
+    public async Task<Link> GetLinkByIdAsync(Guid id)
+    {
+        return await _context.Links.FindAsync(id);
+    }
+    public async Task<Link> UpdateLink(Guid id, CreateLinkDTO dto)
+    {
+        var link = await _context.Links.FindAsync(id);
+        if (link == null)
+            throw new Exception("Link not found");
+
+        link.Title = dto.Title;
+        link.Progress = dto.Progress;
+
+        await _context.SaveChangesAsync();
+        return link;
+    }
+    public async Task DeleteLink(Guid id)
+    {
+        var link = await _context.Links.FindAsync(id);
+        if (link == null)
+            throw new Exception("Link not found");
+
+        _context.Links.Remove(link);
+        await _context.SaveChangesAsync();
+    }
+
+    // ----------------------------
+    // Quizz CRUD
+    // ----------------------------
+
+    public async Task<Guid> PostQuizz(Guid linkId,CreateQuizzDTO dto)
+    {
+
+        var link = await _context.Links.FindAsync(linkId);
+        if (link == null)
+            throw new Exception("Link not found");
+
+        var newQuizz = new Quizz
         {
-            var learnHub = new LearnHub
+            LinkId = linkId,
+            Question = dto.Question,
+            Explanation = dto.Explanation,
+            Points = dto.Points,
+            Options = dto.Options
+        };
+
+        _context.Quizzes.Add(newQuizz);
+        await _context.SaveChangesAsync();
+        return newQuizz.Id;
+    }
+    public async Task<List<GetQuizzDTO>> GetAllQuizzesDTOAsync()
+    {
+        return await _context.Quizzes
+            .Select(q => new GetQuizzDTO
             {
-                Id = Guid.NewGuid(),
-                Title = learnHubDto.Title,
-                Description = learnHubDto.Description,
-                ClassType = learnHubDto.ClassType,
-                Subject = learnHubDto.Subject,
-                IsFree = learnHubDto.IsFree,
-                Links = learnHubDto.Links.Select(linkDto => new Link
-                {
-                    Id = Guid.NewGuid(),
-                    Title = linkDto.Title,
-                    Progress = linkDto.Progress,
-                    Quizzes = linkDto.Quizzes.Select(quizDto => new Quizz
-                    {
-                        Id = Guid.NewGuid(),
-                        Question = quizDto.Question,
-                        Explanation = quizDto.Explanation,
-                        Points = quizDto.Points,
-                        Options = quizDto.Options
-                    }).ToList()
-                }).ToList()
-            };
+                Question = q.Question,
+                Explanation = q.Explanation,
+                Points = q.Points,
+                Options = q.Options,
+            })
+            .ToListAsync();
+    }
+    public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
+    {
+        return await _context.Quizzes
+            .Where(q => q.Id == id)
+            .Select(q => new GetQuizzDTO
+            {
+                Question = q.Question,
+                Explanation = q.Explanation,
+                Points = q.Points,
+                Options = q.Options,
+            })
+            .FirstOrDefaultAsync();
+    }
+    public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
+    {
+        var quizz = await _context.Quizzes.FindAsync(id);
+        if (quizz == null)
+            throw new Exception("Quizz not found");
 
-            _context.LearnHubs.Add(learnHub);
-            await _context.SaveChangesAsync();
+        quizz.Question = dto.Question;
+        quizz.Explanation = dto.Explanation;
+        quizz.Points = dto.Points;
+        quizz.Options = dto.Options;
 
-            return learnHub;
-        }
+
+        await _context.SaveChangesAsync();
+        return quizz;
+    }
+    public async Task DeleteQuizz(Guid id)
+    {
+        var quizz = await _context.Quizzes.FindAsync(id);
+        if (quizz == null)
+            throw new Exception("Quizz not found");
+
+        _context.Quizzes.Remove(quizz);
+        await _context.SaveChangesAsync();
     }
 }

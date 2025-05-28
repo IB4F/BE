@@ -16,18 +16,21 @@ namespace TeachingBACKEND.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IPasswordService _passwordService;
         private readonly ILogger<UserService> _logger;
+        private readonly IPaymentService _paymentService;
 
         public UserService(
             ApplicationDbContext context,
             IConfiguration configuration,
             INotificationService notificationService,
             IPasswordService passwordService,
+            IPaymentService paymentService,
             ILogger<UserService> logger)
         {
             _context = context;
             _notificationService = notificationService;
             _passwordService = passwordService;
             _logger = logger;
+            _paymentService = paymentService;
 
         }
 
@@ -65,22 +68,29 @@ namespace TeachingBACKEND.Application.Services
             };
 
             _context.Users.Add(student);
+            string sessionId;
             try
             {
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Student registered successfully: {Email}", model.Email);
+
+                //Create a payment session
+                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "student"
+                }, student.Id);
             }
             catch (Exception ex)
             {
                 _logger.LogInformation(ex,"Failed to register student: {Email}", model.Email);
-                // Log the exception or handle it accordingly
                 Console.WriteLine(ex.InnerException?.Message);
                 throw;
             }
 
 
             //Send verification email
-            //await _notificationService.SendEmailVerification(model.Email, verificationToken);
+            await _notificationService.SendEmailVerification(model.Email, verificationToken);
 
 
             return new UserResponseDTO
@@ -91,7 +101,8 @@ namespace TeachingBACKEND.Application.Services
                 LastName = student.LastName,
                 Role = student.Role,
                 ApprovalStatus = student.ApprovalStatus,
-                School = student.School
+                School = student.School,
+                SessionId = sessionId
             };
         }
         public async Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model)
@@ -107,15 +118,15 @@ namespace TeachingBACKEND.Application.Services
             var school = new User
             {
                 Email = model.Email,
-                PasswordHash = _passwordService.HashPassword(model.Password),
+                //PasswordHash = _passwordService.HashPassword(model.Password),
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
-                FirstName = model.FirstName,
+                FirstName = model.SchoolName,
                 PhoneNumber = model.PhoneNumber,
                 Profession = model.Profession,
                 City = model.City,
                 PostalCode = model.PostalCode,
-                School = model.School,
+                //School = model.School,
                 IsEmailVerified = false,
                 EmailVerificationToken = verificationToken,
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)

@@ -1,62 +1,56 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.AspNetCore.Annotations;
-using TeachingBACKEND.Application.Services;
+﻿using Microsoft.AspNetCore.Mvc;
 using TeachingBACKEND.Domain.DTOs;
-using TeachingBACKEND.Domain.Entities;
 
-
-namespace TeachingBACKEND.Controllers
+namespace TeachingBACKEND.Api.Controllers
 {
-    [Authorize]
-    public class LearnHubController : ControllerBase
+    [ApiController]
+    [Route("api/[controller]")]
+    public class LearnHubsController : ControllerBase
     {
         private readonly ILearnHubService _learnHubService;
 
-        public LearnHubController(ILearnHubService learnHubService)
+        public LearnHubsController(ILearnHubService learnHubService)
         {
             _learnHubService = learnHubService;
         }
 
-
-        //Admin: Create a new Learn Hub
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        [SwaggerOperation(Summary = "Create a new LearnHub")]
-        [Route("api/admin/learnhub")]
-        public async Task<IActionResult> Create([FromBody] CreateLearnHubDTO model)
+        [HttpPost("Post-Learnhub")]
+        public async Task<IActionResult> PostLearnHub(LearnHubCreateDTO learnHub)
         {
-            if (ModelState.IsValid)
-            {
-                await _learnHubService.CreateLearnHubAsync(model);
-                return Ok(new { message = "LearnHub created successfully" });
-            }
-
-            return BadRequest();
+            var newLearnHub = await _learnHubService.PostLearnHub(learnHub);
+            return Ok(newLearnHub);
         }
 
-
-        // Student/Supervisor: View Learn Hub details
-        [HttpGet]
-        [Authorize(Roles = "Student, Supervisor,Admin")]
-        [SwaggerOperation(Summary = "Receive a LearnHub by its ID")]
-        [Route("api/learnhub/{id}")]
-        public async Task<IActionResult> ViewLearnHub(Guid id)
+        [HttpGet("Get-List-Learnhubs")]
+        public async Task<IActionResult> GetAllLearnHubs()
         {
-            var learnHub = await _learnHubService.GetLearnHubByIdAsync(id);
-            if (learnHub == null) return NotFound(new { message = "LearnHub not found" });
-            return Ok(learnHub);
+            var learnHubs = await _learnHubService.GetLearnHubs();
+            return Ok(learnHubs);
         }
 
-
-        // Public: View all free Learn Hubs
-        [HttpGet]
-        [Route("api/learnhub/free")]
-        [SwaggerOperation(Summary = "Receive all LearnHubs as a Free User")]
-        public async Task<IActionResult> ViewFreeLearnHubs()
+        [HttpGet("Get-Single-Learnhub")]
+        public async Task<IActionResult> GetLearnHub(Guid id)
         {
-            var freeLearnHubs = await _learnHubService.GetAllFreeLearnHubAsync();
-            return Ok(freeLearnHubs);
+            var learnHubs = await _learnHubService.GetSingleLearnHub(id);
+            return Ok(learnHubs);
         }
+
+        [HttpPut("Update-Learnhub")]
+        public async Task<IActionResult> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
+        {
+            var learnHubs = await _learnHubService.UpdateLearnHub(id, dto);
+            return Ok(learnHubs);
+        }
+
+        [HttpDelete("Delete-Learnhub")]
+        public async Task<IActionResult> DeleteLearnHub(Guid id)
+        {
+            await _learnHubService.DeleteLearnHub(id);
+            return Ok("LearnHub deleted");
+        }
+
+       
+       
+
     }
 }

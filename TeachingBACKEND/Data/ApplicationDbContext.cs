@@ -23,6 +23,17 @@ namespace TeachingBACKEND.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<LearnHub>()
+           .Property(e => e.Id)
+           .HasDefaultValueSql("NEWSEQUENTIALID()");
+            modelBuilder.Entity<Link>()
+                .Property(e => e.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+            modelBuilder.Entity<Quizz>()
+                .Property(e => e.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+
             modelBuilder.Entity<User>(entity =>
             {
                 // Primary key

@@ -1,4 +1,5 @@
-﻿using TeachingBACKEND.Domain.Enums;
+﻿using System.Text.Json.Serialization;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Domain.DTOs
 {
@@ -11,5 +12,8 @@ namespace TeachingBACKEND.Domain.DTOs
         public UserRole Role { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public string School { get; set; }
+        public string SessionId { get; set; } 
     }
+
+
 }

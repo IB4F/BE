@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.Entities;
 
@@ -15,6 +16,7 @@ namespace TeachingBACKEND.Controllers
             _detailService = detailService;
         }
 
+        [AllowAnonymous]
         [HttpGet("get-cities")]
         public async Task<ActionResult<IEnumerable<City>>> GetCities()
         {
@@ -26,7 +28,7 @@ namespace TeachingBACKEND.Controllers
             return Ok(cityList);
         }
 
-
+        [AllowAnonymous]
         [HttpGet("get-class")]
         public async Task<ActionResult<IEnumerable<Class>>> GetClasses()
         {

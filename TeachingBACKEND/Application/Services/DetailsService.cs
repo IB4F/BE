@@ -15,6 +15,7 @@ namespace TeachingBACKEND.Application.Services
             _context = context;
         }
 
+
         public async Task<IEnumerable<City>> GetCities()
         {
             var cities = await _context.Cities.ToListAsync();
