@@ -37,7 +37,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
         {
 
-            _logger.LogInformation("Registering new student: {Email}", model.Email);
+            //_logger.LogInformation("Registering new student: {Email}", model.Email);
 
             if (!Regex.IsMatch(model.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$"))
                 throw new InvalidOperationException("Password does not meet complexity requirements.");
@@ -45,7 +45,7 @@ namespace TeachingBACKEND.Application.Services
             var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
             if (existingStudent != null)
             {
-                _logger.LogWarning("Email already exists: {Email}", model.Email);
+              //  _logger.LogWarning("Email already exists: {Email}", model.Email);
                 throw new Exception("Email already exists");
             }
 
@@ -72,7 +72,7 @@ namespace TeachingBACKEND.Application.Services
             try
             {
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Student registered successfully: {Email}", model.Email);
+               // _logger.LogInformation("Student registered successfully: {Email}", model.Email);
 
                 //Create a payment session
                 sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
@@ -83,7 +83,7 @@ namespace TeachingBACKEND.Application.Services
             }
             catch (Exception ex)
             {
-                _logger.LogInformation(ex,"Failed to register student: {Email}", model.Email);
+               // _logger.LogInformation(ex,"Failed to register student: {Email}", model.Email);
                 Console.WriteLine(ex.InnerException?.Message);
                 throw;
             }
