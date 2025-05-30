@@ -34,7 +34,7 @@ namespace TeachingBACKEND.Controllers
             try
             {
                 var response = await _userService.RegisterStudent(model);
-                return Created("", new { message = "Student registered successfully", userId = response.Id });
+                return Created("", new { message = "Student registered successfully", userId = response.Id, sessionId = response.SessionId });
             }
             catch (Exception ex)
             {
