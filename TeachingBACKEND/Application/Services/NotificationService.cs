@@ -16,7 +16,7 @@ public class NotificationService : INotificationService
     public async Task SendEmailVerification(string email, Guid token)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
-        string verificationUrl = $"https://yourdomain.com/api/user/verify-email?token={token}";
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token}";
         string subject = "Email Verification";
         string body = $"Click the link to verify your email: {verificationUrl}";
 
@@ -26,7 +26,7 @@ public class NotificationService : INotificationService
     public async Task SendPasswordResetEmail(string email, Guid resetToken)
     {
         _logger.LogInformation("Starting password-reset workflow for {Email}", email);
-        string resetLink = $"https://frontend.com/reset-password?token={resetToken}";
+        string resetLink = $"http://localhost:4200/reset-password?token={resetToken}";
         string subject = "Password Reset Request";
         string body = $"Click the link to reset your password: {resetLink}";
 

@@ -152,9 +152,9 @@ namespace TeachingBACKEND.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await _passwordService.RequestPasswordReset(model.Email);
-            if (string.IsNullOrEmpty(result)) return NotFound("User with the specified email does not exist.");
+            if (string.IsNullOrEmpty(result)) return NotFound(new { message = "User with the specified email does not exist." });
 
-            return Ok("Password reset link has been sent to your email.");
+            return Ok(new { message = "Password reset link has been sent to your email." });
         }
 
 
@@ -166,9 +166,9 @@ namespace TeachingBACKEND.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await _passwordService.ResetPassword(model.Token, model.NewPassword);
-            if (string.IsNullOrEmpty(result)) return BadRequest("Invalid token or the token has expired");
+            if (string.IsNullOrEmpty(result)) return BadRequest(new { message = "Invalid token or the token has expired" });
 
-            return Ok("Password has been successfully reset");
+            return Ok(new { message = "Password has been successfully reset" });
         }
 
 
