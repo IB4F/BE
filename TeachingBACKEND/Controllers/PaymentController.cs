@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
+using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 
 namespace TeachingBACKEND.Controllers
@@ -11,10 +13,12 @@ namespace TeachingBACKEND.Controllers
     public class PaymentController : ControllerBase
     {
         private readonly IPaymentService _paymentService;
+        private readonly ApplicationDbContext _context;
 
-        public PaymentController(IPaymentService paymentService)
+        public PaymentController(IPaymentService paymentService, ApplicationDbContext context)
         {
             _paymentService = paymentService;
+            _context = context;
         }
 
         [Authorize]
@@ -52,7 +56,23 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
+        ///<summary>
+        ///Get payment Plans
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetAllPlans()
+        {
+            var plans = await _context.RegistrationPlans
+                .Select(p => new
+                {
+                    p.Id,
+                    Name = p.RegistrationPlanName,
+                    p.Type,
+                    p.Price
+                }).ToListAsync();
 
+            return Ok(plans);
+        }
 
     }
 }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250602115712_AddPaymentPlan")]
+    partial class AddPaymentPlan
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -472,7 +475,7 @@ namespace TeachingBACKEND.Migrations
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$.01WE9qeyDsbWDuihLWOVe7/j7Q3vvWcmcPInn/dF/eB3qcKFU0iS",
+                            PasswordHash = "$2a$12$frMhyUwoxnGT6AwRr/eyyuYXUgntjX796XUqkfks/iP68nHK1gfKW",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

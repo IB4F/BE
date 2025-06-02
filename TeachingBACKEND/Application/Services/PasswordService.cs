@@ -9,6 +9,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
+using static TeachingBACKEND.Application.Services.PasswordValidationService;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -17,33 +18,30 @@ namespace TeachingBACKEND.Application.Services
         private readonly ApplicationDbContext _context;
         private readonly string _jwtSecret;
         private readonly INotificationService _notificationService;
+        private readonly IPasswordValidationService _passwordValidation;
 
-        public PasswordService(ApplicationDbContext context, IConfiguration configuration, INotificationService notificationService)
+        public PasswordService(ApplicationDbContext context, IConfiguration configuration, INotificationService notificationService, IPasswordValidationService passwordValidation)
         {
             _context = context;
             _notificationService = notificationService;
             _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+            _passwordValidation = passwordValidation;
         }
 
-        public async Task<string> RequestPasswordReset(string email)
+        public async Task RequestPasswordReset(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
+            if (user != null)
             {
-                return "No account found with this email.";
+                var resetToken = Guid.NewGuid();
+                user.PasswordResetToken = resetToken;
+                user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+
+                await _context.SaveChangesAsync();
+
+                //Send Email
+                await _notificationService.SendPasswordResetEmail(email, resetToken);
             }
-
-
-            var resetToken = Guid.NewGuid();
-            user.PasswordResetToken = resetToken;
-            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
-
-            await _context.SaveChangesAsync();
-
-            //Send Email
-            await _notificationService.SendPasswordResetEmail(email, resetToken);
-
-            return "Password reset email sent successfully.";
         }
         public async Task<string> ResetPassword(Guid token, string newPassword)
         {
@@ -52,6 +50,15 @@ namespace TeachingBACKEND.Application.Services
             {
                 return "Invalid or expired token";
             }
+
+            //Check if new password matches the old one
+            if(VerifyPassword(newPassword, user.PasswordHash))
+            {
+                return "New password must be different from the old one.";
+            }
+
+            if (!_passwordValidation.IsValid(newPassword, out var error))
+                return error;
 
             user.PasswordHash = HashPassword(newPassword);
             user.PasswordResetToken = null;
@@ -63,23 +70,31 @@ namespace TeachingBACKEND.Application.Services
         public async Task<string> GeneratePasswordForApprovedSchool(Guid schoolId, string password)
         {
             var school = await _context.Users.FirstOrDefaultAsync(u =>
-               u.Id == schoolId &&
-               u.Role == UserRole.School &&
-               u.ApprovalStatus == ApprovalStatus.Approved &&
-               u.IsEmailVerified);
+                u.Id == schoolId &&
+                u.Role == UserRole.School &&
+                u.ApprovalStatus == ApprovalStatus.Approved &&
+                u.IsEmailVerified);
 
             if (school == null)
                 return "School is not eligible to set a password.";
 
             if (!string.IsNullOrEmpty(school.PasswordHash))
-                return "Password has already been set.";
+            {
+                if (VerifyPassword(password, school.PasswordHash))
+                    return "New password must be different from the previous one.";
 
+                return "Password has already been set.";
+            }
+
+            if (!_passwordValidation.IsValid(password, out var error))
+                return error;
 
             school.PasswordHash = HashPassword(password);
             await _context.SaveChangesAsync();
 
             return "Password set successfully";
         }
+
         public async Task<string> VerifyEmail(Guid? token)
         {
             if (!token.HasValue)

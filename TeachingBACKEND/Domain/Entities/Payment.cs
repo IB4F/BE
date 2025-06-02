@@ -13,5 +13,8 @@
         public string Currency { get; set; } = "eur";
         public string Status { get; set; } = "pending";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public Guid? PlanId { get; set; }
+        public RegistrationPlan Plan { get; set; }
     }
 }

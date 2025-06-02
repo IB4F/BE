@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Education.Classes;
+using System.Text.RegularExpressions;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.Entities;
@@ -25,9 +26,16 @@ namespace TeachingBACKEND.Application.Services
 
         public async Task<IEnumerable<Class>> GetClasses()
         {
-            var classes = await _context.Classes.ToListAsync();
-            return classes.Any() == true ? classes : new List<Class>();
+            var classes = await _context.Classes
+                .OrderBy(c => c.Name.Length)   
+                .ThenBy(c => c.Name)   
+                .ToListAsync();
+
+            return classes.Any()
+                 ? classes
+                 : new List<Class>();
         }
+
     }
 }
 

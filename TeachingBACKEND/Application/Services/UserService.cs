@@ -78,7 +78,8 @@ namespace TeachingBACKEND.Application.Services
                 sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
                 {
                     Email = model.Email,
-                    RegistrationType = "student"
+                    RegistrationType = "student",
+                    PlanId = model.PlanId,
                 }, student.Id);
             }
             catch (Exception ex)

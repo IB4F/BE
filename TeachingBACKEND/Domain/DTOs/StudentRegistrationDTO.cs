@@ -34,5 +34,8 @@ namespace TeachingBACKEND.Domain.DTOs
         [Required, MinLength(6)]
         [JsonPropertyName("Password")]
         public string Password { get; set; }
+
+
+        public Guid PlanId { get; set; }
     }
 }

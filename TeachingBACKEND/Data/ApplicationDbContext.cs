@@ -18,6 +18,8 @@ namespace TeachingBACKEND.Data
         public DbSet<LearnHub> LearnHubs { get; set; }
         public DbSet<Link> Links { get; set; }
         public DbSet<Quizz> Quizzes {  get; set; }
+        public DbSet<RegistrationPlan> RegistrationPlans { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -67,6 +69,12 @@ namespace TeachingBACKEND.Data
                 .HasForeignKey(quizz => quizz.LinkId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Payment>()
+                .HasOne(p => p.Plan)
+                .WithMany(p => p.Payments)
+                .HasForeignKey(p => p.PlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
 
             modelBuilder.Entity<City>().HasData(
             new City { Id = Guid.Parse("a2d4a4ee-5fa2-4a33-bd3c-2bbf98e9310b"), Name = "Tirana" },
@@ -97,6 +105,15 @@ namespace TeachingBACKEND.Data
             new Class { Id = Guid.Parse("1c0b8bb7-9eb9-4a4d-8c4d-67de8057ae49"), Name = "Klasa 10" },
             new Class { Id = Guid.Parse("3402fc90-d7be-420e-a980-2ff430d84838"), Name = "Klasa 11" },
             new Class { Id = Guid.Parse("013d0df5-50ef-4269-8a12-9b4f91ef07e1"), Name = "Klasa 12" }
+            );
+
+            modelBuilder.Entity<RegistrationPlan>().HasData(
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-1111-1111-111111111111"), RegistrationPlanName = "Bazë", Type = "monthly", Price = 2000, StripeProductName = "Student - Monthly Bazë" },
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-2222-2222-222222222222"), RegistrationPlanName = "Standarde", Type = "monthly", Price = 4000, StripeProductName = "Student - Monthly Standarde" },
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-3333-3333-333333333333"), RegistrationPlanName = "Premium", Type = "monthly", Price = 6000, StripeProductName = "Student - Monthly Premium" },
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-4444-4444-444444444444"), RegistrationPlanName = "Bazë", Type = "yearly", Price = 20000, StripeProductName = "Student - Yearly Bazë" },
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-5555-5555-555555555555"), RegistrationPlanName = "Standarde", Type = "yearly", Price = 40000, StripeProductName = "Student - Yearly Standarde" },
+            new RegistrationPlan { Id = Guid.Parse("a1a1a1a1-a1a1-6666-6666-666666666666"), RegistrationPlanName = "Premium", Type = "yearly", Price = 60000, StripeProductName = "Student - Yearly Premium" }
             );
 
 
