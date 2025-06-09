@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using TeachingBACKEND.Application.Interfaces;
@@ -119,7 +120,7 @@ namespace TeachingBACKEND.Application.Services
             var school = new User
             {
                 Email = model.Email,
-                //PasswordHash = _passwordService.HashPassword(model.Password),
+                PasswordHash = "school-registration-placeholder",
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.SchoolName,
@@ -151,7 +152,6 @@ namespace TeachingBACKEND.Application.Services
 
             return new UserResponseDTO
             {
-                Id = school.Id,
                 Email = school.Email,
                 FirstName = school.FirstName,
                 Role = school.Role,

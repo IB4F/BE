@@ -4,6 +4,7 @@ using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Enums;
+using System.Linq;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -16,20 +17,43 @@ namespace TeachingBACKEND.Application.Services
             _context = context;
         }
 
-        public async Task<List<UserListDTO>> GetAllUsersAsync()
+        public async Task<PaginatedResultDTO<UserListDTO>> GetAllUsers(PaginationRequestDTO dto)
         {
-            return await _context.Users
-                .Select(u => new UserListDTO
-                {
-                    Id = u.Id,
-                    Email = u.Email,
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Role = u.Role.ToString(),
-                    School = u.School,
-                    City = u.City
-                })
-                .ToListAsync();
+            var query = _context.Users.AsQueryable();
+
+            //Filtering
+            if (!string.IsNullOrWhiteSpace(dto.Search))
+            {
+                var search = dto.Search.ToLower();
+                query = query.Where(u =>
+                    u.FirstName.ToLower().Contains(search) ||
+                    u.LastName.ToLower().Contains(search) ||
+                    u.Email.ToLower().Contains(search));
+            }
+
+            query = query.OrderByDescending(u => u.CreateAt);
+            var totalCount = await query.CountAsync();
+
+            var users = await query
+            .Skip((dto.PageNumber - 1) * dto.PageSize)
+            .Take(dto.PageSize)
+            .Select(u => new UserListDTO
+            {
+                Id = u.Id,
+                Email = u.Email,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Role = u.Role.ToString(),
+                School = u.School,
+                City = u.City
+            })
+            .ToListAsync();
+
+            return new PaginatedResultDTO<UserListDTO>
+            {
+                Items = users,
+                TotalCount = totalCount
+            };
         }
 
         public async Task<AdminUserDetailsDTO> GetUserDetailsById(Guid id)

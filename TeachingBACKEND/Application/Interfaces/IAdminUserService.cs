@@ -5,7 +5,7 @@ namespace TeachingBACKEND.Application.Interfaces
 {
     public interface IAdminUserService
     {
-        Task<List<UserListDTO>> GetAllUsersAsync();
+        Task<PaginatedResultDTO<UserListDTO>> GetAllUsers(PaginationRequestDTO dto);
         Task<AdminUserDetailsDTO> GetUserDetailsById(Guid id);
         Task UpdateUser(AdminUserDetailsDTO dto);
         Task DeleteUserAsync(Guid id);

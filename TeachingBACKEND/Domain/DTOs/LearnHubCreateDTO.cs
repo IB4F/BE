@@ -8,5 +8,6 @@
         public string Subject { get; set; }
         public bool IsFree { get; set; }
 
+        public List<CreateLinkDTO> Links { get; set; }
     }
 }

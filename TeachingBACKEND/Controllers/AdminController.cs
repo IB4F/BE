@@ -18,12 +18,18 @@ namespace TeachingBACKEND.Controllers
             _adminUserService = adminUserService;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
+        [HttpPost("paginated")]
+        public async Task<IActionResult> GetAllPaginated([FromBody] PaginationRequestDTO pagination)
         {
-            var users = await _adminUserService.GetAllUsersAsync();
-            return Ok(users); 
+            if (pagination.PageNumber <= 0 || pagination.PageSize <= 0)
+            {
+                return BadRequest(new { error = "PageNumber and PageSize must be greater than zero." });
+            }
+
+            var result = await _adminUserService.GetAllUsers(pagination);
+            return Ok(result);
         }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)

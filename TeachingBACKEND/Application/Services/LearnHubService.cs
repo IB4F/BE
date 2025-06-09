@@ -31,6 +31,11 @@ public class LearnHubService : ILearnHubService
             Subject = dto.Subject,
             ClassType = dto.ClassType,
             IsFree = dto.IsFree,
+            Links = dto.Links?.Select(l => new Link
+            {
+                Title = l.Title,
+                Progress = l.Progress
+            }).ToList() ?? new List<Link>() { }
         };
 
         _context.LearnHubs.Add(postLearnHub);
