@@ -120,7 +120,6 @@ namespace TeachingBACKEND.Application.Services
             var school = new User
             {
                 Email = model.Email,
-                PasswordHash = "school-registration-placeholder",
                 Role = UserRole.School,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.SchoolName,

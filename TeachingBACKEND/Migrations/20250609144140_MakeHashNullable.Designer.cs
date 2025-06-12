@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250609144140_MakeHashNullable")]
+    partial class MakeHashNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -448,10 +451,10 @@ namespace TeachingBACKEND.Migrations
                     b.Property<string>("Profession")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("RefreshToken")
+                    b.Property<Guid>("RefreshToken")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("RefreshTokenExpiry")
+                    b.Property<DateTime>("RefreshTokenExpiry")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Role")
@@ -470,13 +473,13 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2025, 6, 10, 9, 1, 36, 713, DateTimeKind.Utc).AddTicks(2484),
+                            CreateAt = new DateTime(2025, 6, 9, 14, 41, 40, 715, DateTimeKind.Utc).AddTicks(6430),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@teachapp.com",
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$yZW2/y1FDMQAaPWHIcZaZuq42P6i3epKBnFJVPijXc2xSDSgHwuMq",
+                            PasswordHash = "$2a$12$lzEft92rDHsGKFBi7ugJ6u.A7bjdOK5xOej02LwSuuwUH8O09ev8u",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

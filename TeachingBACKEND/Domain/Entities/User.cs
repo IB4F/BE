@@ -8,7 +8,7 @@ namespace TeachingBACKEND.Domain.Entities
 
         // Authentication
         public string Email { get; set; }
-        public string PasswordHash { get; set; }
+        public string? PasswordHash { get; set; }
 
         // Role & Approval Status
         public UserRole Role { get; set; }
@@ -40,8 +40,8 @@ namespace TeachingBACKEND.Domain.Entities
 
 
         //Refresh Token
-        public Guid RefreshToken { get; set; }
-        public DateTime RefreshTokenExpiry { get; set; }
+        public Guid? RefreshToken { get; set; } 
+        public DateTime? RefreshTokenExpiry { get; set; }
 
 
         public ICollection<Payment> Payments { get; set; } = new List<Payment>(); // Navigation

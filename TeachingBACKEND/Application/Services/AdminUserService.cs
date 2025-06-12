@@ -35,7 +35,7 @@ namespace TeachingBACKEND.Application.Services
             var totalCount = await query.CountAsync();
 
             var users = await query
-            .Skip((dto.PageNumber - 1) * dto.PageSize)
+            .Skip((dto.PageNumber) * dto.PageSize)
             .Take(dto.PageSize)
             .Select(u => new UserListDTO
             {
