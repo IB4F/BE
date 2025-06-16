@@ -8,6 +8,7 @@ public interface ILearnHubService
     Task<LearnHub> GetSingleLearnHub(Guid id);
     Task<LearnHub> UpdateLearnHub(Guid id, LearnHubCreateDTO dto);
     Task DeleteLearnHub(Guid id);
+    Task<PaginatedResultDTO<LearnHub>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
 
     // Link
     Task<Guid> PostLink(Guid learnHubId, CreateLinkDTO dto);
@@ -22,4 +23,5 @@ public interface ILearnHubService
     Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id);
     Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto);
     Task DeleteQuizz(Guid id);
+    Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(PaginationRequestDTO dto);
 }

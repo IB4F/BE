@@ -9,5 +9,7 @@
         public string Subject { get; set; }
         public bool IsFree { get; set; }
         public List<Link>Links {get; set;}
+
+        public DateTime CreatedAt { get; set; }
     }
 }

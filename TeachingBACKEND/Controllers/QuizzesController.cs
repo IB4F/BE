@@ -49,5 +49,11 @@ namespace TeachingBACKEND.Api.Controllers
             return Ok("Quiz deleted");
         }
 
+        [HttpPost("Get-Paginated-Quizzes")]
+        public async Task<IActionResult> GetPaginatedQuizzes([FromBody] PaginationRequestDTO dto)
+        {
+            var result = await _learnHubService.GetPaginatedQuizzesAsync(dto);
+            return Ok(result);
+        }
     }
 }

@@ -76,6 +76,43 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<PaginatedResultDTO<LearnHub>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
+    {
+        var query = _context.LearnHubs.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(dto.Search))
+        {
+            var search = dto.Search.ToLower();
+            query = query.Where(lh =>
+                lh.Title.ToLower().Contains(search) ||
+                lh.Subject.ToLower().Contains(search));
+        }
+
+        query = query.OrderByDescending(lh => lh.Title); 
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip(dto.PageNumber * dto.PageSize)
+            .Take(dto.PageSize)
+            .Select(lh => new LearnHub
+            {
+                Id = lh.Id,
+                Title = lh.Title,
+                Subject = lh.Subject,
+                ClassType = lh.ClassType,
+                CreatedAt = DateTime.UtcNow,
+                IsFree = lh.IsFree
+            })
+            .ToListAsync();
+
+        return new PaginatedResultDTO<LearnHub>
+        {
+            Items = items,
+            TotalCount = totalCount
+        };
+    }
+
     // ----------------------------
     // Link CRUD
     // ----------------------------
@@ -201,4 +238,21 @@ public class LearnHubService : ILearnHubService
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
     }
+    public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(PaginationRequestDTO dto)
+    {
+        return await _context.Quizzes
+            .OrderByDescending(q => q.CreatedAt)
+            .Skip((dto.PageNumber - 1) * dto.PageSize)
+            .Take(dto.PageSize)
+            .Select(q => new GetQuizzDTO
+            {
+                Question = q.Question,
+                Explanation = q.Explanation,
+                Points = q.Points,
+                Options = q.Options
+            })
+            .ToListAsync();
+    }
+
+
 }
