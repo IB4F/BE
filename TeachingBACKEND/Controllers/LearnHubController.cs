@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
 
 namespace TeachingBACKEND.Api.Controllers
 {
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/[controller]")]
     public class LearnHubsController : ControllerBase
@@ -57,6 +60,17 @@ namespace TeachingBACKEND.Api.Controllers
 
             var result = await _learnHubService.GetPaginatedLearnHubs(dto);
             return Ok(result);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("Filter-Learnhubs")]
+        public async Task<IActionResult> GetFilteredLearnHubs([FromQuery] string classType, [FromQuery] string subject)
+        {
+            if (string.IsNullOrWhiteSpace(classType) || string.IsNullOrWhiteSpace(subject))
+                return BadRequest(new { error = "ClassType and Subject are required." });
+
+            var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject);
+            return Ok(learnHubs);
         }
 
 

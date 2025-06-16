@@ -9,6 +9,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using DotNetEnv;
 using static TeachingBACKEND.Application.Services.PasswordValidationService;
+using TeachingBACKEND.Infrastructure;
 
 Env.Load();
 
@@ -87,6 +88,9 @@ builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();
 builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService>();
 
+
+
+builder.Services.AddAutoMapper(typeof(LearnHubProfile).Assembly);
 
 Stripe.StripeConfiguration.ApiKey = builder.Configuration["STRIPE_SECRET_KEY"];
 

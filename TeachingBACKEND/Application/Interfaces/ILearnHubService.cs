@@ -4,11 +4,12 @@ using TeachingBACKEND.Domain.Entities;
 public interface ILearnHubService
 {
     Task<Guid> PostLearnHub(LearnHubCreateDTO dto);
-    Task<List<LearnHub>> GetLearnHubs();
-    Task<LearnHub> GetSingleLearnHub(Guid id);
-    Task<LearnHub> UpdateLearnHub(Guid id, LearnHubCreateDTO dto);
+    Task<List<LearnHubDTO>> GetLearnHubs();
+    Task<LearnHubDTO> GetSingleLearnHub(Guid id);
+    Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto);
     Task DeleteLearnHub(Guid id);
-    Task<PaginatedResultDTO<LearnHub>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
+    Task<PaginatedResultDTO<LearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
+    Task<List<LearnHubDTO>> GetFilteredLearnHubs(string classType, string subject);
 
     // Link
     Task<Guid> PostLink(Guid learnHubId, CreateLinkDTO dto);

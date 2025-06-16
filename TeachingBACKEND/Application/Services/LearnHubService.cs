@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
@@ -7,10 +8,12 @@ using TeachingBACKEND.Domain.Entities;
 public class LearnHubService : ILearnHubService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IMapper _mapper;
 
-    public LearnHubService(ApplicationDbContext context)
+    public LearnHubService(ApplicationDbContext context, IMapper mapper)
     {
         _context = context;
+        _mapper = mapper;
     }
 
     // ----------------------------
@@ -42,16 +45,21 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return postLearnHub.Id;
     }
-    public async Task<List<LearnHub>> GetLearnHubs()
+    public async Task<List<LearnHubDTO>> GetLearnHubs()
     {
-        return await _context.LearnHubs.ToListAsync();
+        var learnHubs = await _context.LearnHubs.ToListAsync();
+        return _mapper.Map<List<LearnHubDTO>>(learnHubs);
     }
-    public async Task<LearnHub> GetSingleLearnHub(Guid id)
+
+    public async Task<LearnHubDTO> GetSingleLearnHub(Guid id)
     {
         var learnHub = await _context.LearnHubs.FindAsync(id);
-        return learnHub;
+        if (learnHub == null) return null;
+
+        return _mapper.Map<LearnHubDTO>(learnHub);
     }
-    public async Task<LearnHub> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
+
+    public async Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
     {
         var learnHub = await _context.LearnHubs.FindAsync(id);
         if (learnHub == null)
@@ -64,8 +72,10 @@ public class LearnHubService : ILearnHubService
         learnHub.IsFree = dto.IsFree;
 
         await _context.SaveChangesAsync();
-        return learnHub;
+
+        return _mapper.Map<LearnHubDTO>(learnHub);
     }
+
     public async Task DeleteLearnHub(Guid id)
     {
         var learnHub = await _context.LearnHubs.FindAsync(id);
@@ -75,8 +85,7 @@ public class LearnHubService : ILearnHubService
         _context.LearnHubs.Remove(learnHub);
         await _context.SaveChangesAsync();
     }
-
-    public async Task<PaginatedResultDTO<LearnHub>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
+    public async Task<PaginatedResultDTO<LearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
         var query = _context.LearnHubs.AsQueryable();
 
@@ -88,30 +97,34 @@ public class LearnHubService : ILearnHubService
                 lh.Subject.ToLower().Contains(search));
         }
 
-        query = query.OrderByDescending(lh => lh.Title); 
+        query = query.OrderByDescending(lh => lh.Title);
 
         var totalCount = await query.CountAsync();
 
         var items = await query
             .Skip(dto.PageNumber * dto.PageSize)
             .Take(dto.PageSize)
-            .Select(lh => new LearnHub
-            {
-                Id = lh.Id,
-                Title = lh.Title,
-                Subject = lh.Subject,
-                ClassType = lh.ClassType,
-                CreatedAt = DateTime.UtcNow,
-                IsFree = lh.IsFree
-            })
             .ToListAsync();
 
-        return new PaginatedResultDTO<LearnHub>
+        var dtoItems = _mapper.Map<List<LearnHubDTO>>(items);
+
+        return new PaginatedResultDTO<LearnHubDTO>
         {
-            Items = items,
+            Items = dtoItems,
             TotalCount = totalCount
         };
     }
+
+    public async Task<List<LearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
+    {
+        var learnHubs = await _context.LearnHubs
+            .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
+                         (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
+            .ToListAsync();
+
+        return _mapper.Map<List<LearnHubDTO>>(learnHubs);
+    }
+
 
     // ----------------------------
     // Link CRUD
