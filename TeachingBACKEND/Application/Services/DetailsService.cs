@@ -35,6 +35,18 @@ namespace TeachingBACKEND.Application.Services
                  ? classes
                  : new List<Class>();
         }
+        
+        public async Task<IEnumerable<Subjects>> GetSubjects()
+        {
+            var subjects = await _context.Subjects
+                .OrderBy(c => c.Name.Length)   
+                .ThenBy(c => c.Name)   
+                .ToListAsync();
+
+            return subjects.Any()
+                ? subjects
+                : new List<Subjects>();
+        }
 
     }
 }

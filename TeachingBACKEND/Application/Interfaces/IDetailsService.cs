@@ -6,5 +6,6 @@ namespace TeachingBACKEND.Application.Interfaces
     {
         Task<IEnumerable<City>> GetCities();
         Task<IEnumerable<Class>> GetClasses();
+        Task<IEnumerable<Subjects>> GetSubjects();
     }
 }
