@@ -42,7 +42,7 @@ public class DetailsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("get-subjects")]
-    public async Task<ActionResult<IEnumerable<Class>>> GetSubjects()
+    public async Task<ActionResult<IEnumerable<Subjects>>> GetSubjects()
     {
         var subjectsList = await _detailService.GetSubjects();
 
