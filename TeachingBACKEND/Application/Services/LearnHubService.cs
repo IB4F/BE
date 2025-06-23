@@ -34,6 +34,7 @@ public class LearnHubService : ILearnHubService
             Subject = dto.Subject,
             ClassType = dto.ClassType,
             IsFree = dto.IsFree,
+            //Difficulty = dto.Difficulty,
             Links = dto.Links?.Select(l => new Link
             {
                 Title = l.Title,

@@ -7,7 +7,7 @@
         public string ClassType { get; set; }
         public string Subject { get; set; }
         public bool IsFree { get; set; }
-
+        //public int Difficulty { get; set; }
         public List<CreateLinkDTO> Links { get; set; }
     }
 }
