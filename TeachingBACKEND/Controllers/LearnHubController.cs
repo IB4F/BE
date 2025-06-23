@@ -55,8 +55,8 @@ namespace TeachingBACKEND.Api.Controllers
         [HttpPost("Get-Paginated-Learnhubs")]
         public async Task<IActionResult> GetPaginatedLearnHubs([FromBody] PaginationRequestDTO dto)
         {
-            if (dto.PageNumber <= 0 || dto.PageSize <= 0)
-                return BadRequest(new { error = "PageNumber and PageSize must be greater than zero." });
+            if (dto.PageNumber < 0 || dto.PageSize <= 0)
+                return BadRequest(new { error = "PageSize must be greater than zero." });
 
             var result = await _learnHubService.GetPaginatedLearnHubs(dto);
             return Ok(result);
