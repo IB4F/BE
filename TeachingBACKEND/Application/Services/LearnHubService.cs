@@ -35,6 +35,7 @@ public class LearnHubService : ILearnHubService
             ClassType = dto.ClassType,
             IsFree = dto.IsFree,
             //Difficulty = dto.Difficulty,
+            CreatedAt = DateTime.UtcNow,
             Links = dto.Links?.Select(l => new Link
             {
                 Title = l.Title,
@@ -86,7 +87,7 @@ public class LearnHubService : ILearnHubService
         _context.LearnHubs.Remove(learnHub);
         await _context.SaveChangesAsync();
     }
-    public async Task<PaginatedResultDTO<LearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
+    public async Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
         var query = _context.LearnHubs.AsQueryable();
 
@@ -98,7 +99,7 @@ public class LearnHubService : ILearnHubService
                 lh.Subject.ToLower().Contains(search));
         }
 
-        query = query.OrderByDescending(lh => lh.Title);
+        query = query.OrderByDescending(lh => lh.CreatedAt);
 
         var totalCount = await query.CountAsync();
 
@@ -107,9 +108,9 @@ public class LearnHubService : ILearnHubService
             .Take(dto.PageSize)
             .ToListAsync();
 
-        var dtoItems = _mapper.Map<List<LearnHubDTO>>(items);
+        var dtoItems = _mapper.Map<List<PaginationLearnHubDTO>>(items);
 
-        return new PaginatedResultDTO<LearnHubDTO>
+        return new PaginatedResultDTO<PaginationLearnHubDTO>
         {
             Items = dtoItems,
             TotalCount = totalCount

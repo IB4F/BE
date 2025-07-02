@@ -8,7 +8,7 @@ namespace TeachingBACKEND.Infrastructure
     {
         public LearnHubProfile() 
         {
-            CreateMap<LearnHub, LearnHubDTO>();
+            CreateMap<LearnHub, PaginationLearnHubDTO>();
         }
     }
 }

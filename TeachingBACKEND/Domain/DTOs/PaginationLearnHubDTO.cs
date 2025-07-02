@@ -2,8 +2,9 @@
 
 namespace TeachingBACKEND.Domain.DTOs
 {
-    public class LearnHubDTO
+    public class PaginationLearnHubDTO
     {
+        public Guid Id { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
         public string ClassType { get; set; }
