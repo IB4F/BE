@@ -89,7 +89,9 @@ public class LearnHubService : ILearnHubService
     }
     public async Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
-        var query = _context.LearnHubs.AsQueryable();
+        var query = _context.LearnHubs
+            .Include(lh => lh.Links)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(dto.Search))
         {
@@ -104,15 +106,29 @@ public class LearnHubService : ILearnHubService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .Skip(dto.PageNumber * dto.PageSize)
+            .Skip((dto.PageNumber) * dto.PageSize)
             .Take(dto.PageSize)
+            .Select(lh => new PaginationLearnHubDTO
+            {
+                Id = lh.Id,
+                Title = lh.Title,
+                Description = lh.Description,
+                ClassType = lh.ClassType,
+                Subject = lh.Subject,
+                IsFree = lh.IsFree,
+                CreatedAt = lh.CreatedAt,
+                Links = lh.Links.Select(link => new LinkDTO
+                {
+                    Id = link.Id,
+                    Title = link.Title,
+                    Progress = link.Progress
+                }).ToList()
+            })
             .ToListAsync();
-
-        var dtoItems = _mapper.Map<List<PaginationLearnHubDTO>>(items);
 
         return new PaginatedResultDTO<PaginationLearnHubDTO>
         {
-            Items = dtoItems,
+            Items = items,
             TotalCount = totalCount
         };
     }

@@ -10,6 +10,7 @@ using System.Text;
 using DotNetEnv;
 using static TeachingBACKEND.Application.Services.PasswordValidationService;
 using TeachingBACKEND.Infrastructure;
+using System.Text.Json.Serialization;
 
 Env.Load();
 
@@ -87,6 +88,11 @@ builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();
 builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService>();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
 
 
 
