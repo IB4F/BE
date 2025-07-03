@@ -23,30 +23,45 @@ public class LearnHubService : ILearnHubService
     public async Task<Guid> PostLearnHub(LearnHubCreateDTO dto)
     {
         if (dto == null)
-        {
             throw new Exception("DTO is null");
-        }
+
+        var className = await _context.Classes
+            .Where(c => c.Id == Guid.Parse(dto.ClassType))
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync();
+
+        if (className == null)
+            throw new Exception("Class not found");
+
+        var subjectName = await _context.Subjects
+            .Where(s => s.Id == Guid.Parse(dto.Subject))
+            .Select(s => s.Name)
+            .FirstOrDefaultAsync();
+
+        if (subjectName == null)
+            throw new Exception("Subject not found");
 
         var postLearnHub = new LearnHub
         {
             Title = dto.Title,
             Description = dto.Description,
-            Subject = dto.Subject,
-            ClassType = dto.ClassType,
+            ClassType = className,
+            Subject = subjectName,
             IsFree = dto.IsFree,
-            //Difficulty = dto.Difficulty,
             CreatedAt = DateTime.UtcNow,
             Links = dto.Links?.Select(l => new Link
             {
                 Title = l.Title,
                 Progress = l.Progress
-            }).ToList() ?? new List<Link>() { }
+            }).ToList() ?? new List<Link>()
         };
 
         _context.LearnHubs.Add(postLearnHub);
         await _context.SaveChangesAsync();
         return postLearnHub.Id;
     }
+
+
     public async Task<List<LearnHubDTO>> GetLearnHubs()
     {
         var learnHubs = await _context.LearnHubs.ToListAsync();

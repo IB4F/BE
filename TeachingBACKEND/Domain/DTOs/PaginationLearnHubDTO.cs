@@ -14,3 +14,4 @@ namespace TeachingBACKEND.Domain.DTOs
         public DateTime CreatedAt { get; set; }
     }
 }
+ 
