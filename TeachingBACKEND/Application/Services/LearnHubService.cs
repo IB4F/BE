@@ -68,13 +68,33 @@ public class LearnHubService : ILearnHubService
         return _mapper.Map<List<LearnHubDTO>>(learnHubs);
     }
 
-    public async Task<LearnHubDTO> GetSingleLearnHub(Guid id)
+    public async Task<GetSingleLearnHub> GetSingleLearnHub(Guid id)
     {
-        var learnHub = await _context.LearnHubs.FindAsync(id);
+        var learnHub = await _context.LearnHubs
+            .Include(l => l.Links)
+            .FirstOrDefaultAsync(l => l.Id == id);
+
         if (learnHub == null) return null;
 
-        return _mapper.Map<LearnHubDTO>(learnHub);
+        var dto = new GetSingleLearnHub
+        {
+            Title = learnHub.Title,
+            Description = learnHub.Description,
+            ClassType = learnHub.ClassType,
+            Subject = learnHub.Subject,
+            IsFree = learnHub.IsFree,
+            CreatedAt = learnHub.CreatedAt,
+            Links = learnHub.Links?.Select(link => new LinkDTO
+            {
+                Id = link.Id,
+                Title = link.Title,
+                Progress = link.Progress
+            }).ToList()
+        };
+
+        return dto;
     }
+
 
     public async Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
     {
