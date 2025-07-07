@@ -47,6 +47,7 @@ public class LearnHubService : ILearnHubService
             Description = dto.Description,
             ClassType = className,
             Subject = subjectName,
+            Difficulty = dto.Difficulty,
             IsFree = dto.IsFree,
             CreatedAt = DateTime.UtcNow,
             Links = dto.Links?.Select(l => new Link
