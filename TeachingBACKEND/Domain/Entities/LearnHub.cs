@@ -14,5 +14,6 @@ namespace TeachingBACKEND.Domain.Entities
         [Range(1,10, ErrorMessage ="Difficulty must be between 1 and 10.")]
         public int Difficulty { get; set; } 
         public DateTime CreatedAt { get; set; }
+
     }
 }

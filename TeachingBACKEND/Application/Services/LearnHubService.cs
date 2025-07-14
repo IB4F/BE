@@ -85,6 +85,7 @@ public class LearnHubService : ILearnHubService
             Subject = learnHub.Subject,
             IsFree = learnHub.IsFree,
             CreatedAt = learnHub.CreatedAt,
+            Difficulty = learnHub.Difficulty,
             Links = learnHub.Links?.Select(link => new LinkDTO
             {
                 Id = link.Id,

@@ -11,5 +11,6 @@ namespace TeachingBACKEND.Domain.DTOs
         public bool IsFree { get; set; }
         public List<LinkDTO> Links { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int Difficulty { get; set; }
     }
 }
