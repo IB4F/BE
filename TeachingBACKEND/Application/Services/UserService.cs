@@ -228,6 +228,7 @@ namespace TeachingBACKEND.Application.Services
 
             return new UserDetails
             {
+                Id =  entity.Id,
                 Email = entity.Email,
                 FirstName = entity.FirstName,
                 LastName = entity.LastName,
