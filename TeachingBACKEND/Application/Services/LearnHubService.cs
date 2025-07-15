@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
@@ -124,6 +123,7 @@ public class LearnHubService : ILearnHubService
         _context.LearnHubs.Remove(learnHub);
         await _context.SaveChangesAsync();
     }
+
     public async Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
         var query = _context.LearnHubs
@@ -143,7 +143,7 @@ public class LearnHubService : ILearnHubService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .Skip((dto.PageNumber) * dto.PageSize)
+            .Skip(dto.PageNumber * dto.PageSize)
             .Take(dto.PageSize)
             .Select(lh => new PaginationLearnHubDTO
             {
@@ -170,14 +170,29 @@ public class LearnHubService : ILearnHubService
         };
     }
 
-    public async Task<List<LearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
+    public async Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
     {
         var learnHubs = await _context.LearnHubs
             .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
                          (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
+            .Select(lh => new FilteredLearnHubDTO
+            {
+                Title = lh.Title,
+                Description = lh.Description,
+                ClassType = lh.ClassType,
+                Subject = lh.Subject,
+                IsFree = lh.IsFree,
+                Difficulty = lh.Difficulty,
+                CreatedAt = lh.CreatedAt,
+                Links = lh.Links.Select(link => new LinkDTO
+                {
+                    Id = link.Id,
+                    Title = link.Title
+                }).ToList()
+            })
             .ToListAsync();
 
-        return _mapper.Map<List<LearnHubDTO>>(learnHubs);
+        return learnHubs;
     }
 
 
@@ -196,21 +211,24 @@ public class LearnHubService : ILearnHubService
         {
             LearnHubId = learnHubId,
             Title = dto.Title,
-            Progress = dto.Progress,
+            Progress = dto.Progress
         };
 
         _context.Links.Add(newLink);
         await _context.SaveChangesAsync();
         return newLink.Id;
     }
+
     public async Task<List<Link>> GetAllLinksAsync()
     {
         return await _context.Links.ToListAsync();
     }
+
     public async Task<Link> GetLinkByIdAsync(Guid id)
     {
         return await _context.Links.FindAsync(id);
     }
+
     public async Task<Link> UpdateLink(Guid id, CreateLinkDTO dto)
     {
         var link = await _context.Links.FindAsync(id);
@@ -223,6 +241,7 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return link;
     }
+
     public async Task DeleteLink(Guid id)
     {
         var link = await _context.Links.FindAsync(id);
@@ -237,9 +256,8 @@ public class LearnHubService : ILearnHubService
     // Quizz CRUD
     // ----------------------------
 
-    public async Task<Guid> PostQuizz(Guid linkId,CreateQuizzDTO dto)
+    public async Task<Guid> PostQuizz(Guid linkId, CreateQuizzDTO dto)
     {
-
         var link = await _context.Links.FindAsync(linkId);
         if (link == null)
             throw new Exception("Link not found");
@@ -257,6 +275,7 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return newQuizz.Id;
     }
+
     public async Task<List<GetQuizzDTO>> GetAllQuizzesDTOAsync()
     {
         return await _context.Quizzes
@@ -265,10 +284,11 @@ public class LearnHubService : ILearnHubService
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options,
+                Options = q.Options
             })
             .ToListAsync();
     }
+
     public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
     {
         return await _context.Quizzes
@@ -278,10 +298,11 @@ public class LearnHubService : ILearnHubService
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options,
+                Options = q.Options
             })
             .FirstOrDefaultAsync();
     }
+
     public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
     {
         var quizz = await _context.Quizzes.FindAsync(id);
@@ -297,6 +318,7 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return quizz;
     }
+
     public async Task DeleteQuizz(Guid id)
     {
         var quizz = await _context.Quizzes.FindAsync(id);
@@ -306,6 +328,7 @@ public class LearnHubService : ILearnHubService
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
     }
+
     public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(PaginationRequestDTO dto)
     {
         return await _context.Quizzes
@@ -321,6 +344,4 @@ public class LearnHubService : ILearnHubService
             })
             .ToListAsync();
     }
-
-
 }

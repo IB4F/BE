@@ -9,7 +9,7 @@ public interface ILearnHubService
     Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto);
     Task DeleteLearnHub(Guid id);
     Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
-    Task<List<LearnHubDTO>> GetFilteredLearnHubs(string classType, string subject);
+    Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject);
 
     // Link
     Task<Guid> PostLink(Guid learnHubId, CreateLinkDTO dto);
