@@ -333,7 +333,7 @@ public class LearnHubService : ILearnHubService
     {
         return await _context.Quizzes
             .OrderByDescending(q => q.CreatedAt)
-            .Skip((dto.PageNumber - 1) * dto.PageSize)
+            .Skip(dto.PageNumber * dto.PageSize)
             .Take(dto.PageSize)
             .Select(q => new GetQuizzDTO
             {
