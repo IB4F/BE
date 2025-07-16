@@ -208,6 +208,9 @@ public class LearnHubService : ILearnHubService
         var learnHubs = await _context.LearnHubs
             .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
                          (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
+            .Include(lh => lh.Links)
+              .ThenInclude(link => link.Quizzes)
+              .ThenInclude(q => q.Options)
             .Select(lh => new FilteredLearnHubDTO
             {
                 Title = lh.Title,
