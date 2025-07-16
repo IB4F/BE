@@ -301,7 +301,12 @@ public class LearnHubService : ILearnHubService
             Question = dto.Question,
             Explanation = dto.Explanation,
             Points = dto.Points,
-            Options = dto.Options
+            CreatedAt = DateTime.UtcNow,
+            Options = dto.Options.Select(o => new Option
+            {
+                OptionText = o.OptionText,
+                IsCorrect = o.IsCorrect
+            }).ToList()
         };
 
         _context.Quizzes.Add(newQuizz);
@@ -312,45 +317,69 @@ public class LearnHubService : ILearnHubService
     public async Task<List<GetQuizzDTO>> GetAllQuizzesDTOAsync()
     {
         return await _context.Quizzes
+            .Include(q => q.Options) 
             .Select(q => new GetQuizzDTO
             {
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options
+                Options = q.Options.Select(o => new OptionDTO
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
             })
             .ToListAsync();
     }
 
+
     public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
     {
         return await _context.Quizzes
+            .Include(q => q.Options)
             .Where(q => q.Id == id)
             .Select(q => new GetQuizzDTO
             {
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options
+                Options = q.Options.Select(o => new OptionDTO
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
             })
             .FirstOrDefaultAsync();
     }
 
+
     public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
     {
-        var quizz = await _context.Quizzes.FindAsync(id);
+        var quizz = await _context.Quizzes
+            .Include(q => q.Options)
+            .FirstOrDefaultAsync(q => q.Id == id);
+
         if (quizz == null)
             throw new Exception("Quizz not found");
 
         quizz.Question = dto.Question;
         quizz.Explanation = dto.Explanation;
         quizz.Points = dto.Points;
-        quizz.Options = dto.Options;
 
+        // Remove old options
+        _context.Options.RemoveRange(quizz.Options);
+
+        // Add new options
+        quizz.Options = dto.Options.Select(o => new Option
+        {
+            OptionText = o.OptionText,
+            IsCorrect = o.IsCorrect
+        }).ToList();
 
         await _context.SaveChangesAsync();
         return quizz;
     }
+
 
     public async Task DeleteQuizz(Guid id)
     {
@@ -365,6 +394,7 @@ public class LearnHubService : ILearnHubService
     public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(PaginationRequestDTO dto)
     {
         return await _context.Quizzes
+            .Include(q => q.Options)
             .OrderByDescending(q => q.CreatedAt)
             .Skip(dto.PageNumber * dto.PageSize)
             .Take(dto.PageSize)
@@ -373,8 +403,13 @@ public class LearnHubService : ILearnHubService
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options
+                Options = q.Options.Select(o => new OptionDTO
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
             })
             .ToListAsync();
     }
+
 }

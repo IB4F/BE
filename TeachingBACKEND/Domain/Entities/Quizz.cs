@@ -8,8 +8,8 @@
         public string Question { get; set; }
         public string Explanation { get; set; }
         public int Points { get; set; }
-        public string Options { get; set; } 
         public bool IsAnswered { get; set; }
         public DateTime CreatedAt { get; set; }
+        public ICollection<Option> Options { get; set; } = new List<Option>();
     }
 }

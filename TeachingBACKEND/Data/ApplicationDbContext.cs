@@ -20,7 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Link> Links { get; set; }
     public DbSet<Quizz> Quizzes { get; set; }
     public DbSet<RegistrationPlan> RegistrationPlans { get; set; }
-
+    public DbSet<Option> Options { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +76,11 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(p => p.PlanId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Option>()
+        .HasOne(o => o.Quizz)
+        .WithMany(q => q.Options)
+        .HasForeignKey(o => o.QuizzId)
+        .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<City>().HasData(
             new City { Id = Guid.Parse("a2d4a4ee-5fa2-4a33-bd3c-2bbf98e9310b"), Name = "Tirana" },
