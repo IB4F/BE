@@ -99,20 +99,53 @@ public class LearnHubService : ILearnHubService
 
     public async Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
     {
-        var learnHub = await _context.LearnHubs.FindAsync(id);
+        var learnHub = await _context.LearnHubs
+            .Include(l => l.Links)
+            .FirstOrDefaultAsync(lh => lh.Id == id);
+
         if (learnHub == null)
             throw new Exception("LearnHub not found");
 
+        // Update main fields
         learnHub.Title = dto.Title;
         learnHub.Description = dto.Description;
         learnHub.Subject = dto.Subject;
         learnHub.ClassType = dto.ClassType;
         learnHub.IsFree = dto.IsFree;
 
+        _context.Links.RemoveRange(learnHub.Links);
+        learnHub.Links.Clear();
+
+        var newLinks = dto.Links.Select(linkDto => new Link
+        {
+            LearnHubId = learnHub.Id,
+            Title = linkDto.Title,
+            Progress = linkDto.Progress
+        }).ToList();
+
+        learnHub.Links.AddRange(newLinks);
+
         await _context.SaveChangesAsync();
 
-        return _mapper.Map<LearnHubDTO>(learnHub);
+        var learnHubDto = new LearnHubDTO
+        {
+            Title = learnHub.Title,
+            Description = learnHub.Description,
+            Subject = learnHub.Subject,
+            ClassType = learnHub.ClassType,
+            IsFree = learnHub.IsFree,
+            CreatedAt = learnHub.CreatedAt,
+            Links = learnHub.Links.Select(link => new LinkDTO
+            {
+                Id = link.Id,
+                Title = link.Title,
+                Progress = link.Progress
+            }).ToList()
+        };
+
+        return learnHubDto;
     }
+
 
     public async Task DeleteLearnHub(Guid id)
     {
