@@ -22,9 +22,9 @@ public class QuizzesController : ControllerBase
     }
 
     [HttpGet("Get-List-Quizzes")]
-    public async Task<IActionResult> GetAllQuizzes()
+    public async Task<IActionResult> GetQuizzesByLinkId(Guid linkId)
     {
-        var result = await _learnHubService.GetAllQuizzesDTOAsync();
+        var result = await _learnHubService.GetQuizzesByLinkId(linkId);
         return Ok(result);
     }
 

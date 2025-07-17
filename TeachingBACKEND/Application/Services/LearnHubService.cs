@@ -210,7 +210,6 @@ public class LearnHubService : ILearnHubService
                          (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
             .Include(lh => lh.Links)
             .ThenInclude(link => link.Quizzes)
-
             .Select(lh => new FilteredLearnHubDTO
             {
                 Title = lh.Title,
@@ -318,24 +317,19 @@ public class LearnHubService : ILearnHubService
         return newQuizz.Id;
     }
 
-    public async Task<List<GetQuizzDTO>> GetAllQuizzesDTOAsync()
+    public async Task<List<GetQuizzDTO>> GetQuizzesByLinkId(Guid linkId)
     {
         return await _context.Quizzes
-            .Include(q => q.Options) 
+            .Where(q => q.LinkId == linkId)
             .Select(q => new GetQuizzDTO
             {
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
-                Options = q.Options.Select(o => new OptionDTO
-                {
-                    OptionText = o.OptionText,
-                    IsCorrect = o.IsCorrect
-                }).ToList()
+                IsAnswered = q.IsAnswered,
             })
             .ToListAsync();
     }
-
 
     public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
     {

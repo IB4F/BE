@@ -20,7 +20,7 @@ public interface ILearnHubService
 
     // Quiz
     Task<Guid> PostQuizz(Guid linkId, CreateQuizzDTO dto);
-    Task<List<GetQuizzDTO>> GetAllQuizzesDTOAsync();
+    Task<List<GetQuizzDTO>> GetQuizzesByLinkId(Guid linkId);
     Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id);
     Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto);
     Task DeleteQuizz(Guid id);
