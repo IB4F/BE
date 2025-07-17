@@ -50,11 +50,13 @@ public class QuizzesController : ControllerBase
     }
 
     [HttpPost("Get-Paginated-Quizzes")]
-    public async Task<IActionResult> GetPaginatedQuizzes([FromBody] PaginationRequestDTO dto)
+    public async Task<IActionResult> GetPaginatedQuizzes(Guid linkId, [FromBody] PaginationRequestDTO dto)
     {
-        if (dto.PageNumber < 0 || dto.PageSize <= 0)
-            return BadRequest(new { error = "PageSize must be greater than zero." });
-        var result = await _learnHubService.GetPaginatedQuizzesAsync(dto);
+        if (dto.PageNumber < 1 || dto.PageSize <= 0)
+            return BadRequest(new { error = "PageNumber must be >= 1 and PageSize must be > 0." });
+
+        var result = await _learnHubService.GetPaginatedQuizzesAsync(linkId, dto);
         return Ok(result);
     }
+
 }

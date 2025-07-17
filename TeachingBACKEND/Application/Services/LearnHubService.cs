@@ -221,7 +221,7 @@ public class LearnHubService : ILearnHubService
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
                 Links = lh.Links.Select(link => new LinkDTO
-                {
+                { 
                     Id = link.Id,
                     Title = link.Title
                 }).ToList()
@@ -394,25 +394,25 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(PaginationRequestDTO dto)
+    public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(Guid linkId,PaginationRequestDTO dto)
     {
         return await _context.Quizzes
-            .Include(q => q.Options)
-            .OrderByDescending(q => q.CreatedAt)
-            .Skip(dto.PageNumber * dto.PageSize)
-            .Take(dto.PageSize)
-            .Select(q => new GetQuizzDTO
-            {
-                Question = q.Question,
-                Explanation = q.Explanation,
-                Points = q.Points,
-                Options = q.Options.Select(o => new OptionDTO
-                {
-                    OptionText = o.OptionText,
-                    IsCorrect = o.IsCorrect
-                }).ToList()
-            })
-            .ToListAsync();
+           .Where(q => q.LinkId == linkId)
+           .Include(q => q.Options)
+           .OrderByDescending(q => q.CreatedAt)
+           .Skip((dto.PageNumber - 1) * dto.PageSize)
+           .Take(dto.PageSize)
+           .Select(q => new GetQuizzDTO
+           {
+               Question = q.Question,
+               Explanation = q.Explanation,
+               Points = q.Points,
+               Options = q.Options.Select(o => new OptionDTO
+               {
+                   OptionText = o.OptionText,
+                   IsCorrect = o.IsCorrect
+               }).ToList()
+           })
+           .ToListAsync();
     }
-
 }
