@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+﻿﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
@@ -209,8 +209,8 @@ public class LearnHubService : ILearnHubService
             .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
                          (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
             .Include(lh => lh.Links)
-              .ThenInclude(link => link.Quizzes)
-              .ThenInclude(q => q.Options)
+                .ThenInclude(link => link.Quizzes)
+                .ThenInclude(q => q.Options)
             .Select(lh => new FilteredLearnHubDTO
             {
                 Title = lh.Title,
@@ -220,16 +220,30 @@ public class LearnHubService : ILearnHubService
                 IsFree = lh.IsFree,
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
-                Links = lh.Links.Select(link => new LinkDTO
-                { 
+                Links = lh.Links.Select(link => new LinkWithQuizzedDTO
+                {
                     Id = link.Id,
-                    Title = link.Title
+                    Title = link.Title,
+                    Quizzes = link.Quizzes.Select(q => new GetQuizzDTO
+                    {
+                        Question = q.Question,
+                        Explanation = q.Explanation,
+                        Points = q.Points,
+                        IsAnswered = q.IsAnswered,
+                        CreatedAt = q.CreatedAt,
+                        Options = q.Options.Select(o => new OptionDTO
+                        {
+                            OptionText = o.OptionText,
+                            IsCorrect = o.IsCorrect
+                        }).ToList()
+                    }).ToList()
                 }).ToList()
             })
             .ToListAsync();
 
         return learnHubs;
     }
+
 
 
     // ----------------------------

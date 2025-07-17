@@ -1,4 +1,4 @@
-﻿namespace TeachingBACKEND.Domain.Entities
+﻿﻿namespace TeachingBACKEND.Domain.Entities
 {
     public class Option
     {

@@ -9,8 +9,8 @@ namespace TeachingBACKEND.Domain.DTOs
         public string ClassType { get; set; }
         public string Subject { get; set; }
         public bool IsFree { get; set; }
-        public List<LinkDTO> Links { get; set; }
         public int Difficulty { get; set; }
         public DateTime CreatedAt { get; set; }
+        public List<LinkWithQuizzedDTO> Links { get; set; } = new();
     }
 }
