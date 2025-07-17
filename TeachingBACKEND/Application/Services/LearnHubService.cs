@@ -394,25 +394,47 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<List<GetQuizzDTO>> GetPaginatedQuizzesAsync(Guid linkId,PaginationRequestDTO dto)
+    public async Task<PaginatedResultDTO<GetQuizzDTO>> GetPaginatedQuizzesAsync(Guid linkId, PaginationRequestDTO dto)
     {
-        return await _context.Quizzes
-           .Where(q => q.LinkId == linkId)
-           .Include(q => q.Options)
-           .OrderByDescending(q => q.CreatedAt)
-           .Skip((dto.PageNumber) * dto.PageSize)
-           .Take(dto.PageSize)
-           .Select(q => new GetQuizzDTO
-           {
-               Question = q.Question,
-               Explanation = q.Explanation,
-               Points = q.Points,
-               Options = q.Options.Select(o => new OptionDTO
-               {
-                   OptionText = o.OptionText,
-                   IsCorrect = o.IsCorrect
-               }).ToList()
-           })
-           .ToListAsync();
+        var query = _context.Quizzes
+            .Where(q => q.LinkId == linkId)
+            .Include(q => q.Options)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(dto.Search))
+        {
+            var search = dto.Search.ToLower();
+            query = query.Where(q =>
+                q.Question.ToLower().Contains(search) ||
+                q.Explanation.ToLower().Contains(search));
+        }
+
+        query = query.OrderByDescending(q => q.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip(dto.PageNumber * dto.PageSize)
+            .Take(dto.PageSize)
+            .Select(q => new GetQuizzDTO
+            {
+                Id = q.Id,
+                Question = q.Question,
+                Explanation = q.Explanation,
+                Points = q.Points,
+                CreatedAt = q.CreatedAt,
+                Options = q.Options.Select(o => new OptionDTO
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
+            })
+            .ToListAsync();
+
+        return new PaginatedResultDTO<GetQuizzDTO>
+        {
+            Items = items,
+            TotalCount = totalCount
+        };
     }
 }
