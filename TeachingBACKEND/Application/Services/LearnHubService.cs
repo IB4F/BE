@@ -400,7 +400,7 @@ public class LearnHubService : ILearnHubService
            .Where(q => q.LinkId == linkId)
            .Include(q => q.Options)
            .OrderByDescending(q => q.CreatedAt)
-           .Skip((dto.PageNumber - 1) * dto.PageSize)
+           .Skip((dto.PageNumber) * dto.PageSize)
            .Take(dto.PageSize)
            .Select(q => new GetQuizzDTO
            {
