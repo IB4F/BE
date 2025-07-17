@@ -209,8 +209,8 @@ public class LearnHubService : ILearnHubService
             .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
                          (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
             .Include(lh => lh.Links)
-              .ThenInclude(link => link.Quizzes)
-              .ThenInclude(q => q.Options)
+            .ThenInclude(link => link.Quizzes)
+
             .Select(lh => new FilteredLearnHubDTO
             {
                 Title = lh.Title,
@@ -221,16 +221,17 @@ public class LearnHubService : ILearnHubService
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
                 Links = lh.Links.Select(link => new LinkDTO
-                { 
+                {
                     Id = link.Id,
-                    Title = link.Title
+                    Title = link.Title,
+                    Progress = link.Progress,
+                    QuizzesCount = link.Quizzes.Count()
                 }).ToList()
             })
             .ToListAsync();
 
         return learnHubs;
     }
-
 
     // ----------------------------
     // Link CRUD
