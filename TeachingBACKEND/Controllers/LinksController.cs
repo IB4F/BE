@@ -50,7 +50,7 @@ namespace TeachingBACKEND.Api.Controllers
         public async Task<IActionResult> DeleteLink([FromQuery] Guid id)
         {
             await _learnHubService.DeleteLink(id);
-            return Ok("Link deleted");
+            return Ok(new { message = "Link u fshi" }); 
         }
 
     }

@@ -49,7 +49,7 @@ namespace TeachingBACKEND.Api.Controllers
         public async Task<IActionResult> DeleteLearnHub(Guid id)
         {
             await _learnHubService.DeleteLearnHub(id);
-            return Ok("LearnHub deleted");
+            return Ok(new { message = "LearnHub u fshi" });    
         }
 
         [HttpPost("Get-Paginated-Learnhubs")]
