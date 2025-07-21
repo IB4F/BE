@@ -2,6 +2,7 @@
 {
     public class GetQuizzDTO
     {
+        public Guid Id { get; set; }
         public string Question { get; set; }
         public string Explanation { get; set; }
         public int Points { get; set; }

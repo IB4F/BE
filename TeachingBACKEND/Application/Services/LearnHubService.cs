@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
+using TeachingBACKEND.Domain.DTOs.Quizzes;
 using TeachingBACKEND.Domain.Entities;
 
 public class LearnHubService : ILearnHubService
@@ -317,16 +318,20 @@ public class LearnHubService : ILearnHubService
         return newQuizz.Id;
     }
 
-    public async Task<List<GetQuizzDTO>> GetQuizzesByLinkId(Guid linkId)
+    public async Task<List<QuizDTO>> GetQuizzesByLinkId(Guid linkId)
     {
         return await _context.Quizzes
             .Where(q => q.LinkId == linkId)
-            .Select(q => new GetQuizzDTO
+            .Include(q => q.Options)
+            .Select(q => new QuizDTO
             {
                 Question = q.Question,
-                Explanation = q.Explanation,
                 Points = q.Points,
                 IsAnswered = q.IsAnswered,
+                Options = q.Options.Select(o => new OptionTextDTO
+                {
+                    OptionText = o.OptionText
+                }).ToList()
             })
             .ToListAsync();
     }

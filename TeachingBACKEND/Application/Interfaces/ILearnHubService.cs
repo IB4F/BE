@@ -1,4 +1,5 @@
 ﻿using TeachingBACKEND.Domain.DTOs;
+using TeachingBACKEND.Domain.DTOs.Quizzes;
 using TeachingBACKEND.Domain.Entities;
 
 public interface ILearnHubService
@@ -20,7 +21,7 @@ public interface ILearnHubService
 
     // Quiz
     Task<Guid> PostQuizz(Guid linkId, CreateQuizzDTO dto);
-    Task<List<GetQuizzDTO>> GetQuizzesByLinkId(Guid linkId);
+    Task<List<QuizDTO>> GetQuizzesByLinkId(Guid linkId);
     Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id);
     Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto);
     Task DeleteQuizz(Guid id);
