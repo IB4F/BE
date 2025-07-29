@@ -14,5 +14,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<LoginResponseDTO> Login(LoginDTO model);
         Task<string> Logout(Guid userId);
         Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
+        Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model);
     }
 }

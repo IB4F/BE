@@ -4,6 +4,7 @@
     {
         public string Email { get; set; }
         public string RegistrationType { get; set; }
-        public Guid PlanId {get;set;}
+        public Guid PlanId { get; set; }
+        public int? FamilyMemberCount { get; set; } = 1;
     }
 }

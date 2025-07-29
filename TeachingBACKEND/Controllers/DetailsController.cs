@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Stripe;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.Entities;
 
@@ -50,5 +51,21 @@ public class DetailsController : ControllerBase
             return NotFound("No subjects found.");
 
         return Ok(subjectsList);
+    }
+    [HttpGet("get-plans")]
+    public async Task<ActionResult<IEnumerable<RegistrationPlan>>> GetPlans()
+    {
+        var plans = await _detailService.GetAllPlansAsync();
+        return Ok(plans);
+    }
+
+    [HttpGet("get-plans{id}")]
+    public async Task<ActionResult<RegistrationPlan>> GetPlan(Guid id)
+    {
+        var plan = await _detailService.GetPlanByIdAsync(id);
+        if (plan == null)
+            return NotFound("Plan not found.");
+
+        return Ok(plan);
     }
 }

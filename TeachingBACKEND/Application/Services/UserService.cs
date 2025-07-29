@@ -158,6 +158,80 @@ namespace TeachingBACKEND.Application.Services
                 School = school.School
             };
         }
+
+        public async Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model)
+        {
+            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
+            if (existing != null)
+               throw new Exception("Email already exists");
+
+            var verificationToken = _passwordService.GenerateVerificationToken();
+
+            var primaryUser = new User
+            {
+                Email = model.Email,
+                PasswordHash = _passwordService.HashPassword(model.Password),
+                Role = UserRole.Family,
+                ApprovalStatus = ApprovalStatus.Pending,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                IsEmailVerified = false,
+                EmailVerificationToken = verificationToken,
+                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
+            };
+
+            _context.Users.Add(primaryUser);
+            await _context.SaveChangesAsync();
+
+            for(int i=1; i< model.NumberOfFamilyMembers; i++)
+            {
+                var familyMember = new User
+                {
+                    Email = GenerateFamilyMemberEmail(i, model.Email),
+                    Role = UserRole.Family,
+                    ApprovalStatus = ApprovalStatus.Pending,
+                    FirstName = $"FamilyMember{i}",
+                    LastName = model.LastName,
+                    IsEmailVerified = false,
+                    ParentUserId = primaryUser.Id,
+                };
+
+                _context.Users.Add(familyMember);
+            }
+
+            await _context.SaveChangesAsync();
+ 
+
+
+            var sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
+            {
+                Email = model.Email,
+                PlanId = Guid.Parse(model.PlanId),
+                RegistrationType = "family",
+                FamilyMemberCount = model.NumberOfFamilyMembers
+            }, primaryUser.Id);
+
+            await _notificationService.SendEmailVerification(model.Email, verificationToken);
+
+            return new UserResponseDTO
+            {
+                Id = primaryUser.Id,
+                Email = primaryUser.Email,
+                FirstName = primaryUser.FirstName,
+                LastName = primaryUser.LastName,
+                Role = primaryUser.Role,
+                ApprovalStatus = primaryUser.ApprovalStatus,
+                SessionId = sessionId
+            };
+
+
+        }
+        private string GenerateFamilyMemberEmail(int index, string primaryEmail)
+        {
+            var emailParts = primaryEmail.Split('@');
+            return $"{emailParts[0]}+member{index}@{emailParts[1]}";
+        }
+
         public async Task<LoginResponseDTO> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);

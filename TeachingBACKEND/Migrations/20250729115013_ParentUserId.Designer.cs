@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250729115013_ParentUserId")]
+    partial class ParentUserId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -407,7 +410,7 @@ namespace TeachingBACKEND.Migrations
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-5555-5555-555555555555"),
-                            IsFamilyPlan = true,
+                            IsFamilyPlan = false,
                             Price = 40000L,
                             RegistrationPlanName = "Standarde",
                             StripeProductName = "Student - Yearly Standarde",
@@ -416,7 +419,7 @@ namespace TeachingBACKEND.Migrations
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-6666-6666-666666666666"),
-                            IsFamilyPlan = true,
+                            IsFamilyPlan = false,
                             Price = 60000L,
                             RegistrationPlanName = "Premium",
                             StripeProductName = "Student - Yearly Premium",
@@ -557,13 +560,13 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2025, 7, 29, 12, 24, 33, 66, DateTimeKind.Utc).AddTicks(3200),
+                            CreateAt = new DateTime(2025, 7, 29, 11, 50, 13, 513, DateTimeKind.Utc).AddTicks(1343),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@teachapp.com",
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$j2jHGyxGmnbYBSCt6dQlTuYSkzw9oAOco3ReAP/vxonw/nRYl36XG",
+                            PasswordHash = "$2a$12$pwY29ac1JpMoV.J9jf8V4e3vWTWjhG/15m9sN9zKZzqcLd9bR6fGq",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

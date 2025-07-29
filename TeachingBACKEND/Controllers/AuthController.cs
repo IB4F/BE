@@ -68,6 +68,24 @@ namespace TeachingBACKEND.Controllers
 
 
         [AllowAnonymous]
+        [HttpPost("register-family")]
+        public async Task<IActionResult> RegisterFamily([FromBody] FamilyRegistrationDTO model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _userService.RegisterFamily(model);
+                return Ok(result); 
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message }); 
+            }
+        }
+
+        [AllowAnonymous]
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromQuery] Guid token)
         {
