@@ -231,7 +231,6 @@ namespace TeachingBACKEND.Application.Services
             var emailParts = primaryEmail.Split('@');
             return $"{emailParts[0]}+member{index}@{emailParts[1]}";
         }
-
         public async Task<LoginResponseDTO> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);

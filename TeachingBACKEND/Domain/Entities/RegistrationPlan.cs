@@ -9,5 +9,6 @@
         public string StripeProductName { get; set; }
         public ICollection<Payment> Payments { get; set; }
         public bool IsFamilyPlan { get; set; }
+        public string UserType { get; set; }
     }
 }

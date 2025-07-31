@@ -61,14 +61,11 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return postLearnHub.Id;
     }
-
-
     public async Task<List<LearnHubDTO>> GetLearnHubs()
     {
         var learnHubs = await _context.LearnHubs.ToListAsync();
         return _mapper.Map<List<LearnHubDTO>>(learnHubs);
     }
-
     public async Task<GetSingleLearnHub> GetSingleLearnHub(Guid id)
     {
         var learnHub = await _context.LearnHubs
@@ -96,8 +93,6 @@ public class LearnHubService : ILearnHubService
 
         return dto;
     }
-
-
     public async Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto)
     {
         var learnHub = await _context.LearnHubs
@@ -146,8 +141,6 @@ public class LearnHubService : ILearnHubService
 
         return learnHubDto;
     }
-
-
     public async Task DeleteLearnHub(Guid id)
     {
         var learnHub = await _context.LearnHubs.FindAsync(id);
@@ -157,7 +150,6 @@ public class LearnHubService : ILearnHubService
         _context.LearnHubs.Remove(learnHub);
         await _context.SaveChangesAsync();
     }
-
     public async Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
         var query = _context.LearnHubs
@@ -203,7 +195,6 @@ public class LearnHubService : ILearnHubService
             TotalCount = totalCount
         };
     }
-
     public async Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
     {
         var learnHubs = await _context.LearnHubs
@@ -255,17 +246,14 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return newLink.Id;
     }
-
     public async Task<List<Link>> GetAllLinksAsync()
     {
         return await _context.Links.ToListAsync();
     }
-
     public async Task<Link> GetLinkByIdAsync(Guid id)
     {
         return await _context.Links.FindAsync(id);
     }
-
     public async Task<Link> UpdateLink(Guid id, CreateLinkDTO dto)
     {
         var link = await _context.Links.FindAsync(id);
@@ -278,7 +266,6 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return link;
     }
-
     public async Task DeleteLink(Guid id)
     {
         var link = await _context.Links.FindAsync(id);
@@ -317,7 +304,6 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return newQuizz.Id;
     }
-
     public async Task<List<QuizDTO>> GetQuizzesByLinkId(Guid linkId)
     {
         return await _context.Quizzes
@@ -335,7 +321,6 @@ public class LearnHubService : ILearnHubService
             })
             .ToListAsync();
     }
-
     public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
     {
         return await _context.Quizzes
@@ -354,8 +339,6 @@ public class LearnHubService : ILearnHubService
             })
             .FirstOrDefaultAsync();
     }
-
-
     public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
     {
         var quizz = await _context.Quizzes
@@ -382,8 +365,6 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
         return quizz;
     }
-
-
     public async Task DeleteQuizz(Guid id)
     {
         var quizz = await _context.Quizzes.FindAsync(id);
@@ -393,7 +374,6 @@ public class LearnHubService : ILearnHubService
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
     }
-
     public async Task<PaginatedResultDTO<GetQuizzDTO>> GetPaginatedQuizzesAsync(Guid linkId, PaginationRequestDTO dto)
     {
         var query = _context.Quizzes
