@@ -12,13 +12,15 @@ public class NotificationService : INotificationService
     {
         _logger = logger;
     }
-
+    
     public async Task SendEmailVerification(string email, Guid token)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
         string verificationUrl = $"http://localhost:4200/verify-email?token={token}";
-        string subject = "Email Verification";
-        string body = $"Click the link to verify your email: {verificationUrl}";
+        string subject = "Verifica la tua Email";
+        
+        string htmlTemplate = File.ReadAllText("EmailVerificationTemplate.html");
+        string body = htmlTemplate.Replace("{VERIFICATION_URL}", verificationUrl);
 
         await SendEmail(email, subject, body);
     }
