@@ -23,6 +23,25 @@ public class NotificationService : INotificationService
         await SendEmail(email, subject, body);
     }
 
+    public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames)
+    {
+        _logger.LogInformation("Starting email-verification workflow for {Email}", email);
+
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token.ToString()}";
+        string subject = "Email Verification for Your Family Account";
+
+        string familyNamesFormatted = string.Join(", ", familyMemberNames);
+
+        string body = $@"
+        <p>Hello,</p>
+        <p>Please verify your family account by clicking the link below. This will verify you and the following family members: <strong>{familyNamesFormatted}</strong>.</p>
+        <p><a href='{verificationUrl}'>Verify Family Account</a></p>
+        <p>If you did not register this account, please ignore this email.</p>";
+
+        await SendEmail(email, subject, body);
+    }
+
+
     public async Task SendPasswordResetEmail(string email, Guid resetToken)
     {
         _logger.LogInformation("Starting password-reset workflow for {Email}", email);

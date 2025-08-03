@@ -243,5 +243,19 @@ namespace TeachingBACKEND.Controllers
                 
             }
         }
+
+        [AllowAnonymous]
+        [HttpGet("verify-FamilyEmail")]
+        public async Task<IActionResult> VerifyFamilyEmail([FromQuery] Guid token)
+        {
+            var result = await _userService.VerifyFamilyEmailAsync(token);
+            if (result)
+            {
+                return Ok(new { message = "Email verified successfully." });
+            }
+            return BadRequest(new { message = "Invalid or already verified token." });
+        }
+
+
     }
 }

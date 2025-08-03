@@ -163,14 +163,15 @@ namespace TeachingBACKEND.Application.Services
         {
             var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
             if (existing != null)
-               throw new Exception("Email already exists");
+                throw new Exception("Email already exists");
 
             var verificationToken = _passwordService.GenerateVerificationToken();
+            var passwordHash = _passwordService.HashPassword(model.Password);
 
             var primaryUser = new User
             {
                 Email = model.Email,
-                PasswordHash = _passwordService.HashPassword(model.Password),
+                PasswordHash = passwordHash,
                 Role = UserRole.Family,
                 ApprovalStatus = ApprovalStatus.Pending,
                 FirstName = model.FirstName,
@@ -183,35 +184,50 @@ namespace TeachingBACKEND.Application.Services
             _context.Users.Add(primaryUser);
             await _context.SaveChangesAsync();
 
-            for(int i=1; i< model.NumberOfFamilyMembers; i++)
+            foreach (var member in model.FamilyMembers)
             {
+                // Base email without suffix
+                string baseEmail = $"{member.FirstName.ToLower()}.{member.LastName.ToLower()}@bg.com";
+                string generatedEmail = baseEmail;
+                int suffix = 1;
+
+                // Check if email exists, if yes, add suffix and keep checking
+                while (await _context.Users.AnyAsync(u => u.Email == generatedEmail))
+                {
+                    generatedEmail = $"{member.FirstName.ToLower()}.{member.LastName.ToLower()}{suffix}@bg.com";
+                    suffix++;
+                }
+
                 var familyMember = new User
                 {
-                    Email = GenerateFamilyMemberEmail(i, model.Email),
+                    Email = generatedEmail,
+                    PasswordHash = passwordHash,  // same hashed password
                     Role = UserRole.Family,
                     ApprovalStatus = ApprovalStatus.Pending,
-                    FirstName = $"FamilyMember{i}",
-                    LastName = model.LastName,
+                    FirstName = member.FirstName,
+                    LastName = member.LastName,
                     IsEmailVerified = false,
+                    EmailVerificationToken = null,
+                    EmailVerificationTokenExpiry = null,
                     ParentUserId = primaryUser.Id,
+                    CurrentClass = member.CurrentClass
                 };
 
                 _context.Users.Add(familyMember);
             }
 
             await _context.SaveChangesAsync();
- 
-
 
             var sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
             {
                 Email = model.Email,
                 PlanId = Guid.Parse(model.PlanId),
                 RegistrationType = "family",
-                FamilyMemberCount = model.NumberOfFamilyMembers
+                FamilyMemberCount = model.FamilyMembers.Count + 1
             }, primaryUser.Id);
 
-            await _notificationService.SendEmailVerification(model.Email, verificationToken);
+            var familyNames = model.FamilyMembers.Select(m => $"{m.FirstName} {m.LastName}").ToList();
+            await _notificationService.SendFamilyEmailVerification(model.Email, verificationToken, familyNames);
 
             return new UserResponseDTO
             {
@@ -223,9 +239,41 @@ namespace TeachingBACKEND.Application.Services
                 ApprovalStatus = primaryUser.ApprovalStatus,
                 SessionId = sessionId
             };
-
-
         }
+
+
+
+
+        public async Task<bool> VerifyFamilyEmailAsync(Guid token)
+        {
+            var primaryUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.EmailVerificationToken == token && !u.IsEmailVerified);
+
+            if (primaryUser == null)
+                return false;
+
+            primaryUser.IsEmailVerified = true;
+            primaryUser.EmailVerificationToken = null;
+            primaryUser.EmailVerificationTokenExpiry = null;
+
+            var familyMembers = await _context.Users
+                .Where(u => u.ParentUserId == primaryUser.Id && !u.IsEmailVerified)
+                .ToListAsync();
+
+            foreach (var member in familyMembers)
+            {
+                member.IsEmailVerified = true;
+                // No token on family members, but clear if exists
+                member.EmailVerificationToken = null;
+                member.EmailVerificationTokenExpiry = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+
+
         private string GenerateFamilyMemberEmail(int index, string primaryEmail)
         {
             var emailParts = primaryEmail.Split('@');

@@ -22,5 +22,7 @@ namespace TeachingBACKEND.Domain.DTOs
         [Required, StringLength(10)]
         public string PostalCode { get; set; }
 
+        [Required, StringLength(20)]
+        public Guid PlanId { get; set; }
     }
 }

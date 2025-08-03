@@ -1,25 +1,28 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace TeachingBACKEND.Domain.DTOs
+public class FamilyMemberInput
 {
-    public class FamilyRegistrationDTO
-    {
-        [Required, EmailAddress]
-        public string Email { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string? CurrentClass { get; set; }
+}
 
-        [Required]
-        public string FirstName { get; set; }
+public class FamilyRegistrationDTO
+{
+    [Required]
+    public string Email { get; set; }
 
-        [Required]
-        public string LastName { get; set; }
+    [Required]
+    public string Password { get; set; }
 
-        [Required]
-        public string Password { get; set; }
+    [Required]
+    public string FirstName { get; set; } // main user
+    [Required]
+    public string LastName { get; set; } // main user
 
-        [Range(1, 10)]
-        public int NumberOfFamilyMembers { get; set; }
+    [Required]
+    public string PlanId { get; set; }
 
-        [Required]
-        public string PlanId { get; set; }
-    }
+    [Required]
+    public List<FamilyMemberInput> FamilyMembers { get; set; } // family members to create
 }
