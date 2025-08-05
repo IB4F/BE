@@ -18,4 +18,6 @@ namespace TeachingBACKEND.Domain.DTOs
         public bool IsEmailVerified { get; set; }
         public string VerificationType { get; set; }
     }
+
+
 }

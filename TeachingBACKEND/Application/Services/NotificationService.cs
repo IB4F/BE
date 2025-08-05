@@ -13,21 +13,21 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
-    public async Task SendEmailVerification(string email, Guid token)
+    public async Task SendEmailVerification(string email, Guid token, string verificationType)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
-        string verificationUrl = $"http://localhost:4200/verify-email?token={token}";
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
         string subject = "Email Verification";
         string body = $"Click the link to verify your email: {verificationUrl}";
 
         await SendEmail(email, subject, body);
     }
 
-    public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames)
+    public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames, string verificationType)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
 
-        string verificationUrl = $"http://localhost:4200/verify-email?token={token.ToString()}";
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
         string subject = "Email Verification for Your Family Account";
 
         string familyNamesFormatted = string.Join(", ", familyMemberNames);
@@ -52,11 +52,11 @@ public class NotificationService : INotificationService
         await SendEmail(email, subject, body);
     }
 
-    public async Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName, string lastName)
+    public async Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName, string lastName, string verificationType)
     {
         _logger.LogInformation("Starting student-creation email workflow for {Email}", email);
         
-        string verificationUrl = $"http://localhost:4200/verify-email?token={token}";
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
         string subject = "Student Account Created by School";
         
         string body = $@"

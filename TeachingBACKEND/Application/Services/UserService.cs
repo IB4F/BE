@@ -92,7 +92,7 @@ namespace TeachingBACKEND.Application.Services
 
 
             //Send verification email
-            await _notificationService.SendEmailVerification(model.Email, verificationToken);
+            await _notificationService.SendEmailVerification(model.Email, verificationToken, "student");
 
 
             return new UserResponseDTO
@@ -154,7 +154,7 @@ namespace TeachingBACKEND.Application.Services
             }
 
             // Send verification email
-            await _notificationService.SendEmailVerification(model.Email, verificationToken);
+            await _notificationService.SendEmailVerification(model.Email, verificationToken, "school");
 
             return new UserResponseDTO
             {
@@ -232,7 +232,7 @@ namespace TeachingBACKEND.Application.Services
             }
 
             // Send verification email with the generated password
-            await _notificationService.SendStudentCreatedBySchoolEmail(model.Email, verificationToken, studentPassword, model.FirstName, model.LastName);
+            await _notificationService.SendStudentCreatedBySchoolEmail(model.Email, verificationToken, studentPassword, model.FirstName, model.LastName, "student");
 
             return new UserResponseDTO
             {
@@ -317,7 +317,7 @@ namespace TeachingBACKEND.Application.Services
             }, primaryUser.Id);
 
             var familyNames = model.FamilyMembers.Select(m => $"{m.FirstName} {m.LastName}").ToList();
-            await _notificationService.SendFamilyEmailVerification(model.Email, verificationToken, familyNames);
+            await _notificationService.SendFamilyEmailVerification(model.Email, verificationToken, familyNames, "family");
 
             return new UserResponseDTO
             {
