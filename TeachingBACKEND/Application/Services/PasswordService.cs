@@ -228,5 +228,23 @@ namespace TeachingBACKEND.Application.Services
         {
             return Guid.NewGuid();
         }
+
+        public string GenerateRandomPassword()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$!%*?&";
+            var random = new Random();
+            var password = new string(Enumerable.Repeat(chars, 12)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+            
+            // Ensure password meets complexity requirements
+            if (!password.Any(char.IsUpper) || !password.Any(char.IsLower) || 
+                !password.Any(char.IsDigit) || !password.Any(c => "@$!%*?&".Contains(c)))
+            {
+                // If it doesn't meet requirements, generate a new one
+                return GenerateRandomPassword();
+            }
+            
+            return password;
+        }
     }
 }

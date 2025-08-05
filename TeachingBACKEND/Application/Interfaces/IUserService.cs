@@ -8,6 +8,8 @@ namespace TeachingBACKEND.Application.Interfaces
     {
         Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model);
         Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model);
+        Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId);
+        Task<List<UserResponseDTO>> GetStudentsBySchool(Guid schoolId);
         Task<User> GetUserByEmail(string email);
         Task<User> GetUserById(Guid Id);
         Task UpdateUser(User user);

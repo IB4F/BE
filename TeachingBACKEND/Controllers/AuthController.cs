@@ -256,6 +256,59 @@ namespace TeachingBACKEND.Controllers
             return BadRequest(new { message = "Invalid or already verified token." });
         }
 
+        /// <summary>
+        /// Create a student account by an approved school
+        /// </summary>
+        [Authorize(Roles = "School")]
+        [HttpPost("create-student")]
+        public async Task<IActionResult> CreateStudentBySchool([FromBody] CreateStudentBySchoolDTO model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                // Get the school ID from the JWT token
+                var schoolId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+                
+                var response = await _userService.CreateStudentBySchool(model, schoolId);
+                return Created("", new { 
+                    message = "Student created successfully by school", 
+                    userId = response.Id, 
+                    sessionId = response.SessionId 
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get all students created by a school
+        /// </summary>
+        [Authorize(Roles = "School")]
+        [HttpGet("school-students")]
+        public async Task<IActionResult> GetStudentsBySchool()
+        {
+            try
+            {
+                // Get the school ID from the JWT token
+                var schoolId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+                
+                var students = await _userService.GetStudentsBySchool(schoolId);
+                return Ok(new { 
+                    message = "Students retrieved successfully", 
+                    students = students,
+                    count = students.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
 
     }
 }

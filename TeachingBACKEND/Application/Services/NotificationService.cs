@@ -52,6 +52,26 @@ public class NotificationService : INotificationService
         await SendEmail(email, subject, body);
     }
 
+    public async Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName, string lastName)
+    {
+        _logger.LogInformation("Starting student-creation email workflow for {Email}", email);
+        
+        string verificationUrl = $"http://localhost:4200/verify-email?token={token}";
+        string subject = "Student Account Created by School";
+        
+        string body = $@"
+        <p>Hello {firstName} {lastName},</p>
+        <p>Your student account has been created by your school. Here are your login credentials:</p>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Temporary Password:</strong> {password}</p>
+        <p>Please click the link below to verify your email address and then change your password:</p>
+        <p><a href='{verificationUrl}'>Verify Email Address</a></p>
+        <p>For security reasons, please change your password after your first login.</p>
+        <p>If you did not expect this email, please contact your school administrator.</p>";
+
+        await SendEmail(email, subject, body);
+    }
+
     public async Task SendEmail(string email, string subject, string body)
     {
         var fromAddress = new MailAddress(

@@ -104,7 +104,8 @@ namespace TeachingBACKEND.Application.Services
                 Role = student.Role,
                 ApprovalStatus = student.ApprovalStatus,
                 School = student.School,
-                SessionId = sessionId
+                SessionId = sessionId,
+                VerificationType = "student"
             };
         }
         public async Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model)
@@ -127,16 +128,24 @@ namespace TeachingBACKEND.Application.Services
                 Profession = model.Profession,
                 City = model.City,
                 PostalCode = model.PostalCode,
-                //School = model.School,
                 IsEmailVerified = false,
                 EmailVerificationToken = verificationToken,
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
             };
 
             _context.Users.Add(school);
+            string sessionId;
             try
             {
                 await _context.SaveChangesAsync();
+
+                // Create a payment session for the school
+                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "school",
+                    PlanId = model.PlanId,
+                }, school.Id);
             }
             catch (Exception ex)
             {
@@ -144,18 +153,97 @@ namespace TeachingBACKEND.Application.Services
                 throw;
             }
 
-
-
-            //Send verification email
+            // Send verification email
             await _notificationService.SendEmailVerification(model.Email, verificationToken);
 
             return new UserResponseDTO
             {
+                Id = school.Id,
                 Email = school.Email,
                 FirstName = school.FirstName,
                 Role = school.Role,
                 ApprovalStatus = school.ApprovalStatus,
-                School = school.School
+                School = school.School,
+                SessionId = sessionId,
+                VerificationType = "school"
+            };
+        }
+
+        public async Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId)
+        {
+            // Verify the school exists and is approved
+            var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
+            if (school == null)
+            {
+                throw new Exception("School not found");
+            }
+
+            if (school.ApprovalStatus != ApprovalStatus.Approved)
+            {
+                throw new Exception("School is not approved to create students");
+            }
+
+            // Check if student email already exists
+            var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
+            if (existingStudent != null)
+            {
+                throw new Exception("Student email already exists");
+            }
+
+            // Generate a random password for the student
+            var studentPassword = _passwordService.GenerateRandomPassword();
+            var verificationToken = _passwordService.GenerateVerificationToken();
+
+            var student = new User
+            {
+                Email = model.Email,
+                PasswordHash = _passwordService.HashPassword(studentPassword),
+                Role = UserRole.Student,
+                ApprovalStatus = ApprovalStatus.Approved, // Auto-approved since created by approved school
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                DateOfBirth = model.DateOfBirth,
+                CurrentClass = model.CurrentClass,
+                School = model.School,
+                IsEmailVerified = false,
+                EmailVerificationToken = verificationToken,
+                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
+                ParentUserId = schoolId // Link to the school that created this student
+            };
+
+            _context.Users.Add(student);
+            string sessionId;
+            try
+            {
+                await _context.SaveChangesAsync();
+
+                // Create a payment session for the student
+                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "student",
+                    PlanId = model.PlanId,
+                }, student.Id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.InnerException?.Message);
+                throw;
+            }
+
+            // Send verification email with the generated password
+            await _notificationService.SendStudentCreatedBySchoolEmail(model.Email, verificationToken, studentPassword, model.FirstName, model.LastName);
+
+            return new UserResponseDTO
+            {
+                Id = student.Id,
+                Email = student.Email,
+                FirstName = student.FirstName,
+                LastName = student.LastName,
+                Role = student.Role,
+                ApprovalStatus = student.ApprovalStatus,
+                School = student.School,
+                SessionId = sessionId
             };
         }
 
@@ -174,6 +262,7 @@ namespace TeachingBACKEND.Application.Services
                 PasswordHash = passwordHash,
                 Role = UserRole.Family,
                 ApprovalStatus = ApprovalStatus.Pending,
+                PhoneNumber = model.PhoneNumber,
                 FirstName = model.FirstName,
                 LastName = model.LastName,
                 IsEmailVerified = false,
@@ -206,6 +295,7 @@ namespace TeachingBACKEND.Application.Services
                     ApprovalStatus = ApprovalStatus.Pending,
                     FirstName = member.FirstName,
                     LastName = member.LastName,
+                    PhoneNumber = model.PhoneNumber,
                     IsEmailVerified = false,
                     EmailVerificationToken = null,
                     EmailVerificationTokenExpiry = null,
@@ -237,7 +327,8 @@ namespace TeachingBACKEND.Application.Services
                 LastName = primaryUser.LastName,
                 Role = primaryUser.Role,
                 ApprovalStatus = primaryUser.ApprovalStatus,
-                SessionId = sessionId
+                SessionId = sessionId,
+                VerificationType = "family"
             };
         }
 
@@ -358,6 +449,40 @@ namespace TeachingBACKEND.Application.Services
                 PhoneNumber = entity.PhoneNumber,
                 Profession = entity.Profession                
             };
+        }
+
+        public async Task<List<UserResponseDTO>> GetStudentsBySchool(Guid schoolId)
+        {
+            // Verify the school exists and is approved
+            var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
+            if (school == null)
+            {
+                throw new Exception("School not found");
+            }
+
+            if (school.ApprovalStatus != ApprovalStatus.Approved)
+            {
+                throw new Exception("School is not approved");
+            }
+
+            var students = await _context.Users
+                .Where(u => u.ParentUserId == schoolId && u.Role == UserRole.Student)
+                .Select(u => new UserResponseDTO
+                {
+                    Id = u.Id,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Role = u.Role,
+                    ApprovalStatus = u.ApprovalStatus,
+                    School = u.School,
+                    CurrentClass = u.CurrentClass,
+                    DateOfBirth = u.DateOfBirth,
+                    IsEmailVerified = u.IsEmailVerified
+                })
+                .ToListAsync();
+
+            return students;
         }
     }
 }

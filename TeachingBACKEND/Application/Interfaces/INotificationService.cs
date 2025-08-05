@@ -6,5 +6,6 @@
         Task SendPasswordResetEmail(string email, Guid resetToken);
         Task SendEmail(string email, string subject, string body);
         Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames);
+        Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName, string lastName);
     }
 }
