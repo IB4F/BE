@@ -47,7 +47,5 @@ namespace TeachingBACKEND.Domain.Entities
         public ICollection<Payment> Payments { get; set; } = new List<Payment>(); // Navigation
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
         public Guid? ParentUserId { get; set; }
-        public VerificationType? EmailVerificationType { get; set; }
-
     }
 }
