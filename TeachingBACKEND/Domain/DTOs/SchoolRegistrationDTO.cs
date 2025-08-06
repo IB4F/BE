@@ -24,5 +24,8 @@ namespace TeachingBACKEND.Domain.DTOs
 
         [Required, StringLength(20)]
         public Guid PlanId { get; set; }
+
+        [Required]
+        public List<CreateStudentBySchoolDTO> Students { get; set; }
     }
 }

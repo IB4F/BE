@@ -116,6 +116,22 @@ namespace TeachingBACKEND.Application.Services
                 throw new Exception("School already exists in DB");
             }
 
+            // Fetch the registration plan and max users
+            var plan = await _context.RegistrationPlans.FirstOrDefaultAsync(p => p.Id == model.PlanId);
+            if (plan == null)
+            {
+                throw new Exception("Registration plan not found");
+            }
+            int maxUsers = plan.MaxUsers;
+
+            if (model.Students == null)
+                model.Students = new List<CreateStudentBySchoolDTO>();
+
+            if (model.Students.Count > maxUsers)
+            {
+                throw new Exception($"The selected plan allows a maximum of {maxUsers} students. You provided {model.Students.Count}.");
+            }
+
             var verificationToken = _passwordService.GenerateVerificationToken();
 
             var school = new User
@@ -153,7 +169,55 @@ namespace TeachingBACKEND.Application.Services
                 throw;
             }
 
-            // Send verification email
+            // Register students
+            var registeredStudents = new List<UserResponseDTO>();
+            foreach (var studentDto in model.Students)
+            {
+                // Check if student email already exists
+                var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == studentDto.Email.ToLower());
+                if (existingStudent != null)
+                {
+                    // Optionally: skip or throw. Here, skip and continue.
+                    continue;
+                }
+                var studentPassword = _passwordService.GenerateRandomPassword();
+                var studentVerificationToken = _passwordService.GenerateVerificationToken();
+                var student = new User
+                {
+                    Email = studentDto.Email,
+                    PasswordHash = _passwordService.HashPassword(studentPassword),
+                    Role = UserRole.Student,
+                    ApprovalStatus = ApprovalStatus.Approved, // Auto-approved since created by school
+                    FirstName = studentDto.FirstName,
+                    LastName = studentDto.LastName,
+                    DateOfBirth = studentDto.DateOfBirth,
+                    CurrentClass = studentDto.CurrentClass,
+                    School = model.SchoolName,
+                    IsEmailVerified = false,
+                    EmailVerificationToken = studentVerificationToken,
+                    EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
+                };
+                _context.Users.Add(student);
+                await _context.SaveChangesAsync();
+                // Optionally: send verification email to student
+                await _notificationService.SendEmailVerification(student.Email, studentVerificationToken, "student");
+                registeredStudents.Add(new UserResponseDTO
+                {
+                    Id = student.Id,
+                    Email = student.Email,
+                    FirstName = student.FirstName,
+                    LastName = student.LastName,
+                    Role = student.Role,
+                    ApprovalStatus = student.ApprovalStatus,
+                    School = student.School,
+                    CurrentClass = student.CurrentClass,
+                    DateOfBirth = student.DateOfBirth,
+                    IsEmailVerified = student.IsEmailVerified,
+                    VerificationType = "student"
+                });
+            }
+
+            // Send verification email to school
             await _notificationService.SendEmailVerification(model.Email, verificationToken, "school");
 
             return new UserResponseDTO
@@ -165,87 +229,88 @@ namespace TeachingBACKEND.Application.Services
                 ApprovalStatus = school.ApprovalStatus,
                 School = school.School,
                 SessionId = sessionId,
-                VerificationType = "school"
+                VerificationType = "school",
+                Students = registeredStudents
             };
         }
 
-        public async Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId)
-        {
-            // Verify the school exists and is approved
-            var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
-            if (school == null)
-            {
-                throw new Exception("School not found");
-            }
+        //public async Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId)
+        //{
+        //    // Verify the school exists and is approved
+        //    var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
+        //    if (school == null)
+        //    {
+        //        throw new Exception("School not found");
+        //    }
 
-            if (school.ApprovalStatus != ApprovalStatus.Approved)
-            {
-                throw new Exception("School is not approved to create students");
-            }
+        //    if (school.ApprovalStatus != ApprovalStatus.Approved)
+        //    {
+        //        throw new Exception("School is not approved to create students");
+        //    }
 
-            // Check if student email already exists
-            var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
-            if (existingStudent != null)
-            {
-                throw new Exception("Student email already exists");
-            }
+        //    // Check if student email already exists
+        //    var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
+        //    if (existingStudent != null)
+        //    {
+        //        throw new Exception("Student email already exists");
+        //    }
 
-            // Generate a random password for the student
-            var studentPassword = _passwordService.GenerateRandomPassword();
-            var verificationToken = _passwordService.GenerateVerificationToken();
+        //    // Generate a random password for the student
+        //    var studentPassword = _passwordService.GenerateRandomPassword();
+        //    var verificationToken = _passwordService.GenerateVerificationToken();
 
-            var student = new User
-            {
-                Email = model.Email,
-                PasswordHash = _passwordService.HashPassword(studentPassword),
-                Role = UserRole.Student,
-                ApprovalStatus = ApprovalStatus.Approved, // Auto-approved since created by approved school
-                FirstName = model.FirstName,
-                LastName = model.LastName,
-                DateOfBirth = model.DateOfBirth,
-                CurrentClass = model.CurrentClass,
-                School = model.School,
-                IsEmailVerified = false,
-                EmailVerificationToken = verificationToken,
-                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
-                ParentUserId = schoolId // Link to the school that created this student
-            };
+        //    var student = new User
+        //    {
+        //        Email = model.Email,
+        //        PasswordHash = _passwordService.HashPassword(studentPassword),
+        //        Role = UserRole.Student,
+        //        ApprovalStatus = ApprovalStatus.Approved, // Auto-approved since created by approved school
+        //        FirstName = model.FirstName,
+        //        LastName = model.LastName,
+        //        DateOfBirth = model.DateOfBirth,
+        //        CurrentClass = model.CurrentClass,
+        //        School = model.School,
+        //        IsEmailVerified = false,
+        //        EmailVerificationToken = verificationToken,
+        //        EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
+        //        ParentUserId = schoolId // Link to the school that created this student
+        //    };
 
-            _context.Users.Add(student);
-            string sessionId;
-            try
-            {
-                await _context.SaveChangesAsync();
+        //    _context.Users.Add(student);
+        //    string sessionId;
+        //    try
+        //    {
+        //        await _context.SaveChangesAsync();
 
-                // Create a payment session for the student
-                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
-                {
-                    Email = model.Email,
-                    RegistrationType = "student",
-                    PlanId = model.PlanId,
-                }, student.Id);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.InnerException?.Message);
-                throw;
-            }
+        //        // Create a payment session for the student
+        //        sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
+        //        {
+        //            Email = model.Email,
+        //            RegistrationType = "student",
+        //            PlanId = model.PlanId,
+        //        }, student.Id);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine(ex.InnerException?.Message);
+        //        throw;
+        //    }
 
-            // Send verification email with the generated password
-            await _notificationService.SendStudentCreatedBySchoolEmail(model.Email, verificationToken, studentPassword, model.FirstName, model.LastName, "student");
+        //    // Send verification email with the generated password
+        //    await _notificationService.SendStudentCreatedBySchoolEmail(model.Email, verificationToken, studentPassword, model.FirstName, model.LastName, "student");
 
-            return new UserResponseDTO
-            {
-                Id = student.Id,
-                Email = student.Email,
-                FirstName = student.FirstName,
-                LastName = student.LastName,
-                Role = student.Role,
-                ApprovalStatus = student.ApprovalStatus,
-                School = student.School,
-                SessionId = sessionId
-            };
-        }
+        //    return new UserResponseDTO
+        //    {
+        //        Id = student.Id,
+        //        Email = student.Email,
+        //        FirstName = student.FirstName,
+        //        LastName = student.LastName,
+        //        Role = student.Role,
+        //        ApprovalStatus = student.ApprovalStatus,
+        //        School = student.School,
+        //        SessionId = sessionId
+        //    };
+        //}
 
         public async Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model)
         {

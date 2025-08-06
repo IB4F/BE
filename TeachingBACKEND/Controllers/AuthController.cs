@@ -46,7 +46,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
-        /// Register a school
+        /// Register a school and its students (each student receives a randomly generated password via email)
         /// </summary>
         [AllowAnonymous]
         [HttpPost("register-school")]
@@ -58,7 +58,19 @@ namespace TeachingBACKEND.Controllers
             try
             {
                 var response = await _userService.RegisterSchool(model);
-                return Created("", new { message = "School registered successfully", userId = response.Id });
+                return Created("", new {
+                    message = "School and students registered successfully",
+                    userId = response.Id,
+                    students = response.Students?.Select(s => new {
+                        s.Id,
+                        s.Email,
+                        s.FirstName,
+                        s.LastName,
+                        s.IsEmailVerified,
+                        s.VerificationType
+                    }),
+                    note = "Each student receives a randomly generated password via email."
+                });
             }
             catch (Exception ex)
             {

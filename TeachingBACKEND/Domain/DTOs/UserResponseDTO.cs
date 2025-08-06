@@ -17,6 +17,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public DateTime? DateOfBirth { get; set; }
         public bool IsEmailVerified { get; set; }
         public string VerificationType { get; set; }
+        public List<UserResponseDTO> Students { get; set; }
     }
 
 
