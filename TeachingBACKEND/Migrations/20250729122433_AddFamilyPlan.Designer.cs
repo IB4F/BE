@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250729122433_AddFamilyPlan")]
+    partial class AddFamilyPlan
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -348,9 +351,6 @@ namespace TeachingBACKEND.Migrations
                     b.Property<bool>("IsFamilyPlan")
                         .HasColumnType("bit");
 
-                    b.Property<int>("MaxUsers")
-                        .HasColumnType("int");
-
                     b.Property<long>("Price")
                         .HasColumnType("bigint");
 
@@ -366,10 +366,6 @@ namespace TeachingBACKEND.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("UserType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
                     b.ToTable("RegistrationPlans");
@@ -379,89 +375,55 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("a1a1a1a1-a1a1-1111-1111-111111111111"),
                             IsFamilyPlan = false,
-                            MaxUsers = 1,
                             Price = 2000L,
                             RegistrationPlanName = "Bazë",
                             StripeProductName = "Student - Monthly Bazë",
-                            Type = "monthly",
-                            UserType = "student"
+                            Type = "monthly"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-2222-2222-222222222222"),
                             IsFamilyPlan = false,
-                            MaxUsers = 1,
                             Price = 4000L,
                             RegistrationPlanName = "Standarde",
                             StripeProductName = "Student - Monthly Standarde",
-                            Type = "monthly",
-                            UserType = "student"
+                            Type = "monthly"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-3333-3333-333333333333"),
                             IsFamilyPlan = false,
-                            MaxUsers = 1,
                             Price = 6000L,
                             RegistrationPlanName = "Premium",
                             StripeProductName = "Student - Monthly Premium",
-                            Type = "monthly",
-                            UserType = "student"
+                            Type = "monthly"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-4444-4444-444444444444"),
                             IsFamilyPlan = false,
-                            MaxUsers = 1,
                             Price = 20000L,
                             RegistrationPlanName = "Bazë",
                             StripeProductName = "Student - Yearly Bazë",
-                            Type = "yearly",
-                            UserType = "student"
+                            Type = "yearly"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-5555-5555-555555555555"),
                             IsFamilyPlan = true,
-                            MaxUsers = 5,
                             Price = 40000L,
                             RegistrationPlanName = "Standarde",
                             StripeProductName = "Student - Yearly Standarde",
-                            Type = "yearly",
-                            UserType = "family"
+                            Type = "yearly"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-6666-6666-666666666666"),
                             IsFamilyPlan = true,
-                            MaxUsers = 10,
                             Price = 60000L,
                             RegistrationPlanName = "Premium",
                             StripeProductName = "Student - Yearly Premium",
-                            Type = "yearly",
-                            UserType = "family"
-                        },
-                        new
-                        {
-                            Id = new Guid("a1a1a1a1-a1a1-7777-7777-777777777777"),
-                            IsFamilyPlan = false,
-                            MaxUsers = 50,
-                            Price = 10000L,
-                            RegistrationPlanName = "Supervisor - Monthly",
-                            StripeProductName = "Supervisor - Monthly Plan",
-                            Type = "monthly",
-                            UserType = "supervisor"
-                        },
-                        new
-                        {
-                            Id = new Guid("a1a1a1a1-a1a1-8888-8888-888888888888"),
-                            IsFamilyPlan = false,
-                            MaxUsers = 500,
-                            Price = 100000L,
-                            RegistrationPlanName = "Supervisor - Yearly",
-                            StripeProductName = "Supervisor - Yearly Plan",
-                            Type = "yearly",
-                            UserType = "supervisor"
+                            Type = "yearly"
                         });
                 });
 
@@ -598,13 +560,13 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2025, 7, 31, 14, 9, 13, 636, DateTimeKind.Utc).AddTicks(9533),
+                            CreateAt = new DateTime(2025, 7, 29, 12, 24, 33, 66, DateTimeKind.Utc).AddTicks(3200),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@teachapp.com",
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$icvPf0P9t8v597BB0NIzFexb6ExfBsFIi.y0FPgEtOvS.O/tnH6x.",
+                            PasswordHash = "$2a$12$j2jHGyxGmnbYBSCt6dQlTuYSkzw9oAOco3ReAP/vxonw/nRYl36XG",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

@@ -46,7 +46,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
-        /// Register a school
+        /// Register a school and its students (each student receives a randomly generated password via email)
         /// </summary>
         [AllowAnonymous]
         [HttpPost("register-school")]
@@ -58,7 +58,19 @@ namespace TeachingBACKEND.Controllers
             try
             {
                 var response = await _userService.RegisterSchool(model);
-                return Created("", new { message = "School registered successfully", userId = response.Id });
+                return Created("", new {
+                    message = "School and students registered successfully",
+                    userId = response.Id,
+                    students = response.Students?.Select(s => new {
+                        s.Id,
+                        s.Email,
+                        s.FirstName,
+                        s.LastName,
+                        s.IsEmailVerified,
+                        s.VerificationType
+                    }),
+                    note = "Each student receives a randomly generated password via email."
+                });
             }
             catch (Exception ex)
             {
@@ -66,6 +78,24 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
+
+        [AllowAnonymous]
+        [HttpPost("register-family")]
+        public async Task<IActionResult> RegisterFamily([FromBody] FamilyRegistrationDTO model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _userService.RegisterFamily(model);
+                return Ok(result); 
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message }); 
+            }
+        }
 
         [AllowAnonymous]
         [HttpGet("verify-email")]
@@ -225,5 +255,19 @@ namespace TeachingBACKEND.Controllers
                 
             }
         }
+
+        [AllowAnonymous]
+        [HttpGet("verify-FamilyEmail")]
+        public async Task<IActionResult> VerifyFamilyEmail([FromQuery] Guid token)
+        {
+            var result = await _userService.VerifyFamilyEmailAsync(token);
+            if (result)
+            {
+                return Ok(new { message = "Email verified successfully." });
+            }
+            return BadRequest(new { message = "Invalid or already verified token." });
+        }
+
+
     }
 }

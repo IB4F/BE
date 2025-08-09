@@ -4,6 +4,7 @@
     {
        Admin,    //0
        School,   //1
-       Student   //2     
+       Student,  //2
+       Family    //3
     }
 }

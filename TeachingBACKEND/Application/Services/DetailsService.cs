@@ -15,15 +15,11 @@ namespace TeachingBACKEND.Application.Services
         {
             _context = context;
         }
-
-
         public async Task<IEnumerable<City>> GetCities()
         {
             var cities = await _context.Cities.ToListAsync();
             return cities.Any() == true ? cities : new List<City>();
         }
-
-
         public async Task<IEnumerable<Class>> GetClasses()
         {
             var classes = await _context.Classes
@@ -34,8 +30,7 @@ namespace TeachingBACKEND.Application.Services
             return classes.Any()
                  ? classes
                  : new List<Class>();
-        }
-        
+        }  
         public async Task<IEnumerable<Subjects>> GetSubjects()
         {
             var subjects = await _context.Subjects
@@ -47,7 +42,15 @@ namespace TeachingBACKEND.Application.Services
                 ? subjects
                 : new List<Subjects>();
         }
+        public async Task<List<RegistrationPlan>> GetAllPlansAsync()
+        {
+            return await _context.RegistrationPlans.ToListAsync();
+        }
 
+        public async Task<RegistrationPlan?> GetPlanByIdAsync(Guid id)
+        {
+            return await _context.RegistrationPlans.FirstOrDefaultAsync(p => p.Id == id);
+        }
     }
 }
 

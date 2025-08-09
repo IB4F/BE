@@ -113,37 +113,97 @@ public class ApplicationDbContext : DbContext
         );
 
         modelBuilder.Entity<RegistrationPlan>().HasData(
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-1111-1111-111111111111"), RegistrationPlanName = "Bazë",
-                Type = "monthly", Price = 2000, StripeProductName = "Student - Monthly Bazë"
-            },
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-2222-2222-222222222222"), RegistrationPlanName = "Standarde",
-                Type = "monthly", Price = 4000, StripeProductName = "Student - Monthly Standarde"
-            },
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-3333-3333-333333333333"), RegistrationPlanName = "Premium",
-                Type = "monthly", Price = 6000, StripeProductName = "Student - Monthly Premium"
-            },
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-4444-4444-444444444444"), RegistrationPlanName = "Bazë", Type = "yearly",
-                Price = 20000, StripeProductName = "Student - Yearly Bazë"
-            },
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-5555-5555-555555555555"), RegistrationPlanName = "Standarde",
-                Type = "yearly", Price = 40000, StripeProductName = "Student - Yearly Standarde"
-            },
-            new RegistrationPlan
-            {
-                Id = Guid.Parse("a1a1a1a1-a1a1-6666-6666-666666666666"), RegistrationPlanName = "Premium",
-                Type = "yearly", Price = 60000, StripeProductName = "Student - Yearly Premium"
-            }
-        );
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-1111-1111-111111111111"),
+        RegistrationPlanName = "Bazë",
+        Type = "monthly",
+        Price = 2000,
+        StripeProductName = "Student - Monthly Bazë",
+        IsFamilyPlan = false,
+        UserType = "student",
+        MaxUsers = 1  
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-2222-2222-222222222222"),
+        RegistrationPlanName = "Standarde",
+        Type = "monthly",
+        Price = 4000,
+        StripeProductName = "Student - Monthly Standarde",
+        IsFamilyPlan = false,
+        UserType = "student",
+        MaxUsers = 1
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-3333-3333-333333333333"),
+        RegistrationPlanName = "Premium",
+        Type = "monthly",
+        Price = 6000,
+        StripeProductName = "Student - Monthly Premium",
+        IsFamilyPlan = false,
+        UserType = "student",
+        MaxUsers = 1
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-4444-4444-444444444444"),
+        RegistrationPlanName = "Bazë",
+        Type = "yearly",
+        Price = 20000,
+        StripeProductName = "Student - Yearly Bazë",
+        IsFamilyPlan = false,
+        UserType = "student",
+        MaxUsers = 1
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-5555-5555-555555555555"),
+        RegistrationPlanName = "Standarde",
+        Type = "yearly",
+        Price = 40000,
+        StripeProductName = "Student - Yearly Standarde",
+        IsFamilyPlan = true,
+        UserType = "family",
+        MaxUsers = 5 
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-6666-6666-666666666666"),
+        RegistrationPlanName = "Premium",
+        Type = "yearly",
+        Price = 60000,
+        StripeProductName = "Student - Yearly Premium",
+        IsFamilyPlan = true,
+        UserType = "family",
+        MaxUsers = 10
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-7777-7777-777777777777"),
+        RegistrationPlanName = "Supervisor - Monthly",
+        Type = "monthly",
+        Price = 10000,
+        StripeProductName = "Supervisor - Monthly Plan",
+        IsFamilyPlan = false,
+        UserType = "supervisor",
+        MaxUsers = 50  
+    },
+    new RegistrationPlan
+    {
+        Id = Guid.Parse("a1a1a1a1-a1a1-8888-8888-888888888888"),
+        RegistrationPlanName = "Supervisor - Yearly",
+        Type = "yearly",
+        Price = 100000,
+        StripeProductName = "Supervisor - Yearly Plan",
+        IsFamilyPlan = false,
+        UserType = "supervisor",
+        MaxUsers = 500
+    }
+);
+
+
 
         modelBuilder.Entity<Subjects>().HasData(
             new Subjects { Id = Guid.Parse("dbe6757d-2138-463a-bee7-5d07a6d7b320"), Name = "Letërsi" },

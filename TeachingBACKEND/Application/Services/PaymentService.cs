@@ -21,6 +21,7 @@ namespace TeachingBACKEND.Application.Services
             _configuration = configuration;
             _logger = logger;
         }
+        
 
         public async Task<string> CreateCheckoutSessionAsync(PaymentSessionRequestDTO dto, Guid userId)
         {
@@ -28,14 +29,17 @@ namespace TeachingBACKEND.Application.Services
             {
                 _logger.LogInformation("Creating checkout session for email: {Email}, type: {Type}", dto.Email, dto.RegistrationType);
 
-                var stripeSecretKey = _configuration["STRIPE_SECRET_KEY"];
-                var stripePublishableKey = _configuration["STRIPE_PUBLISHABLE_KEY"];
-
-                StripeConfiguration.ApiKey = stripeSecretKey;
+                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
 
                 var plan = await _context.RegistrationPlans.FindAsync(dto.PlanId);
                 if (plan == null)
-                    throw new Exception("Invalid registraton plan selected.");
+                    throw new Exception("Invalid registration plan selected.");
+
+                int memberCount = dto.FamilyMemberCount ?? 1;
+                int totalPrice = plan.IsFamilyPlan ? (int)(plan.Price * memberCount) : (int)plan.Price;
+                string description = plan.IsFamilyPlan
+                    ? $"{plan.StripeProductName} x {memberCount} users"
+                    : plan.StripeProductName;
 
                 var options = new SessionCreateOptions
                 {
@@ -45,21 +49,21 @@ namespace TeachingBACKEND.Application.Services
                     CancelUrl = _configuration["STRIPE_CANCEL_URL"],
                     CustomerEmail = dto.Email,
                     LineItems = new List<SessionLineItemOptions>
+            {
+                new()
                 {
-                    new()
+                    PriceData = new SessionLineItemPriceDataOptions
                     {
-                        PriceData = new SessionLineItemPriceDataOptions
+                        Currency = "eur",
+                        UnitAmount = totalPrice,
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
                         {
-                            Currency = "eur",
-                            UnitAmount = plan.Price,
-                            ProductData = new SessionLineItemPriceDataProductDataOptions
-                            {
-                                Name = plan.StripeProductName
-                            }
-                        },
-                        Quantity = 1
-                    }
+                            Name = description
+                        }
+                    },
+                    Quantity = 1
                 }
+            }
                 };
 
                 var service = new SessionService();
@@ -71,10 +75,10 @@ namespace TeachingBACKEND.Application.Services
                     Email = dto.Email,
                     RegistrationType = dto.RegistrationType,
                     StripeSessionId = session.Id,
-                    Amount = plan.Price,
+                    Amount = totalPrice,
                     Currency = "eur",
                     Status = "pending",
-                    PlanId = plan.Id,
+                    PlanId = plan.Id
                 };
 
                 _context.Payments.Add(payment);
@@ -84,11 +88,9 @@ namespace TeachingBACKEND.Application.Services
             }
             catch (Exception ex)
             {
-
                 _logger.LogError(ex, "Failed to create checkout session for email: {Email}", dto.Email);
                 throw new Exception("Unable to create Stripe session. Please try again later");
             }
-          
         }
 
         public async Task HandleStripeWebhookAsync(HttpRequest request)

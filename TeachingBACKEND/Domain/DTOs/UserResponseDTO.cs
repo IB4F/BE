@@ -12,7 +12,12 @@ namespace TeachingBACKEND.Domain.DTOs
         public UserRole Role { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public string School { get; set; }
-        public string SessionId { get; set; } 
+        public string SessionId { get; set; }
+        public string CurrentClass { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public bool IsEmailVerified { get; set; }
+        public string VerificationType { get; set; }
+        public List<UserResponseDTO> Students { get; set; }
     }
 
 
