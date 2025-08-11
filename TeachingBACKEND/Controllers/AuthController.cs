@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
@@ -268,6 +269,22 @@ namespace TeachingBACKEND.Controllers
             return BadRequest(new { message = "Invalid or already verified token." });
         }
 
+        [AllowAnonymous]
+        [HttpPost("resend-verification")]
+        public async Task<IActionResult> ResendVerification([FromBody] string email)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+            if (user == null)
+                return NotFound(new { message = "User not found." });
 
+            if (user.IsEmailVerified)
+                return BadRequest(new { message = "Email is already verified." });
+
+            var newToken = _passwordService.GenerateVerificationToken();
+            user.EmailVerificationToken = newToken;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Verification resent" });
+        }
     }
 }

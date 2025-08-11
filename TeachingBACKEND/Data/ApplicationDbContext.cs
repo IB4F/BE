@@ -202,9 +202,6 @@ public class ApplicationDbContext : DbContext
         MaxUsers = 500
     }
 );
-
-
-
         modelBuilder.Entity<Subjects>().HasData(
             new Subjects { Id = Guid.Parse("dbe6757d-2138-463a-bee7-5d07a6d7b320"), Name = "Letërsi" },
             new Subjects { Id = Guid.Parse("616273bd-2a2a-4894-b689-57fe86702ae0"), Name = "Matematik" },
