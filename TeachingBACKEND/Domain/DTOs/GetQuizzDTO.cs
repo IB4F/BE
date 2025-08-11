@@ -9,5 +9,7 @@
         public List<OptionDTO> Options { get; set; }
         public bool IsAnswered { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string AudioUrl { get; set; }
+        public string ImageUrl { get; set; }
     }
 }

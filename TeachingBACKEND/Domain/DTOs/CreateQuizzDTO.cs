@@ -6,5 +6,7 @@
         public string Explanation { get; set; }
         public int Points { get; set; }
         public List<OptionDTO> Options { get; set; }
+        public string AudioUrl { get; set; }
+        public string ImageUrl { get; set; }
     }
 }

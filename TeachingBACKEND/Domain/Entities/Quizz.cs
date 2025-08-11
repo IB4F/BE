@@ -10,6 +10,8 @@
         public int Points { get; set; }
         public bool IsAnswered { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string AudioUrl { get; set; }
+        public string ImageUrl { get; set; }
         public ICollection<Option> Options { get; set; } = new List<Option>();
     }
 }

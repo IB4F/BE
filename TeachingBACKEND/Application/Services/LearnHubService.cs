@@ -293,6 +293,8 @@ public class LearnHubService : ILearnHubService
             Explanation = dto.Explanation,
             Points = dto.Points,
             CreatedAt = DateTime.UtcNow,
+            AudioUrl = dto.AudioUrl,
+            ImageUrl = dto.ImageUrl,
             Options = dto.Options.Select(o => new Option
             {
                 OptionText = o.OptionText,
@@ -311,9 +313,12 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.Options)
             .Select(q => new QuizDTO
             {
+                Id = q.Id,
                 Question = q.Question,
                 Points = q.Points,
                 IsAnswered = q.IsAnswered,
+                AudioUrl = q.AudioUrl,
+                ImageUrl = q.ImageUrl,
                 Options = q.Options.Select(o => new OptionTextDTO
                 {
                     OptionText = o.OptionText
@@ -328,14 +333,19 @@ public class LearnHubService : ILearnHubService
             .Where(q => q.Id == id)
             .Select(q => new GetQuizzDTO
             {
+                Id = q.Id,
                 Question = q.Question,
                 Explanation = q.Explanation,
                 Points = q.Points,
+                AudioUrl = q.AudioUrl,
+                ImageUrl = q.ImageUrl,
                 Options = q.Options.Select(o => new OptionDTO
                 {
                     OptionText = o.OptionText,
                     IsCorrect = o.IsCorrect
-                }).ToList()
+                }).ToList(),
+                IsAnswered = q.IsAnswered,
+                CreatedAt = q.CreatedAt
             })
             .FirstOrDefaultAsync();
     }
