@@ -8,6 +8,7 @@ using TeachingBACKEND.Application.Services;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Controllers
 {
@@ -16,12 +17,14 @@ namespace TeachingBACKEND.Controllers
         private readonly IUserService _userService;
         private readonly ApplicationDbContext _context;
         private readonly IPasswordService _passwordService;
+        private readonly INotificationService _notificationService;
 
-        public AuthController(IUserService userService, ApplicationDbContext context, IPasswordService passwordService)
+        public AuthController(IUserService userService, ApplicationDbContext context, IPasswordService passwordService, INotificationService notificationService)
         {
             _userService = userService;
             _context = context;
             _passwordService = passwordService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -280,11 +283,40 @@ namespace TeachingBACKEND.Controllers
             if (user.IsEmailVerified)
                 return BadRequest(new { message = "Email is already verified." });
 
+            // Generate new verification token
             var newToken = _passwordService.GenerateVerificationToken();
             user.EmailVerificationToken = newToken;
+            user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Verification resent" });
+            // Send email based on user type
+            switch (user.Role)
+            {
+                case UserRole.Student:
+                    await _notificationService.SendEmailVerification(user.Email, newToken, "student");
+                    break;
+
+                case UserRole.School:
+                    await _notificationService.SendEmailVerification(user.Email, newToken, "school");
+                    break;
+
+                case UserRole.Family:
+                    // Collect family member names if needed for template
+                    var familyMembers = await _context.Users
+                        .Where(u => u.ParentUserId == user.Id)
+                        .Select(u => $"{u.FirstName} {u.LastName}")
+                        .ToListAsync();
+
+                    await _notificationService.SendFamilyEmailVerification(user.Email, newToken, familyMembers, "family");
+                    break;
+
+                default:
+                    return BadRequest(new { message = "Unsupported user role for email verification." });
+            }
+
+            return Ok(new { message = "Verification email resent successfully." });
         }
+
     }
 }
