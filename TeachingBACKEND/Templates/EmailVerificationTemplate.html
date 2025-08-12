@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f2f5f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 550px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            overflow: hidden;
+            border-top: 6px solid #0056b3;
+            box-sizing: border-box;
+        }
+
+        .header {
+            color: #222;
+            margin-bottom: 25px;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 700;
+            color: #0056b3;
+        }
+
+        .content {
+            padding: 0 10px;
+            color: #555;
+            line-height: 1.7;
+            font-size: 16px;
+        }
+
+        .content p {
+            margin-bottom: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 16px 35px;
+            margin-top: 30px;
+            background-color: #1a73e8;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 6px 15px rgba(26, 115, 232, 0.35);
+            border: none;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #0d47a1;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(26, 115, 232, 0.45);
+        }
+
+        .link-text {
+            word-break: break-all;
+            color: #1a73e8;
+            text-decoration: none;
+            font-size: 14.5px;
+            display: block;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        .link-text:hover {
+            text-decoration: underline;
+        }
+
+        .footer {
+            margin-top: 35px;
+            font-size: 0.8em;
+            color: #999;
+            padding-top: 25px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>{TEMPLATE_TITLE}</h2>
+    </div>
+    <div class="content">
+        {TEMPLATE_CONTENT}
+        <p>
+            <a class="button" href="{TEMPLATE_CTA_URL}">{TEMPLATE_CTA_TEXT}</a>
+        </p>
+        <p>Nëse keni probleme me klikimin e butonit, kopjoni dhe ngjisni lidhjen e mëposhtme në shfletuesin tuaj:</p>
+        <a class="link-text" href="{TEMPLATE_CTA_URL}">{TEMPLATE_CTA_URL}</a>
+        <p>Nëse nuk e keni bërë ju këtë kërkesë, ju lutemi injorojeni këtë email.</p>
+    </div>
+    <div class="footer">
+        <p>{TEMPLATE_FOOTER}</p>
+    </div>
+</div>
+</body>
+</html>
