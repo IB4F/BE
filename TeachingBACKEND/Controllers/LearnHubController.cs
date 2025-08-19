@@ -72,7 +72,20 @@ namespace TeachingBACKEND.Api.Controllers
             var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject);
             return Ok(learnHubs);
         }
-
+        
+        [HttpPost("migrate-class-types")]
+        public async Task<IActionResult> MigrateClassTypes()
+        {
+            try
+            {
+                await _learnHubService.MigrateLearnHubClassTypes();
+                return Ok(new { message = "LearnHub class types migrated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
 
     }
 }

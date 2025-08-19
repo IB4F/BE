@@ -24,29 +24,25 @@ public class LearnHubService : ILearnHubService
     {
         if (dto == null)
             throw new Exception("DTO is null");
+        
+        var classExists = await _context.Classes
+            .AnyAsync(c => c.Id == Guid.Parse(dto.ClassType));
 
-        var className = await _context.Classes
-            .Where(c => c.Id == Guid.Parse(dto.ClassType))
-            .Select(c => c.Name)
-            .FirstOrDefaultAsync();
-
-        if (className == null)
+        if (!classExists)
             throw new Exception("Class not found");
+        
+        var subjectExists = await _context.Subjects
+            .AnyAsync(s => s.Id == Guid.Parse(dto.Subject));
 
-        var subjectName = await _context.Subjects
-            .Where(s => s.Id == Guid.Parse(dto.Subject))
-            .Select(s => s.Name)
-            .FirstOrDefaultAsync();
-
-        if (subjectName == null)
+        if (!subjectExists)
             throw new Exception("Subject not found");
 
         var postLearnHub = new LearnHub
         {
             Title = dto.Title,
             Description = dto.Description,
-            ClassType = className,
-            Subject = subjectName,
+            ClassType = dto.ClassType, // Store the class ID directly
+            Subject = dto.Subject, // Store the subject ID directly
             Difficulty = dto.Difficulty,
             IsFree = dto.IsFree,
             CreatedAt = DateTime.UtcNow,
@@ -101,12 +97,24 @@ public class LearnHubService : ILearnHubService
 
         if (learnHub == null)
             throw new Exception("LearnHub not found");
+        
+        var classExists = await _context.Classes
+            .AnyAsync(c => c.Id == Guid.Parse(dto.ClassType));
+
+        if (!classExists)
+            throw new Exception("Class not found");
+        
+        var subjectExists = await _context.Subjects
+            .AnyAsync(s => s.Id == Guid.Parse(dto.Subject));
+
+        if (!subjectExists)
+            throw new Exception("Subject not found");
 
         // Update main fields
         learnHub.Title = dto.Title;
         learnHub.Description = dto.Description;
-        learnHub.Subject = dto.Subject;
-        learnHub.ClassType = dto.ClassType;
+        learnHub.Subject = dto.Subject; // Store subject ID
+        learnHub.ClassType = dto.ClassType; // Store class ID
         learnHub.IsFree = dto.IsFree;
 
         _context.Links.RemoveRange(learnHub.Links);
@@ -141,6 +149,43 @@ public class LearnHubService : ILearnHubService
 
         return learnHubDto;
     }
+    
+    public async Task MigrateLearnHubClassTypes()
+    {
+        var learnHubs = await _context.LearnHubs.ToListAsync();
+        
+        foreach (var learnHub in learnHubs)
+        {
+            // Check if ClassType is a class name (not a GUID)
+            if (!Guid.TryParse(learnHub.ClassType, out _))
+            {
+                // Find the class by name
+                var classEntity = await _context.Classes
+                    .FirstOrDefaultAsync(c => c.Name == learnHub.ClassType);
+                
+                if (classEntity != null)
+                {
+                    learnHub.ClassType = classEntity.Id.ToString();
+                }
+            }
+
+            // Check if Subject is a subject name (not a GUID)
+            if (!Guid.TryParse(learnHub.Subject, out _))
+            {
+                // Find the subject by name
+                var subjectEntity = await _context.Subjects
+                    .FirstOrDefaultAsync(s => s.Name == learnHub.Subject);
+                
+                if (subjectEntity != null)
+                {
+                    learnHub.Subject = subjectEntity.Id.ToString();
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     public async Task DeleteLearnHub(Guid id)
     {
         var learnHub = await _context.LearnHubs.FindAsync(id);

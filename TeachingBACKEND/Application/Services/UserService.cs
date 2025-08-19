@@ -35,6 +35,52 @@ namespace TeachingBACKEND.Application.Services
 
         }
 
+        /// <summary>
+        /// Validates and converts class input to ensure it's always a valid class ID
+        /// </summary>
+        /// <param name="classInput">Either a class ID (Guid) or class name</param>
+        /// <returns>The class ID as a string</returns>
+        private async Task<string> ValidateAndGetClassId(string classInput)
+        {
+            if (string.IsNullOrWhiteSpace(classInput))
+                throw new ArgumentException("Class cannot be null or empty");
+
+            // First, try to parse as GUID (class ID)
+            if (Guid.TryParse(classInput, out Guid classId))
+            {
+                // Verify the class ID exists in the database
+                var classExists = await _context.Classes.AnyAsync(c => c.Id == classId);
+                if (classExists)
+                {
+                    return classId.ToString();
+                }
+                throw new ArgumentException($"Class with ID '{classInput}' not found");
+            }
+
+            // If not a GUID, treat as class name and find the corresponding ID
+            var classEntity = await _context.Classes.FirstOrDefaultAsync(c => c.Name == classInput);
+            if (classEntity != null)
+            {
+                return classEntity.Id.ToString();
+            }
+
+            throw new ArgumentException($"Class '{classInput}' not found");
+        }
+
+        /// <summary>
+        /// Converts a class ID to its corresponding class name
+        /// </summary>
+        /// <param name="classId">The class ID as a string</param>
+        /// <returns>The class name, or null if not found</returns>
+        private async Task<string?> GetClassNameById(string? classId)
+        {
+            if (string.IsNullOrWhiteSpace(classId) || !Guid.TryParse(classId, out Guid id))
+                return null;
+
+            var classEntity = await _context.Classes.FirstOrDefaultAsync(c => c.Id == id);
+            return classEntity?.Name;
+        }
+
         public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
         {
 
@@ -52,6 +98,9 @@ namespace TeachingBACKEND.Application.Services
 
             var verificationToken = _passwordService.GenerateVerificationToken();
 
+            // Validate and ensure CurrentClass is always a class ID
+            var validatedClassId = await ValidateAndGetClassId(model.CurrentClass);
+
             var student = new User
             {
                 Email = model.Email,
@@ -61,7 +110,7 @@ namespace TeachingBACKEND.Application.Services
                 FirstName = model.FirstName,
                 LastName = model.LastName,
                 DateOfBirth = model.DateOfBirth,
-                CurrentClass = model.CurrentClass,
+                CurrentClass = validatedClassId,
                 School = model.School,
                 IsEmailVerified = false,
                 EmailVerificationToken = verificationToken,
@@ -182,6 +231,10 @@ namespace TeachingBACKEND.Application.Services
                 }
                 var studentPassword = _passwordService.GenerateRandomPassword();
                 var studentVerificationToken = _passwordService.GenerateVerificationToken();
+                
+                // Validate and ensure CurrentClass is always a class ID
+                var validatedClassId = await ValidateAndGetClassId(studentDto.CurrentClass);
+                
                 var student = new User
                 {
                     Email = studentDto.Email,
@@ -191,7 +244,7 @@ namespace TeachingBACKEND.Application.Services
                     FirstName = studentDto.FirstName,
                     LastName = studentDto.LastName,
                     DateOfBirth = studentDto.DateOfBirth,
-                    CurrentClass = studentDto.CurrentClass,
+                    CurrentClass = validatedClassId,
                     School = model.SchoolName,
                     IsEmailVerified = false,
                     EmailVerificationToken = studentVerificationToken,
@@ -259,6 +312,9 @@ namespace TeachingBACKEND.Application.Services
         //    var studentPassword = _passwordService.GenerateRandomPassword();
         //    var verificationToken = _passwordService.GenerateVerificationToken();
 
+        //    // Validate and ensure CurrentClass is always a class ID
+        //    var validatedClassId = await ValidateAndGetClassId(model.CurrentClass);
+
         //    var student = new User
         //    {
         //        Email = model.Email,
@@ -268,7 +324,7 @@ namespace TeachingBACKEND.Application.Services
         //        FirstName = model.FirstName,
         //        LastName = model.LastName,
         //        DateOfBirth = model.DateOfBirth,
-        //        CurrentClass = model.CurrentClass,
+        //        CurrentClass = validatedClassId,
         //        School = model.School,
         //        IsEmailVerified = false,
         //        EmailVerificationToken = verificationToken,
@@ -352,6 +408,9 @@ namespace TeachingBACKEND.Application.Services
                     suffix++;
                 }
 
+                // Validate and ensure CurrentClass is always a class ID
+                var validatedClassId = await ValidateAndGetClassId(member.CurrentClass);
+
                 var familyMember = new User
                 {
                     Email = generatedEmail,
@@ -365,7 +424,7 @@ namespace TeachingBACKEND.Application.Services
                     EmailVerificationToken = null,
                     EmailVerificationTokenExpiry = null,
                     ParentUserId = primaryUser.Id,
-                    CurrentClass = member.CurrentClass
+                    CurrentClass = validatedClassId
                 };
 
                 _context.Users.Add(familyMember);
@@ -548,6 +607,19 @@ namespace TeachingBACKEND.Application.Services
                 .ToListAsync();
 
             return students;
+        }
+
+        /// <summary>
+        /// Gets all available classes with their IDs and names
+        /// </summary>
+        /// <returns>List of classes with ID and Name</returns>
+        public async Task<List<object>> GetAvailableClasses()
+        {
+            var classes = await _context.Classes
+                .Select(c => new { c.Id, c.Name })
+                .ToListAsync();
+            
+            return classes.Cast<object>().ToList();
         }
     }
 }

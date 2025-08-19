@@ -97,6 +97,21 @@ namespace TeachingBACKEND.Controllers
                 return BadRequest(new { message = ex.Message }); 
             }
         }
+        
+        [AllowAnonymous]
+        [HttpGet("available-classes")]
+        public async Task<IActionResult> GetAvailableClasses()
+        {
+            try
+            {
+                var classes = await _userService.GetAvailableClasses();
+                return Ok(classes);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
 
         [AllowAnonymous]
         [HttpGet("verify-email")]

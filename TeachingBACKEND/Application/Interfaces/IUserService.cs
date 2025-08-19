@@ -18,5 +18,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
         Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model);
         Task<bool> VerifyFamilyEmailAsync(Guid token);
+        Task<List<object>> GetAvailableClasses();
     }
 }

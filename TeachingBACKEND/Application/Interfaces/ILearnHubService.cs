@@ -11,6 +11,7 @@ public interface ILearnHubService
     Task DeleteLearnHub(Guid id);
     Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
     Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject);
+    Task MigrateLearnHubClassTypes();
 
     // Link
     Task<Guid> PostLink(Guid learnHubId, CreateLinkDTO dto);

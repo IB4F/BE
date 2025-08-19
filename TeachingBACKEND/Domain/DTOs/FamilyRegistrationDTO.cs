@@ -4,7 +4,10 @@ public class FamilyMemberInput
 {
     public string FirstName { get; set; }
     public string LastName { get; set; }
-    public string? CurrentClass { get; set; }
+            /// <summary>
+        /// Class ID (Guid) or Class Name. Will be converted to Class ID internally.
+        /// </summary>
+        public string? CurrentClass { get; set; }
 }
 
 public class FamilyRegistrationDTO
