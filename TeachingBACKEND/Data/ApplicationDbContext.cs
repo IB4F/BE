@@ -21,6 +21,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Quizz> Quizzes { get; set; }
     public DbSet<RegistrationPlan> RegistrationPlans { get; set; }
     public DbSet<Option> Options { get; set; }
+    public DbSet<QuizType> QuizTypes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -209,6 +210,11 @@ public class ApplicationDbContext : DbContext
             new Subjects { Id = Guid.Parse("a5cf5e27-ef08-4fef-b907-109496b284eb"), Name = "Histori" },
             new Subjects { Id = Guid.Parse("5eac82ae-0b4b-47a8-9871-ba6ab1c99df7"), Name = "Gjeografi" },
             new Subjects { Id = Guid.Parse("faf6b93a-91d1-4ead-85f5-0120ac85f7d2"), Name = "Shkenca" }
+        );
+
+        modelBuilder.Entity<QuizType>().HasData(
+            new QuizType { Id = Guid.Parse("b1b1b1b1-b1b1-1111-1111-111111111111"), Name = "text" },
+            new QuizType { Id = Guid.Parse("b2b2b2b2-b2b2-2222-2222-222222222222"), Name = "imazhe" }
         );
 
         var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");

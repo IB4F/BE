@@ -7,6 +7,7 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<IEnumerable<City>> GetCities();
         Task<IEnumerable<Class>> GetClasses();
         Task<IEnumerable<Subjects>> GetSubjects();
+        Task<IEnumerable<QuizType>> GetQuizTypes();
         Task<List<RegistrationPlan>> GetAllPlansAsync();
         Task<RegistrationPlan?> GetPlanByIdAsync(Guid id);
     }

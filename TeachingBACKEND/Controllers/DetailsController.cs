@@ -57,6 +57,18 @@ public class DetailsController : ControllerBase
 
         return Ok(subjectsList);
     }
+
+    [AllowAnonymous]
+    [HttpGet("get-quiz-types")]
+    public async Task<ActionResult<IEnumerable<QuizType>>> GetQuizTypes()
+    {
+        var quizTypesList = await _detailService.GetQuizTypes();
+
+        if (!quizTypesList.Any())
+            return NotFound("No quiz types found.");
+
+        return Ok(quizTypesList);
+    }
     [HttpGet("get-plans")]
     public async Task<ActionResult<IEnumerable<RegistrationPlan>>> GetPlans()
     {

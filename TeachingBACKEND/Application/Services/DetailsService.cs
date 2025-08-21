@@ -42,6 +42,17 @@ namespace TeachingBACKEND.Application.Services
                 ? subjects
                 : new List<Subjects>();
         }
+        public async Task<IEnumerable<QuizType>> GetQuizTypes()
+        {
+            var quizTypes = await _context.QuizTypes
+                .OrderBy(c => c.Name.Length)   
+                .ThenBy(c => c.Name)   
+                .ToListAsync();
+
+            return quizTypes.Any()
+                ? quizTypes
+                : new List<QuizType>();
+        }
         public async Task<List<RegistrationPlan>> GetAllPlansAsync()
         {
             return await _context.RegistrationPlans.ToListAsync();

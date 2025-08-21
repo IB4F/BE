@@ -21,7 +21,7 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("paginated")]
         public async Task<IActionResult> GetAllPaginated([FromBody] PaginationRequestDTO pagination)
         {
-            if (pagination.PageNumber <= 0 || pagination.PageSize <= 0)
+            if (pagination.PageNumber < 0 || pagination.PageSize < 0)
             {
                 return BadRequest(new { error = "PageNumber and PageSize must be greater than zero." });
             }
