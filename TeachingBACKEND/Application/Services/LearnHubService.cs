@@ -5,18 +5,21 @@ using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.DTOs.Quizzes;
 using TeachingBACKEND.Domain.Entities;
 using Microsoft.AspNetCore.Http;
+using TeachingBACKEND.Application.Interfaces;
 
 public class LearnHubService : ILearnHubService
 {
     private readonly ApplicationDbContext _context;
     private readonly IMapper _mapper;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IFileService _fileService;
 
-    public LearnHubService(ApplicationDbContext context, IMapper mapper, IHttpContextAccessor httpContextAccessor)
+    public LearnHubService(ApplicationDbContext context, IMapper mapper, IHttpContextAccessor httpContextAccessor, IFileService fileService)
     {
         _context = context;
         _mapper = mapper;
         _httpContextAccessor = httpContextAccessor;
+        _fileService = fileService;
     }
 
     private string GetFullUrl(string relativeUrl)
@@ -456,6 +459,14 @@ public class LearnHubService : ILearnHubService
         if (quizType == null)
             throw new Exception("Quiz type not found");
 
+        // Store old file IDs for cleanup
+        var oldQuestionAudioId = quizz.QuestionAudioId;
+        var oldExplanationAudioId = quizz.ExplanationAudioId;
+        var oldOptionImageIds = quizz.Options
+            .Where(o => o.OptionImageId.HasValue)
+            .Select(o => o.OptionImageId.Value)
+            .ToList();
+
         quizz.Question = dto.Question;
         quizz.Explanation = dto.Explanation;
         quizz.Points = dto.Points;
@@ -475,16 +486,101 @@ public class LearnHubService : ILearnHubService
         }).ToList();
 
         await _context.SaveChangesAsync();
+
+        // Clean up old files that are no longer referenced
+        await CleanupUnusedFiles(oldQuestionAudioId, oldExplanationAudioId, oldOptionImageIds, dto);
+
         return quizz;
+    }
+
+    private async Task CleanupUnusedFiles(Guid? oldQuestionAudioId, Guid? oldExplanationAudioId, List<Guid> oldOptionImageIds, CreateQuizzDTO newDto)
+    {
+        var filesToDelete = new List<Guid>();
+
+        // Check if question audio was replaced
+        if (oldQuestionAudioId.HasValue && 
+            (string.IsNullOrEmpty(newDto.QuestionAudioId) || Guid.Parse(newDto.QuestionAudioId) != oldQuestionAudioId.Value))
+        {
+            filesToDelete.Add(oldQuestionAudioId.Value);
+        }
+
+        // Check if explanation audio was replaced
+        if (oldExplanationAudioId.HasValue && 
+            (string.IsNullOrEmpty(newDto.ExplanationAudioId) || Guid.Parse(newDto.ExplanationAudioId) != oldExplanationAudioId.Value))
+        {
+            filesToDelete.Add(oldExplanationAudioId.Value);
+        }
+
+        // Check option images that were replaced
+        var newOptionImageIds = newDto.Options
+            .Where(o => !string.IsNullOrEmpty(o.OptionImageId))
+            .Select(o => Guid.Parse(o.OptionImageId))
+            .ToList();
+
+        foreach (var oldImageId in oldOptionImageIds)
+        {
+            if (!newOptionImageIds.Contains(oldImageId))
+            {
+                filesToDelete.Add(oldImageId);
+            }
+        }
+
+        // Delete the unused files
+        foreach (var fileId in filesToDelete)
+        {
+            try
+            {
+                await _fileService.DeleteFileAsync(fileId);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the update
+                // You might want to add proper logging here
+                Console.WriteLine($"Failed to delete file {fileId}: {ex.Message}");
+            }
+        }
     }
     public async Task DeleteQuizz(Guid id)
     {
-        var quizz = await _context.Quizzes.FindAsync(id);
+        var quizz = await _context.Quizzes
+            .Include(q => q.Options)
+            .FirstOrDefaultAsync(q => q.Id == id);
+            
         if (quizz == null)
             throw new Exception("Quizz not found");
 
+        // Collect all file IDs to delete
+        var filesToDelete = new List<Guid>();
+        
+        if (quizz.QuestionAudioId.HasValue)
+            filesToDelete.Add(quizz.QuestionAudioId.Value);
+            
+        if (quizz.ExplanationAudioId.HasValue)
+            filesToDelete.Add(quizz.ExplanationAudioId.Value);
+            
+        foreach (var option in quizz.Options)
+        {
+            if (option.OptionImageId.HasValue)
+                filesToDelete.Add(option.OptionImageId.Value);
+        }
+
+        // Remove the quiz first
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
+
+        // Delete associated files
+        foreach (var fileId in filesToDelete)
+        {
+            try
+            {
+                await _fileService.DeleteFileAsync(fileId);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the deletion
+                Console.WriteLine($"Failed to delete file {fileId} during quiz deletion: {ex.Message}");
+            }
+        }
     }
     public async Task<PaginatedResultDTO<SimpleQuizDTO>> GetPaginatedQuizzesAsync(Guid linkId, PaginationRequestDTO dto)
     {
