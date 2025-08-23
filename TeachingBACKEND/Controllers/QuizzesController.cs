@@ -61,18 +61,4 @@ public class QuizzesController : ControllerBase
         return Ok(result);
     }
 
-    [HttpGet("types")]
-    public async Task<IActionResult> GetQuizTypes()
-    {
-        try
-        {
-            var quizTypes = await _learnHubService.GetQuizTypesAsync();
-            return Ok(quizTypes);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }
-
 }
