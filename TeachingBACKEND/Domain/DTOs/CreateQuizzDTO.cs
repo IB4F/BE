@@ -3,10 +3,11 @@
     public class CreateQuizzDTO
     {
         public string Question { get; set; }
+        public string? QuestionAudioId { get; set; }
         public string Explanation { get; set; }
+        public string? ExplanationAudioId { get; set; }
         public int Points { get; set; }
         public List<OptionDTO> Options { get; set; }
-        public string AudioUrl { get; set; }
-        public string ImageUrl { get; set; }
+        public string QuizType { get; set; }
     }
 }

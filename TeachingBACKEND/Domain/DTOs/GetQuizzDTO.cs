@@ -8,8 +8,10 @@
         public int Points { get; set; }
         public List<OptionDTO> Options { get; set; }
         public bool IsAnswered { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string AudioUrl { get; set; }
-        public string ImageUrl { get; set; }
+        public string? QuestionAudioId { get; set; }
+        public string? ExplanationAudioId { get; set; }
+        public string? QuestionAudioUrl { get; set; }
+        public string? ExplanationAudioUrl { get; set; }
+        public string QuizType { get; set; }
     }
 }

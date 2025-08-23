@@ -26,5 +26,6 @@ public interface ILearnHubService
     Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id);
     Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto);
     Task DeleteQuizz(Guid id);
-    Task<PaginatedResultDTO<GetQuizzDTO>> GetPaginatedQuizzesAsync(Guid linkId,PaginationRequestDTO dto);
+    Task<PaginatedResultDTO<SimpleQuizDTO>> GetPaginatedQuizzesAsync(Guid linkId,PaginationRequestDTO dto);
+    Task<List<QuizType>> GetQuizTypesAsync();
 }

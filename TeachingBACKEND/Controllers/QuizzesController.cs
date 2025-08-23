@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TeachingBACKEND.Domain.DTOs;
 
 namespace TeachingBACKEND.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin")]
 public class QuizzesController : ControllerBase
 {
     private readonly ILearnHubService _learnHubService;
@@ -52,11 +54,25 @@ public class QuizzesController : ControllerBase
     [HttpPost("Get-Paginated-Quizzes")]
     public async Task<IActionResult> GetPaginatedQuizzes(Guid linkId, [FromBody] PaginationRequestDTO dto)
     {
-        if (dto.PageNumber < 0 || dto.PageSize <= 0)
+        if (dto.PageNumber < 0 || dto.PageSize < 0)
             return BadRequest(new { error = "PageNumber must be >= 0 and PageSize must be > 0." });
 
         var result = await _learnHubService.GetPaginatedQuizzesAsync(linkId, dto);
         return Ok(result);
+    }
+
+    [HttpGet("types")]
+    public async Task<IActionResult> GetQuizTypes()
+    {
+        try
+        {
+            var quizTypes = await _learnHubService.GetQuizTypesAsync();
+            return Ok(quizTypes);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
     }
 
 }

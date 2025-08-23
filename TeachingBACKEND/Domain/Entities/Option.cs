@@ -7,5 +7,7 @@
         public Quizz Quizz { get; set; }
         public string OptionText { get; set; }
         public bool IsCorrect { get; set; }
+        public Guid? OptionImageId { get; set; }
+        public UploadedFile OptionImage { get; set; }
     }
 }

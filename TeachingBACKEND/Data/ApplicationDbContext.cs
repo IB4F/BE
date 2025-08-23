@@ -22,6 +22,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RegistrationPlan> RegistrationPlans { get; set; }
     public DbSet<Option> Options { get; set; }
     public DbSet<QuizType> QuizTypes { get; set; }
+    public DbSet<UploadedFile> Files { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +83,30 @@ public class ApplicationDbContext : DbContext
         .WithMany(q => q.Options)
         .HasForeignKey(o => o.QuizzId)
         .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Option>()
+        .HasOne(o => o.OptionImage)
+        .WithMany()
+        .HasForeignKey(o => o.OptionImageId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Quizz>()
+        .HasOne(q => q.QuizzType)
+        .WithMany()
+        .HasForeignKey(q => q.QuizzTypeId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Quizz>()
+        .HasOne(q => q.QuestionAudio)
+        .WithMany()
+        .HasForeignKey(q => q.QuestionAudioId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Quizz>()
+        .HasOne(q => q.ExplanationAudio)
+        .WithMany()
+        .HasForeignKey(q => q.ExplanationAudioId)
+        .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<City>().HasData(
             new City { Id = Guid.Parse("a2d4a4ee-5fa2-4a33-bd3c-2bbf98e9310b"), Name = "Tirana" },

@@ -80,6 +80,7 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHttpContextAccessor(); // Add this for URL generation
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
@@ -88,6 +89,7 @@ builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();
 builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService>();
+builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -119,6 +121,7 @@ builder.Host.UseSerilog();
 var app = builder.Build();
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // Add static file serving
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
