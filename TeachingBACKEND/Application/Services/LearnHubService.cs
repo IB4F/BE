@@ -112,6 +112,7 @@ public class LearnHubService : ILearnHubService
     {
         var learnHub = await _context.LearnHubs
             .Include(l => l.Links)
+                .ThenInclude(link => link.Quizzes)
             .FirstOrDefaultAsync(lh => lh.Id == id);
 
         if (learnHub == null)
@@ -136,17 +137,43 @@ public class LearnHubService : ILearnHubService
         learnHub.ClassType = dto.ClassType; // Store class ID
         learnHub.IsFree = dto.IsFree;
 
-        _context.Links.RemoveRange(learnHub.Links);
-        learnHub.Links.Clear();
+        // Smart link update - preserve existing links and their quizzes
+        var existingLinks = learnHub.Links.ToList();
+        var newLinkDtos = dto.Links.ToList();
 
-        var newLinks = dto.Links.Select(linkDto => new Link
+        // Update existing links that match by index (assuming order matters)
+        for (int i = 0; i < Math.Min(existingLinks.Count, newLinkDtos.Count); i++)
         {
-            LearnHubId = learnHub.Id,
-            Title = linkDto.Title,
-            Progress = linkDto.Progress
-        }).ToList();
+            var existingLink = existingLinks[i];
+            var newLinkDto = newLinkDtos[i];
+            
+            existingLink.Title = newLinkDto.Title;
+            existingLink.Progress = newLinkDto.Progress;
+        }
 
-        learnHub.Links.AddRange(newLinks);
+        // Remove extra existing links (if new DTO has fewer links)
+        if (existingLinks.Count > newLinkDtos.Count)
+        {
+            var linksToRemove = existingLinks.Skip(newLinkDtos.Count).ToList();
+            _context.Links.RemoveRange(linksToRemove);
+            foreach (var link in linksToRemove)
+            {
+                learnHub.Links.Remove(link);
+            }
+        }
+
+        // Add new links (if new DTO has more links)
+        if (newLinkDtos.Count > existingLinks.Count)
+        {
+            var newLinks = newLinkDtos.Skip(existingLinks.Count).Select(linkDto => new Link
+            {
+                LearnHubId = learnHub.Id,
+                Title = linkDto.Title,
+                Progress = linkDto.Progress
+            }).ToList();
+
+            learnHub.Links.AddRange(newLinks);
+        }
 
         await _context.SaveChangesAsync();
 
@@ -332,12 +359,49 @@ public class LearnHubService : ILearnHubService
     }
     public async Task DeleteLink(Guid id)
     {
-        var link = await _context.Links.FindAsync(id);
+        var link = await _context.Links
+            .Include(l => l.Quizzes)
+                .ThenInclude(q => q.Options)
+            .FirstOrDefaultAsync(l => l.Id == id);
+            
         if (link == null)
             throw new Exception("Link not found");
 
+        // Collect all file IDs to delete before removing the link
+        var filesToDelete = new List<Guid>();
+        
+        foreach (var quiz in link.Quizzes)
+        {
+            if (quiz.QuestionAudioId.HasValue)
+                filesToDelete.Add(quiz.QuestionAudioId.Value);
+                
+            if (quiz.ExplanationAudioId.HasValue)
+                filesToDelete.Add(quiz.ExplanationAudioId.Value);
+                
+            foreach (var option in quiz.Options)
+            {
+                if (option.OptionImageId.HasValue)
+                    filesToDelete.Add(option.OptionImageId.Value);
+            }
+        }
+
+        // Remove the link (this will cascade delete quizzes and options)
         _context.Links.Remove(link);
         await _context.SaveChangesAsync();
+
+        // Delete associated files
+        foreach (var fileId in filesToDelete)
+        {
+            try
+            {
+                await _fileService.DeleteFileAsync(fileId);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the deletion
+                Console.WriteLine($"Failed to delete file {fileId} during link deletion: {ex.Message}");
+            }
+        }
     }
 
     // ----------------------------
