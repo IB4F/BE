@@ -28,4 +28,8 @@ public interface ILearnHubService
     Task DeleteQuizz(Guid id);
     Task<PaginatedResultDTO<SimpleQuizDTO>> GetPaginatedQuizzesAsync(Guid linkId,PaginationRequestDTO dto);
     Task<List<QuizType>> GetQuizTypesAsync();
+    
+    // Parent-Child Quiz methods
+    Task<List<QuizDTO>> GetParentQuizzesByLinkId(Guid linkId);
+    Task<List<ChildQuizDTO>> GetChildQuizzesByParentId(Guid parentQuizId);
 }

@@ -108,6 +108,13 @@ public class ApplicationDbContext : DbContext
         .HasForeignKey(q => q.ExplanationAudioId)
         .OnDelete(DeleteBehavior.NoAction);
 
+        // Self-referencing relationship for parent-child quizzes
+        modelBuilder.Entity<Quizz>()
+            .HasOne(q => q.ParentQuiz)
+            .WithMany(q => q.ChildQuizzes)
+            .HasForeignKey(q => q.ParentQuizId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         modelBuilder.Entity<City>().HasData(
             new City { Id = Guid.Parse("a2d4a4ee-5fa2-4a33-bd3c-2bbf98e9310b"), Name = "Tirana" },
             new City { Id = Guid.Parse("b8e13e5a-bba4-48b6-99d6-c4f123ab2cb3"), Name = "Durrës" },

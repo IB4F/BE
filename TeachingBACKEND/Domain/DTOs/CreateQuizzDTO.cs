@@ -9,5 +9,6 @@
         public int Points { get; set; }
         public List<OptionDTO> Options { get; set; }
         public string QuizType { get; set; }
+        public string? ParentQuizId { get; set; } // Optional parent quiz ID for child quizzes
     }
 }

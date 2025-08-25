@@ -16,6 +16,12 @@
         public UploadedFile QuestionAudio { get; set; }
         public Guid? ExplanationAudioId { get; set; }
         public UploadedFile ExplanationAudio { get; set; }
+        
+        // Parent-Child relationship properties
+        public Guid? ParentQuizId { get; set; }
+        public Quizz ParentQuiz { get; set; }
+        public ICollection<Quizz> ChildQuizzes { get; set; } = new List<Quizz>();
+        
         public ICollection<Option> Options { get; set; } = new List<Option>();
     }
 }

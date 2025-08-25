@@ -1,6 +1,6 @@
-﻿namespace TeachingBACKEND.Domain.DTOs
+namespace TeachingBACKEND.Domain.DTOs.Quizzes
 {
-    public class GetQuizzDTO
+    public class ChildGetQuizzDTO
     {
         public Guid Id { get; set; }
         public string Question { get; set; }
@@ -13,7 +13,7 @@
         public string? QuestionAudioUrl { get; set; }
         public string? ExplanationAudioUrl { get; set; }
         public string QuizType { get; set; }
-        public Guid? ParentQuizId { get; set; } // Parent quiz ID if this is a child quiz
-        public List<object> ChildQuizzes { get; set; } = new List<object>(); // Child quizzes if this is a parent
+        public Guid? ParentQuizId { get; set; }
+        // No ChildQuizzes property - child quizzes don't have children
     }
 }

@@ -12,5 +12,7 @@ namespace TeachingBACKEND.Domain.DTOs.Quizzes
         public string? QuestionAudioUrl { get; set; }
         public string? ExplanationAudioUrl { get; set; }
         public string QuizzTypeName { get; set; }
+        public Guid? ParentQuizId { get; set; } // Parent quiz ID if this is a child quiz
+        public List<QuizDTO> ChildQuizzes { get; set; } = new List<QuizDTO>(); // Child quizzes if this is a parent
     }
 }

@@ -422,6 +422,27 @@ public class LearnHubService : ILearnHubService
         if (quizType == null)
             throw new Exception("Quiz type not found");
 
+        // Validate parent quiz if provided
+        Guid? parentQuizId = null;
+        if (!string.IsNullOrEmpty(dto.ParentQuizId))
+        {
+            if (!Guid.TryParse(dto.ParentQuizId, out Guid parsedParentId))
+                throw new Exception("Invalid parent quiz ID");
+
+            var parentQuiz = await _context.Quizzes
+                .Include(q => q.ChildQuizzes)
+                .FirstOrDefaultAsync(q => q.Id == parsedParentId && q.LinkId == linkId);
+
+            if (parentQuiz == null)
+                throw new Exception("Parent quiz not found");
+
+            // Check if parent already has 3 children
+            if (parentQuiz.ChildQuizzes.Count >= 3)
+                throw new Exception("Parent quiz already has maximum number of child quizzes (3)");
+
+            parentQuizId = parsedParentId;
+        }
+
         var newQuizz = new Quizz
         {
             LinkId = linkId,
@@ -432,6 +453,7 @@ public class LearnHubService : ILearnHubService
             CreatedAt = DateTime.UtcNow,
             QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null,
             ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null,
+            ParentQuizId = parentQuizId,
             Options = dto.Options.Select(o => new Option
             {
                 OptionText = o.OptionText,
@@ -453,24 +475,40 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.QuestionAudio)
             .Include(q => q.ExplanationAudio)
             .Include(q => q.QuizzType)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.Options)
+                    .ThenInclude(o => o.OptionImage)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuestionAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.ExplanationAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuizzType)
             .ToListAsync();
 
-        return quizzes.Select(q => new QuizDTO
+        return quizzes.Select(q => MapToQuizDTO(q)).ToList();
+    }
+
+    private QuizDTO MapToQuizDTO(Quizz quiz)
+    {
+        return new QuizDTO
         {
-            Id = q.Id,
-            Question = q.Question,
-            Points = q.Points,
-            IsAnswered = q.IsAnswered,
-            QuestionAudioUrl = GetFullUrl(q.QuestionAudio?.FileUrl),
-            ExplanationAudioUrl = GetFullUrl(q.ExplanationAudio?.FileUrl),
-            QuizzTypeName = q.QuizzType.Name,
-            Options = q.Options.Select(o => new OptionTextDTO
+            Id = quiz.Id,
+            Question = quiz.Question,
+            Points = quiz.Points,
+            IsAnswered = quiz.IsAnswered,
+            QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            QuizzTypeName = quiz.QuizzType.Name,
+            ParentQuizId = quiz.ParentQuizId,
+            Options = quiz.Options.Select(o => new OptionTextDTO
             {
                 OptionText = o.OptionText,
                 OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
-            }).ToList()
-        }).ToList();
+            }).ToList(),
+            ChildQuizzes = quiz.ChildQuizzes.Select(cq => MapToQuizDTO(cq)).ToList()
+        };
     }
     public async Task<GetQuizzDTO?> GetQuizzByIdDTOAsync(Guid id)
     {
@@ -480,11 +518,25 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.QuestionAudio)
             .Include(q => q.ExplanationAudio)
             .Include(q => q.QuizzType)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.Options)
+                    .ThenInclude(o => o.OptionImage)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuestionAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.ExplanationAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuizzType)
             .FirstOrDefaultAsync(q => q.Id == id);
 
         if (quiz == null)
             return null;
 
+        return MapToGetQuizzDTO(quiz);
+    }
+
+    private GetQuizzDTO MapToGetQuizzDTO(Quizz quiz)
+    {
         return new GetQuizzDTO
         {
             Id = quiz.Id,
@@ -496,6 +548,33 @@ public class LearnHubService : ILearnHubService
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
+            ParentQuizId = quiz.ParentQuizId,
+            Options = quiz.Options.Select(o => new OptionDTO
+            {
+                OptionText = o.OptionText,
+                IsCorrect = o.IsCorrect,
+                OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
+                OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
+            }).ToList(),
+            IsAnswered = quiz.IsAnswered,
+            ChildQuizzes = quiz.ParentQuizId == null ? quiz.ChildQuizzes.Select(cq => (object)MapToChildGetQuizzDTO(cq)).ToList() : new List<object>()
+        };
+    }
+
+    private ChildGetQuizzDTO MapToChildGetQuizzDTO(Quizz quiz)
+    {
+        return new ChildGetQuizzDTO
+        {
+            Id = quiz.Id,
+            Question = quiz.Question,
+            Explanation = quiz.Explanation,
+            Points = quiz.Points,
+            QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
+            ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            QuizType = quiz.QuizzTypeId.ToString("D"),
+            ParentQuizId = quiz.ParentQuizId,
             Options = quiz.Options.Select(o => new OptionDTO
             {
                 OptionText = o.OptionText,
@@ -504,6 +583,7 @@ public class LearnHubService : ILearnHubService
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
             }).ToList(),
             IsAnswered = quiz.IsAnswered
+            // No ChildQuizzes property - child quizzes don't have children
         };
     }
     public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
@@ -523,6 +603,35 @@ public class LearnHubService : ILearnHubService
         if (quizType == null)
             throw new Exception("Quiz type not found");
 
+        // Validate parent quiz if provided
+        Guid? parentQuizId = null;
+        if (!string.IsNullOrEmpty(dto.ParentQuizId))
+        {
+            if (!Guid.TryParse(dto.ParentQuizId, out Guid parsedParentId))
+                throw new Exception("Invalid parent quiz ID");
+
+            // Prevent circular reference - quiz cannot be its own parent
+            if (parsedParentId == id)
+                throw new Exception("Quiz cannot be its own parent");
+
+            var parentQuiz = await _context.Quizzes
+                .Include(q => q.ChildQuizzes)
+                .FirstOrDefaultAsync(q => q.Id == parsedParentId && q.LinkId == quizz.LinkId);
+
+            if (parentQuiz == null)
+                throw new Exception("Parent quiz not found");
+
+            // Check if parent already has 3 children (excluding current quiz if it's already a child)
+            var existingChildCount = parentQuiz.ChildQuizzes.Count;
+            if (quizz.ParentQuizId != parsedParentId) // If changing parent
+            {
+                if (existingChildCount >= 3)
+                    throw new Exception("Parent quiz already has maximum number of child quizzes (3)");
+            }
+
+            parentQuizId = parsedParentId;
+        }
+
         // Store old file IDs for cleanup
         var oldQuestionAudioId = quizz.QuestionAudioId;
         var oldExplanationAudioId = quizz.ExplanationAudioId;
@@ -537,6 +646,7 @@ public class LearnHubService : ILearnHubService
         quizz.QuizzTypeId = quizTypeId;
         quizz.QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null;
         quizz.ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null;
+        quizz.ParentQuizId = parentQuizId;
 
         // Remove old options
         _context.Options.RemoveRange(quizz.Options);
@@ -565,7 +675,7 @@ public class LearnHubService : ILearnHubService
         if (oldQuestionAudioId.HasValue && 
             (string.IsNullOrEmpty(newDto.QuestionAudioId) || Guid.Parse(newDto.QuestionAudioId) != oldQuestionAudioId.Value))
         {
-            filesToDelete.Add(oldQuestionAudioId.Value);
+            filesToDelete.Add(oldQuestionAudioId.Value);    
         }
 
         // Check if explanation audio was replaced
@@ -608,14 +718,17 @@ public class LearnHubService : ILearnHubService
     {
         var quizz = await _context.Quizzes
             .Include(q => q.Options)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.Options)
             .FirstOrDefaultAsync(q => q.Id == id);
             
         if (quizz == null)
             throw new Exception("Quizz not found");
 
-        // Collect all file IDs to delete
+        // Collect all file IDs to delete (including child quizzes)
         var filesToDelete = new List<Guid>();
         
+        // Collect files from parent quiz
         if (quizz.QuestionAudioId.HasValue)
             filesToDelete.Add(quizz.QuestionAudioId.Value);
             
@@ -628,7 +741,29 @@ public class LearnHubService : ILearnHubService
                 filesToDelete.Add(option.OptionImageId.Value);
         }
 
-        // Remove the quiz first
+        // Collect files from child quizzes
+        foreach (var childQuiz in quizz.ChildQuizzes)
+        {
+            if (childQuiz.QuestionAudioId.HasValue)
+                filesToDelete.Add(childQuiz.QuestionAudioId.Value);
+                
+            if (childQuiz.ExplanationAudioId.HasValue)
+                filesToDelete.Add(childQuiz.ExplanationAudioId.Value);
+                
+            foreach (var option in childQuiz.Options)
+            {
+                if (option.OptionImageId.HasValue)
+                    filesToDelete.Add(option.OptionImageId.Value);
+            }
+        }
+
+        // Remove child quizzes first (since we use NoAction instead of Cascade)
+        foreach (var childQuiz in quizz.ChildQuizzes.ToList())
+        {
+            _context.Quizzes.Remove(childQuiz);
+        }
+        
+        // Remove the parent quiz
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
 
@@ -649,7 +784,7 @@ public class LearnHubService : ILearnHubService
     public async Task<PaginatedResultDTO<SimpleQuizDTO>> GetPaginatedQuizzesAsync(Guid linkId, PaginationRequestDTO dto)
     {
         var query = _context.Quizzes
-            .Where(q => q.LinkId == linkId)
+            .Where(q => q.LinkId == linkId && q.ParentQuizId == null) // Only parent quizzes (no parent)
             .Include(q => q.QuizzType)
             .AsQueryable();
 
@@ -672,7 +807,8 @@ public class LearnHubService : ILearnHubService
             {
                 Id = q.Id,
                 Question = q.Question,
-                QuizType = q.QuizzTypeId.ToString("D")
+                QuizType = q.QuizzTypeId.ToString("D"),
+                ParentQuizId = q.ParentQuizId // Add this temporarily for debugging
             })
             .ToListAsync();
 
@@ -686,5 +822,68 @@ public class LearnHubService : ILearnHubService
     public async Task<List<QuizType>> GetQuizTypesAsync()
     {
         return await _context.QuizTypes.ToListAsync();
+    }
+
+    // Parent-Child Quiz methods
+    public async Task<List<QuizDTO>> GetParentQuizzesByLinkId(Guid linkId)
+    {
+        var parentQuizzes = await _context.Quizzes
+            .Where(q => q.LinkId == linkId && q.ParentQuizId == null) // Only quizzes without parents
+            .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
+            .Include(q => q.QuestionAudio)
+            .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.Options)
+                    .ThenInclude(o => o.OptionImage)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuestionAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.ExplanationAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuizzType)
+            .ToListAsync();
+
+        return parentQuizzes.Select(q => MapToQuizDTO(q)).ToList();
+    }
+
+    public async Task<List<ChildQuizDTO>> GetChildQuizzesByParentId(Guid parentQuizId)
+    {
+        var childQuizzes = await _context.Quizzes
+            .Where(q => q.ParentQuizId == parentQuizId)
+            .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
+            .Include(q => q.QuestionAudio)
+            .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
+            .ToListAsync();
+
+        return childQuizzes.Select(q => MapToChildQuizDTO(q)).ToList();
+    }
+
+    private ChildQuizDTO MapToChildQuizDTO(Quizz quiz)
+    {
+        return new ChildQuizDTO
+        {
+            Id = quiz.Id,
+            Question = quiz.Question,
+            Explanation = quiz.Explanation,
+            Points = quiz.Points,
+            IsAnswered = quiz.IsAnswered,
+            QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
+            ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            QuizType = quiz.QuizzTypeId.ToString("D"),
+            ParentQuizId = quiz.ParentQuizId,
+            Options = quiz.Options.Select(o => new OptionTextDTO
+            {
+                OptionText = o.OptionText,
+                IsCorrect = o.IsCorrect,
+                OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
+                OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
+            }).ToList()
+        };
     }
 }

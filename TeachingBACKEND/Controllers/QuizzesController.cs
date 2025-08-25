@@ -48,7 +48,7 @@ public class QuizzesController : ControllerBase
     public async Task<IActionResult> DeleteQuizz([FromQuery] Guid id)
     {
         await _learnHubService.DeleteQuizz(id);
-        return Ok("Quiz deleted");
+        return Ok(new { message = "Quiz deleted successfully", quizId = id });
     }
 
     [HttpPost("Get-Paginated-Quizzes")]
@@ -61,4 +61,27 @@ public class QuizzesController : ControllerBase
         return Ok(result);
     }
 
+    // New endpoints for parent-child relationship
+    [HttpGet("Get-Parent-Quizzes")]
+    public async Task<IActionResult> GetParentQuizzes(Guid linkId)
+    {
+        var result = await _learnHubService.GetParentQuizzesByLinkId(linkId);
+        return Ok(result);
+    }
+
+    [HttpGet("Get-Child-Quizzes")]
+    public async Task<IActionResult> GetChildQuizzes([FromQuery] Guid parentQuizId)
+    {
+        var result = await _learnHubService.GetChildQuizzesByParentId(parentQuizId);
+        return Ok(result);
+    }
+
+    [HttpPost("Post-Child-Quiz")]
+    public async Task<IActionResult> PostChildQuiz(Guid linkId, Guid parentQuizId, [FromBody] CreateQuizzDTO dto)
+    {
+        // Set the parent quiz ID in the DTO
+        dto.ParentQuizId = parentQuizId.ToString();
+        var id = await _learnHubService.PostQuizz(linkId, dto);
+        return Ok(id);
+    }
 }
