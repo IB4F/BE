@@ -11,6 +11,8 @@ using TeachingBACKEND.Domain.Entities;
 
 namespace TeachingBACKEND.Controllers
 {
+    [Route("api/[controller]")]
+    [ApiController]
     public class AuthController : ControllerBase
     {
         private readonly IUserService _userService;

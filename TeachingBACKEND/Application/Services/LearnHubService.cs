@@ -288,17 +288,36 @@ public class LearnHubService : ILearnHubService
     }
     public async Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
     {
+        // Handle null or empty parameters
+        if (string.IsNullOrWhiteSpace(classType) || string.IsNullOrWhiteSpace(subject))
+        {
+            return new List<FilteredLearnHubDTO>();
+        }
+
+        // Find the class and subject by name to get their GUIDs
+        var classEntity = await _context.Classes
+            .FirstOrDefaultAsync(c => c.Name.ToLower() == classType.ToLower());
+        
+        var subjectEntity = await _context.Subjects
+            .FirstOrDefaultAsync(s => s.Name.ToLower() == subject.ToLower());
+
+        // If class or subject not found, return empty list
+        if (classEntity == null || subjectEntity == null)
+        {
+            return new List<FilteredLearnHubDTO>();
+        }
+
         var learnHubs = await _context.LearnHubs
-            .Where(lh => (string.IsNullOrEmpty(classType) || lh.ClassType.ToLower() == classType.ToLower()) &&
-                         (string.IsNullOrEmpty(subject) || lh.Subject.ToLower() == subject.ToLower()))
+            .Where(lh => lh.ClassType == classEntity.Id.ToString() &&
+                         lh.Subject == subjectEntity.Id.ToString())
             .Include(lh => lh.Links)
             .ThenInclude(link => link.Quizzes)
             .Select(lh => new FilteredLearnHubDTO
             {
                 Title = lh.Title,
                 Description = lh.Description,
-                ClassType = lh.ClassType,
-                Subject = lh.Subject,
+                ClassType = classEntity.Name,
+                Subject = subjectEntity.Name,
                 IsFree = lh.IsFree,
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
