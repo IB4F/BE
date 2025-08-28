@@ -119,7 +119,6 @@ builder.Host.UseSerilog();
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // Add static file serving
 app.UseCors("AllowAll");
 app.UseRouting();
 app.UseAuthentication();
@@ -129,24 +128,12 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    app.MapControllers();
 }
 else
 {
-    // Production logic with the correct folder paths
-    var angularPath = Path.Combine(app.Environment.ContentRootPath, "braingainalbania-api", "wwwroot", "braingainalbania");
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(angularPath),
-        RequestPath = ""
-    });
-    
-    app.MapControllers(); // Must be here to handle API calls before fallback
-
-    app.MapFallbackToFile("index.html", new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(angularPath),
-    });
+    app.UseStaticFiles(); // Serves files from wwwroot
+    app.MapControllers(); // Maps API endpoints
+    app.MapFallbackToFile("index.html"); // Fallback for all other routes
 }
 
 app.Run();
