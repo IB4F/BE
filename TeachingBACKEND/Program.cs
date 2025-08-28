@@ -11,6 +11,7 @@ using DotNetEnv;
 using static TeachingBACKEND.Application.Services.PasswordValidationService;
 using TeachingBACKEND.Infrastructure;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
 
 Env.Load();
 
@@ -94,6 +95,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
 
@@ -101,10 +103,6 @@ builder.Services.AddControllers()
 builder.Services.AddAutoMapper(typeof(LearnHubProfile).Assembly);
 
 Stripe.StripeConfiguration.ApiKey = builder.Configuration["STRIPE_SECRET_KEY"];
-
-
-builder.Services.AddControllers()
-    .AddJsonOptions(opts => opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true);
 
 
 Log.Logger = new LoggerConfiguration()
@@ -123,6 +121,7 @@ var app = builder.Build();
 app.UseHttpsRedirection();
 app.UseStaticFiles(); // Add static file serving
 app.UseCors("AllowAll");
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -130,8 +129,24 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.MapControllers();
 }
+else
+{
+    // Production logic with the correct folder paths
+    var angularPath = Path.Combine(app.Environment.ContentRootPath, "braingainalbania-api", "wwwroot", "braingainalbania");
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(angularPath),
+        RequestPath = ""
+    });
+    
+    app.MapControllers(); // Must be here to handle API calls before fallback
 
-app.MapControllers();
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(angularPath),
+    });
+}
 
 app.Run();
