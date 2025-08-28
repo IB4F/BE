@@ -120,7 +120,6 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
-app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -129,11 +128,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-else
-{
-    app.UseStaticFiles(); // Serves files from wwwroot
-    app.MapControllers(); // Maps API endpoints
-    app.MapFallbackToFile("index.html"); // Fallback for all other routes
-}
+
+app.MapControllers();
 
 app.Run();
