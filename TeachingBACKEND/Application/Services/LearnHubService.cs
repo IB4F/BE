@@ -234,12 +234,72 @@ public class LearnHubService : ILearnHubService
 
     public async Task DeleteLearnHub(Guid id)
     {
-        var learnHub = await _context.LearnHubs.FindAsync(id);
+        var learnHub = await _context.LearnHubs
+            .Include(lh => lh.Links)
+                .ThenInclude(l => l.Quizzes)
+                    .ThenInclude(q => q.Options)
+            .Include(lh => lh.Links)
+                .ThenInclude(l => l.Quizzes)
+                    .ThenInclude(q => q.ChildQuizzes)
+                        .ThenInclude(cq => cq.Options)
+            .FirstOrDefaultAsync(lh => lh.Id == id);
+            
         if (learnHub == null)
             throw new Exception("LearnHub not found");
+        
+        var filesToDelete = new List<Guid>();
+        
+        foreach (var link in learnHub.Links)
+        {
+            foreach (var quiz in link.Quizzes)
+            {
+                if (quiz.QuestionAudioId.HasValue)
+                    filesToDelete.Add(quiz.QuestionAudioId.Value);
+                    
+                if (quiz.ExplanationAudioId.HasValue)
+                    filesToDelete.Add(quiz.ExplanationAudioId.Value);
+                    
+                foreach (var option in quiz.Options)
+                {
+                    if (option.OptionImageId.HasValue)
+                        filesToDelete.Add(option.OptionImageId.Value);
+                }
 
+                // Collect files from child quizzes
+                foreach (var childQuiz in quiz.ChildQuizzes)
+                {
+                    if (childQuiz.QuestionAudioId.HasValue)
+                        filesToDelete.Add(childQuiz.QuestionAudioId.Value);
+                        
+                    if (childQuiz.ExplanationAudioId.HasValue)
+                        filesToDelete.Add(childQuiz.ExplanationAudioId.Value);
+                        
+                    foreach (var option in childQuiz.Options)
+                    {
+                        if (option.OptionImageId.HasValue)
+                            filesToDelete.Add(option.OptionImageId.Value);
+                    }
+                }
+            }
+        }
+
+        // Remove the learnHub (this will cascade delete links, quizzes, and options)
         _context.LearnHubs.Remove(learnHub);
         await _context.SaveChangesAsync();
+
+        // Delete associated files
+        foreach (var fileId in filesToDelete)
+        {
+            try
+            {
+                await _fileService.DeleteFileAsync(fileId);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the deletion
+                Console.WriteLine($"Failed to delete file {fileId} during learnHub deletion: {ex.Message}");
+            }
+        }
     }
     public async Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto)
     {
