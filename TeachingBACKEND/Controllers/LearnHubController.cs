@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Mvc;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace TeachingBACKEND.Api.Controllers
 {
@@ -11,10 +14,12 @@ namespace TeachingBACKEND.Api.Controllers
     public class LearnHubsController : ControllerBase
     {
         private readonly ILearnHubService _learnHubService;
+        private readonly IConfiguration _configuration;
 
-        public LearnHubsController(ILearnHubService learnHubService)
+        public LearnHubsController(ILearnHubService learnHubService, IConfiguration configuration)
         {
             _learnHubService = learnHubService;
+            _configuration = configuration;
         }
 
         [HttpPost("Post-Learnhub")]
@@ -69,7 +74,35 @@ namespace TeachingBACKEND.Api.Controllers
             if (string.IsNullOrWhiteSpace(classType) || string.IsNullOrWhiteSpace(subject))
                 return BadRequest(new { error = "ClassType and Subject are required." });
 
-            var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject);
+            // Check if user is authenticated by validating JWT token
+            var isAuthenticated = false;
+            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+            {
+                var token = authHeader.Substring("Bearer ".Length).Trim();
+                try
+                {
+                    var tokenHandler = new JwtSecurityTokenHandler();
+                    var key = Encoding.ASCII.GetBytes(_configuration["JWT_SECRET_KEY"]);
+                    tokenHandler.ValidateToken(token, new TokenValidationParameters
+                    {
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(key),
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ClockSkew = TimeSpan.Zero
+                    }, out SecurityToken validatedToken);
+
+                    isAuthenticated = true;
+                }
+                catch
+                {
+                    // Token is invalid, user is not authenticated
+                    isAuthenticated = false;
+                }
+            }
+            
+            var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject, isAuthenticated);
             return Ok(learnHubs);
         }
         

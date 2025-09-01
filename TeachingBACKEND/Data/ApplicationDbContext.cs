@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Option> Options { get; set; }
     public DbSet<QuizType> QuizTypes { get; set; }
     public DbSet<UploadedFile> Files { get; set; }
+    public DbSet<StudentQuizAttempt> StudentQuizAttempts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -114,6 +115,26 @@ public class ApplicationDbContext : DbContext
             .WithMany(q => q.ChildQuizzes)
             .HasForeignKey(q => q.ParentQuizId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<StudentQuizAttempt>(entity =>
+        {
+            entity.HasKey(sqa => sqa.Id);
+            
+            entity.HasOne(sqa => sqa.Student)
+                .WithMany()
+                .HasForeignKey(sqa => sqa.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+                
+            entity.HasOne(sqa => sqa.Quiz)
+                .WithMany()
+                .HasForeignKey(sqa => sqa.QuizId)
+                .OnDelete(DeleteBehavior.NoAction);
+                
+            entity.HasOne(sqa => sqa.Link)
+                .WithMany()
+                .HasForeignKey(sqa => sqa.LinkId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
 
         modelBuilder.Entity<City>().HasData(
             new City { Id = Guid.Parse("a2d4a4ee-5fa2-4a33-bd3c-2bbf98e9310b"), Name = "Tirana" },

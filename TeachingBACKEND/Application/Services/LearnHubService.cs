@@ -346,7 +346,7 @@ public class LearnHubService : ILearnHubService
             TotalCount = totalCount
         };
     }
-    public async Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject)
+    public async Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject, bool isAuthenticated = false)
     {
         // Handle null or empty parameters
         if (string.IsNullOrWhiteSpace(classType) || string.IsNullOrWhiteSpace(subject))
@@ -369,7 +369,8 @@ public class LearnHubService : ILearnHubService
 
         var learnHubs = await _context.LearnHubs
             .Where(lh => lh.ClassType == classEntity.Id.ToString() &&
-                         lh.Subject == subjectEntity.Id.ToString())
+                         lh.Subject == subjectEntity.Id.ToString() &&
+                         (isAuthenticated || lh.IsFree)) // Show all for authenticated users, only free for anonymous
             .Include(lh => lh.Links)
             .ThenInclude(link => link.Quizzes)
             .Select(lh => new FilteredLearnHubDTO
@@ -386,7 +387,7 @@ public class LearnHubService : ILearnHubService
                     Id = link.Id,
                     Title = link.Title,
                     Progress = link.Progress,
-                    QuizzesCount = link.Quizzes.Count()
+                    QuizzesCount = link.Quizzes.Count(q => q.ParentQuizId == null)
                 }).ToList()
             })
             .ToListAsync();
@@ -962,6 +963,316 @@ public class LearnHubService : ILearnHubService
                 IsCorrect = o.IsCorrect,
                 OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
+            }).ToList()
+        };
+    }
+
+    // Student Quiz methods
+    public async Task<List<StudentQuizDTO>> GetStudentQuizzesByLinkId(Guid linkId)
+    {
+        var parentQuizzes = await _context.Quizzes
+            .Where(q => q.LinkId == linkId && q.ParentQuizId == null) // Only parent quizzes
+            .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
+            .Include(q => q.QuestionAudio)
+            .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
+            .ToListAsync();
+
+        return parentQuizzes.Select(q => MapToStudentQuizDTO(q)).ToList();
+    }
+
+    public async Task<StudentQuizDTO?> GetStudentQuizById(Guid quizId)
+    {
+        var quiz = await _context.Quizzes
+            .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
+            .Include(q => q.QuestionAudio)
+            .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
+            .FirstOrDefaultAsync(q => q.Id == quizId);
+
+        return quiz != null ? MapToStudentQuizDTO(quiz) : null;
+    }
+
+    public async Task<StudentQuizListResponseDTO> GetStudentQuizzesWithProgress(Guid linkId, Guid studentId)
+    {
+        // Get all parent quizzes for the link
+        var parentQuizzes = await _context.Quizzes
+            .Where(q => q.LinkId == linkId && q.ParentQuizId == null)
+            .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
+            .Include(q => q.QuestionAudio)
+            .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
+            .OrderBy(q => q.CreatedAt)
+            .ToListAsync();
+
+        // Get student's attempts for this link
+        var studentAttempts = await _context.StudentQuizAttempts
+            .Where(sqa => sqa.StudentId == studentId && sqa.LinkId == linkId)
+            .ToListAsync();
+
+        // Calculate progress
+        var totalQuizzes = parentQuizzes.Count;
+        var completedQuizzes = studentAttempts.Count(sqa => sqa.IsCorrect);
+        var totalPointsEarned = studentAttempts.Sum(sqa => sqa.PointsEarned);
+        var lastCompletedAttempt = studentAttempts
+            .Where(sqa => sqa.IsCorrect)
+            .OrderByDescending(sqa => sqa.CompletedAt)
+            .FirstOrDefault();
+
+        var progress = new StudentProgressSummaryDTO
+        {
+            TotalQuizzes = totalQuizzes,
+            CompletedQuizzes = completedQuizzes,
+            CurrentQuizIndex = completedQuizzes,
+            TotalPointsEarned = totalPointsEarned,
+            LastCompletedQuizId = lastCompletedAttempt?.QuizId,
+            LastCompletedAt = lastCompletedAttempt?.CompletedAt
+        };
+
+        // Map quizzes with progress information
+        var quizzesWithProgress = parentQuizzes.Select(quiz =>
+        {
+            var attempt = studentAttempts.FirstOrDefault(sqa => sqa.QuizId == quiz.Id);
+            
+            return new StudentQuizProgressDTO
+            {
+                Id = quiz.Id,
+                Question = quiz.Question,
+                Points = quiz.Points,
+                IsCompleted = attempt?.IsCorrect ?? false,
+                PointsEarned = attempt?.PointsEarned ?? 0,
+                StartedAt = attempt?.StartedAt,
+                CompletedAt = attempt?.CompletedAt,
+                TimeSpentSeconds = attempt?.TimeSpentSeconds,
+                QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+                ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+                QuizzTypeName = quiz.QuizzType.Name,
+                ParentQuizId = quiz.ParentQuizId,
+                Options = quiz.Options.Select(o => new StudentOptionDTO
+                {
+                    Id = o.Id.ToString(),
+                    OptionText = o.OptionText,
+                    OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
+                }).ToList()
+            };
+        }).ToList();
+
+        return new StudentQuizListResponseDTO
+        {
+            Progress = progress,
+            Quizzes = quizzesWithProgress
+        };
+    }
+
+    public async Task<StudentQuizStartResponseDTO> StartStudentQuiz(Guid quizId, Guid studentId)
+    {
+        var quiz = await _context.Quizzes
+            .FirstOrDefaultAsync(q => q.Id == quizId);
+
+        if (quiz == null)
+            throw new Exception("Quiz not found");
+
+        var startTime = DateTime.UtcNow;
+
+        // Check if there's already a pending attempt for this student and quiz
+        var existingAttempt = await _context.StudentQuizAttempts
+            .FirstOrDefaultAsync(sqa => sqa.StudentId == studentId && 
+                                       sqa.QuizId == quizId && 
+                                       sqa.LinkId == quiz.LinkId);
+
+        if (existingAttempt != null)
+        {
+            // Update the existing attempt with new start time
+            existingAttempt.StartedAt = startTime;
+            existingAttempt.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            // Create a new attempt record
+            var attempt = new StudentQuizAttempt
+            {
+                Id = Guid.NewGuid(),
+                StudentId = studentId,
+                QuizId = quizId,
+                LinkId = quiz.LinkId,
+                SubmittedAnswerId = "", // Will be updated when submitted
+                IsCorrect = false, // Will be updated when submitted
+                PointsEarned = 0, // Will be updated when submitted
+                StartedAt = startTime,
+                CompletedAt = startTime, // Will be updated when submitted
+                TimeSpentSeconds = 0 // Will be calculated when submitted
+            };
+
+            _context.StudentQuizAttempts.Add(attempt);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return new StudentQuizStartResponseDTO
+        {
+            QuizId = quizId,
+            StartedAt = startTime,
+            Message = "Quiz started successfully"
+        };
+    }
+
+    public async Task<StudentQuizSubmissionResponseDTO> SubmitStudentAnswer(StudentQuizSubmissionDTO submission, Guid studentId)
+    {
+        var quiz = await _context.Quizzes
+            .Include(q => q.Options)
+            .Include(q => q.ChildQuizzes)
+            .Include(q => q.ExplanationAudio)
+            .FirstOrDefaultAsync(q => q.Id == submission.QuizId);
+
+        if (quiz == null)
+            throw new Exception("Quiz not found");
+
+        // Check if the answer is correct by comparing answer ID
+        var correctOption = quiz.Options.FirstOrDefault(o => o.IsCorrect);
+        var isCorrect = correctOption?.Id.ToString() == submission.AnswerId;
+
+        // Calculate points earned
+        var pointsEarned = isCorrect ? quiz.Points : 0;
+
+        var completedAt = DateTime.UtcNow;
+
+        // Find existing attempt or create new one
+        var attempt = await _context.StudentQuizAttempts
+            .FirstOrDefaultAsync(sqa => sqa.StudentId == studentId && 
+                                       sqa.QuizId == submission.QuizId && 
+                                       sqa.LinkId == quiz.LinkId);
+
+        if (attempt == null)
+        {
+            // Create new attempt if none exists
+            var startTime = submission.StartedAt ?? completedAt; // Use provided start time or current time
+            var timeSpent = (int)(completedAt - startTime).TotalSeconds;
+
+            attempt = new StudentQuizAttempt
+            {
+                Id = Guid.NewGuid(),
+                StudentId = studentId,
+                QuizId = quiz.Id,
+                LinkId = quiz.LinkId,
+                SubmittedAnswerId = submission.AnswerId,
+                IsCorrect = isCorrect,
+                PointsEarned = pointsEarned,
+                StartedAt = startTime,
+                CompletedAt = completedAt,
+                TimeSpentSeconds = timeSpent
+            };
+
+            _context.StudentQuizAttempts.Add(attempt);
+        }
+        else
+        {
+            // Update existing attempt
+            attempt.SubmittedAnswerId = submission.AnswerId;
+            attempt.IsCorrect = isCorrect;
+            attempt.PointsEarned = pointsEarned;
+            attempt.CompletedAt = completedAt;
+            
+            // Calculate time spent
+            var startTime = attempt.StartedAt;
+            attempt.TimeSpentSeconds = (int)(completedAt - startTime).TotalSeconds;
+            attempt.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var response = new StudentQuizSubmissionResponseDTO
+        {
+            Answer = isCorrect
+        };
+
+        // If answer is incorrect, include the explanation
+        if (!isCorrect)
+        {
+            response.Explanation = quiz.Explanation;
+            response.ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl);
+        }
+
+        if (isCorrect)
+        {
+            // If answer is correct, only return the answer field
+            // No need to set quizId, explanation, or explanationAudioUrl
+        }
+        else
+        {
+            // If answer is incorrect, determine what quiz to show next
+            if (quiz.ParentQuizId == null)
+            {
+                // This is a parent quiz - show the first child quiz
+                // First try to get from loaded ChildQuizzes
+                var firstChildQuiz = quiz.ChildQuizzes
+                    .OrderBy(cq => cq.CreatedAt)
+                    .FirstOrDefault();
+
+                // If no child quizzes found in loaded collection, query the database directly
+                if (firstChildQuiz == null)
+                {
+                    firstChildQuiz = await _context.Quizzes
+                        .Where(q => q.ParentQuizId == quiz.Id)
+                        .OrderBy(q => q.CreatedAt)
+                        .FirstOrDefaultAsync();
+                }
+
+                if (firstChildQuiz != null)
+                {
+                    response.QuizId = firstChildQuiz.Id.ToString();
+                }
+                else
+                {
+                    // If no child quizzes, stay on the same parent quiz (loop back)
+                    response.QuizId = quiz.Id.ToString();
+                }
+            }
+            else
+            {
+                // This is a child quiz - show the next child quiz or return to parent
+                var allChildQuizzes = await _context.Quizzes
+                    .Where(q => q.ParentQuizId == quiz.ParentQuizId)
+                    .OrderBy(q => q.CreatedAt)
+                    .ToListAsync();
+
+                var currentChildIndex = allChildQuizzes.FindIndex(cq => cq.Id == quiz.Id);
+
+                if (currentChildIndex >= 0 && currentChildIndex < allChildQuizzes.Count - 1)
+                {
+                    // Show the next child quiz
+                    response.QuizId = allChildQuizzes[currentChildIndex + 1].Id.ToString();
+                }
+                else
+                {
+                    // This was the last child quiz (or not found), return to parent
+                    response.QuizId = quiz.ParentQuizId.ToString();
+                }
+            }
+        }
+
+        return response;
+    }
+
+    private StudentQuizDTO MapToStudentQuizDTO(Quizz quiz)
+    {
+        return new StudentQuizDTO
+        {
+            Id = quiz.Id,
+            Question = quiz.Question,
+            Points = quiz.Points,
+            QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            QuizzTypeName = quiz.QuizzType.Name,
+            ParentQuizId = quiz.ParentQuizId,
+            Options = quiz.Options.Select(o => new StudentOptionDTO
+            {
+                Id = o.Id.ToString(),
+                OptionText = o.OptionText,
+                OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
+                // Note: IsCorrect is intentionally excluded for security
             }).ToList()
         };
     }

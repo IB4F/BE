@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250901185713_AddStudentQuizAttempts")]
+    partial class AddStudentQuizAttempts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -541,18 +544,12 @@ namespace TeachingBACKEND.Migrations
                     b.Property<Guid>("QuizId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<Guid>("StudentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("SubmittedAnswerId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TimeSpentSeconds")
-                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -740,13 +737,13 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2025, 9, 1, 19, 12, 56, 611, DateTimeKind.Utc).AddTicks(4490),
+                            CreateAt = new DateTime(2025, 9, 1, 18, 57, 13, 106, DateTimeKind.Utc).AddTicks(6640),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@teachapp.com",
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$2vtEwPpF4oak0WJtHF7y3.6.//.hr6d027bZZIPYYOrz.OSuAXpQ.",
+                            PasswordHash = "$2a$12$I3NXUZGihWksfJdxRIn34eZtcg1esPeX/GA1GizSPHzAb44cFeyW2",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

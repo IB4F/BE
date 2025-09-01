@@ -10,7 +10,7 @@ public interface ILearnHubService
     Task<LearnHubDTO> UpdateLearnHub(Guid id, LearnHubCreateDTO dto);
     Task DeleteLearnHub(Guid id);
     Task<PaginatedResultDTO<PaginationLearnHubDTO>> GetPaginatedLearnHubs(PaginationRequestDTO dto);
-    Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject);
+    Task<List<FilteredLearnHubDTO>> GetFilteredLearnHubs(string classType, string subject, bool isAuthenticated = false);
     Task MigrateLearnHubClassTypes();
 
     // Link
@@ -32,4 +32,11 @@ public interface ILearnHubService
     // Parent-Child Quiz methods
     Task<List<QuizDTO>> GetParentQuizzesByLinkId(Guid linkId);
     Task<List<ChildQuizDTO>> GetChildQuizzesByParentId(Guid parentQuizId);
+    
+    // Student Quiz methods
+    Task<List<StudentQuizDTO>> GetStudentQuizzesByLinkId(Guid linkId);
+    Task<StudentQuizListResponseDTO> GetStudentQuizzesWithProgress(Guid linkId, Guid studentId);
+    Task<StudentQuizDTO?> GetStudentQuizById(Guid quizId);
+    Task<StudentQuizStartResponseDTO> StartStudentQuiz(Guid quizId, Guid studentId);
+    Task<StudentQuizSubmissionResponseDTO> SubmitStudentAnswer(StudentQuizSubmissionDTO submission, Guid studentId);
 }
