@@ -27,7 +27,7 @@ namespace TeachingBACKEND.Domain.DTOs
         [JsonPropertyName("School")]
         public string School { get; set; }
 
-        [Required, StringLength(20)]
+        [Required, StringLength(50)]
         [JsonPropertyName("CurrentClass")]
         public string CurrentClass { get; set; }
 
