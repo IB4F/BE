@@ -89,6 +89,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();
+builder.Services.AddScoped<IStudentPerformanceService, StudentPerformanceService>();
 builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddControllers()

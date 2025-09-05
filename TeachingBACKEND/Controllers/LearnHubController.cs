@@ -76,6 +76,7 @@ namespace TeachingBACKEND.Api.Controllers
 
             // Check if user is authenticated by validating JWT token
             var isAuthenticated = false;
+            Guid? userId = null;
             var authHeader = Request.Headers["Authorization"].FirstOrDefault();
             if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
             {
@@ -83,7 +84,7 @@ namespace TeachingBACKEND.Api.Controllers
                 try
                 {
                     var tokenHandler = new JwtSecurityTokenHandler();
-                    var key = Encoding.ASCII.GetBytes(_configuration["JWT_SECRET_KEY"]);
+                    var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET_KEY"));
                     tokenHandler.ValidateToken(token, new TokenValidationParameters
                     {
                         ValidateIssuerSigningKey = true,
@@ -92,6 +93,14 @@ namespace TeachingBACKEND.Api.Controllers
                         ValidateAudience = false,
                         ClockSkew = TimeSpan.Zero
                     }, out SecurityToken validatedToken);
+
+                    // Extract user ID from the token using "nameid" claim
+                    var jwtToken = (JwtSecurityToken)validatedToken;
+                    var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "nameid");
+                    if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid extractedUserId))
+                    {
+                        userId = extractedUserId;
+                    }
 
                     isAuthenticated = true;
                 }
@@ -102,7 +111,7 @@ namespace TeachingBACKEND.Api.Controllers
                 }
             }
             
-            var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject, isAuthenticated);
+            var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject, isAuthenticated, userId);
             return Ok(learnHubs);
         }
         

@@ -11,19 +11,19 @@ namespace TeachingBACKEND.Api.Controllers;
 [Authorize(Roles = "Student")]
 public class StudentController : ControllerBase
 {
-    private readonly ILearnHubService _learnHubService;
+    private readonly IStudentPerformanceService _performanceService;
 
-    public StudentController(ILearnHubService learnHubService)
+    public StudentController(IStudentPerformanceService performanceService)
     {
-        _learnHubService = learnHubService;
+        _performanceService = performanceService;
     }
 
     /// <summary>
     /// Get all parent quizzes for a specific link with student progress (for students)
-    /// This endpoint excludes sensitive information like correct answers and includes progress tracking
+    /// This endpoint returns only parent quiz IDs and progress information
     /// </summary>
     /// <param name="linkId">The ID of the link to get quizzes for</param>
-    /// <returns>List of quizzes with progress information</returns>
+    /// <returns>Parent quiz IDs and progress information</returns>
     [HttpGet("quizzes/{linkId}")]
     public async Task<IActionResult> GetQuizzesByLinkId(Guid linkId)
     {
@@ -37,7 +37,7 @@ public class StudentController : ControllerBase
                 return Unauthorized(new { error = "Invalid user authentication" });
             }
 
-            var result = await _learnHubService.GetStudentQuizzesWithProgress(linkId, studentId);
+            var result = await _performanceService.GetQuizzesWithPerformance(linkId, studentId);
             return Ok(result);
         }
         catch (Exception ex)
@@ -46,19 +46,28 @@ public class StudentController : ControllerBase
         }
     }
 
+
+
     /// <summary>
-    /// Get a specific quiz by ID (for students)
-    /// This endpoint excludes sensitive information like correct answers
+    /// Get a single quiz by ID (for students)
+    /// This endpoint excludes sensitive information like correct answers for security
     /// </summary>
-    /// <param name="quizId">The ID of the quiz to get</param>
-    /// <returns>Quiz without correct answer information</returns>
+    /// <param name="quizId">The ID of the quiz to retrieve</param>
+    /// <returns>The quiz details without sensitive information</returns>
     [HttpGet("quizzes/single/{quizId}")]
-    public async Task<IActionResult> GetQuizById(Guid quizId)
+    public async Task<IActionResult> GetSingleQuiz(Guid quizId)
     {
         try
         {
-            var result = await _learnHubService.GetStudentQuizById(quizId);
-            return result != null ? Ok(result) : NotFound();
+            if (quizId == Guid.Empty)
+                return BadRequest(new { error = "Valid quiz ID is required" });
+
+            var result = await _performanceService.GetSingleQuiz(quizId);
+            
+            if (result == null)
+                return NotFound(new { error = "Quiz not found" });
+
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -87,7 +96,7 @@ public class StudentController : ControllerBase
                 return Unauthorized(new { error = "Invalid user authentication" });
             }
 
-            var result = await _learnHubService.StartStudentQuiz(quizId, studentId);
+            var result = await _performanceService.StartQuizSession(quizId, studentId);
             return Ok(result);
         }
         catch (Exception ex)
@@ -124,7 +133,33 @@ public class StudentController : ControllerBase
                 return Unauthorized(new { error = "Invalid user authentication" });
             }
 
-            var result = await _learnHubService.SubmitStudentAnswer(submission, studentId);
+            var result = await _performanceService.SubmitAnswer(submission, studentId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get detailed performance analytics for the current student
+    /// </summary>
+    /// <param name="linkId">The ID of the link to get analytics for</param>
+    /// <returns>Detailed performance analytics and recommendations</returns>
+    [HttpGet("analytics/{linkId}")]
+    public async Task<IActionResult> GetPerformanceAnalytics(Guid linkId)
+    {
+        try
+        {
+            var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
+            if (string.IsNullOrEmpty(studentIdClaim) || !Guid.TryParse(studentIdClaim, out var studentId))
+            {
+                return Unauthorized(new { error = "Invalid user authentication" });
+            }
+
+            var result = await _performanceService.GetPerformanceAnalytics(studentId, linkId);
             return Ok(result);
         }
         catch (Exception ex)

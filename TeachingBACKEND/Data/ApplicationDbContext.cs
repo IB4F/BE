@@ -23,7 +23,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Option> Options { get; set; }
     public DbSet<QuizType> QuizTypes { get; set; }
     public DbSet<UploadedFile> Files { get; set; }
-    public DbSet<StudentQuizAttempt> StudentQuizAttempts { get; set; }
+    public DbSet<StudentQuizPerformance> StudentQuizPerformances { get; set; }
+    public DbSet<StudentQuizSession> StudentQuizSessions { get; set; }
+    public DbSet<StudentPerformanceSummary> StudentPerformanceSummaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -116,23 +118,58 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(q => q.ParentQuizId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        modelBuilder.Entity<StudentQuizAttempt>(entity =>
+        modelBuilder.Entity<StudentQuizPerformance>(entity =>
         {
-            entity.HasKey(sqa => sqa.Id);
+            entity.HasKey(sqp => sqp.Id);
             
-            entity.HasOne(sqa => sqa.Student)
+            entity.HasOne(sqp => sqp.Student)
                 .WithMany()
-                .HasForeignKey(sqa => sqa.StudentId)
+                .HasForeignKey(sqp => sqp.StudentId)
                 .OnDelete(DeleteBehavior.NoAction);
                 
-            entity.HasOne(sqa => sqa.Quiz)
+            entity.HasOne(sqp => sqp.Quiz)
                 .WithMany()
-                .HasForeignKey(sqa => sqa.QuizId)
+                .HasForeignKey(sqp => sqp.QuizId)
                 .OnDelete(DeleteBehavior.NoAction);
                 
-            entity.HasOne(sqa => sqa.Link)
+            entity.HasOne(sqp => sqp.Link)
                 .WithMany()
-                .HasForeignKey(sqa => sqa.LinkId)
+                .HasForeignKey(sqp => sqp.LinkId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<StudentQuizSession>(entity =>
+        {
+            entity.HasKey(sqs => sqs.Id);
+            
+            entity.HasOne(sqs => sqs.Student)
+                .WithMany()
+                .HasForeignKey(sqs => sqs.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+                
+            entity.HasOne(sqs => sqs.Quiz)
+                .WithMany()
+                .HasForeignKey(sqs => sqs.QuizId)
+                .OnDelete(DeleteBehavior.NoAction);
+                
+            entity.HasOne(sqs => sqs.Link)
+                .WithMany()
+                .HasForeignKey(sqs => sqs.LinkId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<StudentPerformanceSummary>(entity =>
+        {
+            entity.HasKey(sps => sps.Id);
+            
+            entity.HasOne(sps => sps.Student)
+                .WithMany()
+                .HasForeignKey(sps => sps.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+                
+            entity.HasOne(sps => sps.Link)
+                .WithMany()
+                .HasForeignKey(sps => sps.LinkId)
                 .OnDelete(DeleteBehavior.NoAction);
         });
 
