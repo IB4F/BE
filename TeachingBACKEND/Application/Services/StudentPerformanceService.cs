@@ -14,11 +14,26 @@ public class StudentPerformanceService : IStudentPerformanceService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<StudentPerformanceService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public StudentPerformanceService(ApplicationDbContext context, ILogger<StudentPerformanceService> logger)
+    public StudentPerformanceService(ApplicationDbContext context, ILogger<StudentPerformanceService> logger, IHttpContextAccessor httpContextAccessor)
     {
         _context = context;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    private string GetFullUrl(string relativeUrl)
+    {
+        if (string.IsNullOrEmpty(relativeUrl))
+            return null;
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request == null)
+            return relativeUrl;
+
+        var baseUrl = $"{request.Scheme}://{request.Host}";
+        return $"{baseUrl}{relativeUrl}";
     }
 
     public async Task<StudentQuizStartResponseDTO> StartQuizSession(Guid quizId, Guid studentId)
@@ -83,9 +98,35 @@ public class StudentPerformanceService : IStudentPerformanceService
         if (quiz == null)
             throw new Exception("Quiz not found");
 
-        // Check if the answer is correct
-        var correctOption = quiz.Options.FirstOrDefault(o => o.IsCorrect);
-        var isCorrect = correctOption?.Id.ToString() == submission.AnswerId;
+        // Check if the answer(s) is/are correct
+        var correctOptions = quiz.Options.Where(o => o.IsCorrect).ToList();
+        var correctOptionIds = correctOptions.Select(o => o.Id.ToString()).ToHashSet();
+        
+        bool isCorrect;
+        List<string> submittedAnswerIds;
+        
+        // Collect all submitted answers (both single and multiple)
+        submittedAnswerIds = new List<string>();
+        
+        // Add single answer if provided
+        if (!string.IsNullOrWhiteSpace(submission.AnswerId))
+        {
+            submittedAnswerIds.Add(submission.AnswerId);
+        }
+        
+        // Add multiple answers if provided
+        if (submission.AnswerIds != null && submission.AnswerIds.Any())
+        {
+            submittedAnswerIds.AddRange(submission.AnswerIds);
+        }
+        
+        // Remove duplicates and validate
+        submittedAnswerIds = submittedAnswerIds.Distinct().ToList();
+        
+        // Check if all submitted answers are correct and match the correct answers exactly
+        isCorrect = submittedAnswerIds.Count == correctOptionIds.Count && 
+                   submittedAnswerIds.All(id => correctOptionIds.Contains(id));
+        
         var pointsEarned = isCorrect ? quiz.Points : 0;
 
         var completedAt = DateTime.UtcNow;
@@ -108,7 +149,7 @@ public class StudentPerformanceService : IStudentPerformanceService
                 StudentId = studentId,
                 QuizId = quiz.Id,
                 LinkId = quiz.LinkId,
-                SubmittedAnswerId = submission.AnswerId,
+                SubmittedAnswerId = string.Join(",", submittedAnswerIds), // Store multiple answers as comma-separated
                 IsCorrect = isCorrect,
                 PointsEarned = pointsEarned,
                 StartedAt = startTime,
@@ -123,7 +164,7 @@ public class StudentPerformanceService : IStudentPerformanceService
         else
         {
             // Update existing performance record
-            performance.SubmittedAnswerId = submission.AnswerId;
+            performance.SubmittedAnswerId = string.Join(",", submittedAnswerIds); // Store multiple answers as comma-separated
             performance.IsCorrect = isCorrect;
             performance.PointsEarned = pointsEarned;
             performance.CompletedAt = completedAt;
@@ -153,6 +194,12 @@ public class StudentPerformanceService : IStudentPerformanceService
         }
 
         await _context.SaveChangesAsync();
+
+        // If this is a child quiz answered correctly, also mark the parent quiz as completed
+        if (isCorrect && quiz.ParentQuizId.HasValue)
+        {
+            await MarkParentQuizAsCompleted(studentId, quiz.ParentQuizId.Value, quiz.LinkId);
+        }
 
         // Update performance summary
         await UpdatePerformanceSummary(studentId, quiz.LinkId);
@@ -192,7 +239,7 @@ public class StudentPerformanceService : IStudentPerformanceService
             ParentQuizId = parentQuizId,
             ChildQuizId = childQuizId,
             Explanation = isCorrect ? null : quiz.Explanation,
-            ExplanationAudioUrl = isCorrect ? null : quiz.ExplanationAudio?.FileUrl
+            ExplanationAudioUrl = isCorrect ? null : GetFullUrl(quiz.ExplanationAudio?.FileUrl)
         };
     }
 
@@ -245,6 +292,7 @@ public class StudentPerformanceService : IStudentPerformanceService
     {
         var quiz = await _context.Quizzes
             .Include(q => q.Options)
+                .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuizzType)
             .Include(q => q.QuestionAudio)
             .Include(q => q.ExplanationAudio)
@@ -252,6 +300,10 @@ public class StudentPerformanceService : IStudentPerformanceService
 
         if (quiz == null)
             return null;
+
+        // Count how many options are correct to determine if this is a multiple answer question
+        var correctOptionsCount = quiz.Options.Count(o => o.IsCorrect);
+        var multipleAnswer = correctOptionsCount > 1;
 
         return new StudentQuizDTO
         {
@@ -262,12 +314,14 @@ public class StudentPerformanceService : IStudentPerformanceService
             {
                 Id = o.Id.ToString(),
                 OptionText = o.OptionText,
-                OptionImageUrl = o.OptionImage?.FileUrl
+                OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
+                OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
             }).ToList(),
-            QuestionAudioUrl = quiz.QuestionAudio?.FileUrl,
-            ExplanationAudioUrl = quiz.ExplanationAudio?.FileUrl,
+            QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             QuizzTypeName = quiz.QuizzType.Name,
-            ParentQuizId = quiz.ParentQuizId
+            ParentQuizId = quiz.ParentQuizId,
+            MultipleAnswer = multipleAnswer
         };
     }
 
@@ -390,15 +444,30 @@ public class StudentPerformanceService : IStudentPerformanceService
     {
         if (isCorrect)
         {
-            // Move to next parent quiz
-            var nextParentQuiz = await _context.Quizzes
-                .Where(q => q.LinkId == currentQuiz.LinkId && 
-                           q.ParentQuizId == null &&
-                           q.CreatedAt > currentQuiz.CreatedAt)
-                .OrderBy(q => q.CreatedAt)
-                .FirstOrDefaultAsync();
+            // If this is a child quiz answered correctly, move to next parent quiz
+            if (currentQuiz.ParentQuizId.HasValue)
+            {
+                var nextParentQuiz = await _context.Quizzes
+                    .Where(q => q.LinkId == currentQuiz.LinkId && 
+                               q.ParentQuizId == null &&
+                               q.CreatedAt > currentQuiz.CreatedAt)
+                    .OrderBy(q => q.CreatedAt)
+                    .FirstOrDefaultAsync();
 
-            return nextParentQuiz?.Id;
+                return nextParentQuiz?.Id;
+            }
+            else
+            {
+                // This is a parent quiz answered correctly, move to next parent quiz
+                var nextParentQuiz = await _context.Quizzes
+                    .Where(q => q.LinkId == currentQuiz.LinkId && 
+                               q.ParentQuizId == null &&
+                               q.CreatedAt > currentQuiz.CreatedAt)
+                    .OrderBy(q => q.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                return nextParentQuiz?.Id;
+            }
         }
         else
         {
@@ -482,5 +551,62 @@ public class StudentPerformanceService : IStudentPerformanceService
         }
 
         return recommendations;
+    }
+
+    private async Task MarkParentQuizAsCompleted(Guid studentId, Guid parentQuizId, Guid linkId)
+    {
+        // Check if parent quiz performance already exists
+        var parentPerformance = await _context.StudentQuizPerformances
+            .FirstOrDefaultAsync(sqp => sqp.StudentId == studentId && 
+                                       sqp.QuizId == parentQuizId &&
+                                       sqp.LinkId == linkId);
+
+        if (parentPerformance == null)
+        {
+            // Get the parent quiz to get its points
+            var parentQuiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == parentQuizId);
+
+            if (parentQuiz != null)
+            {
+                // Create new performance record for parent quiz
+                var completedAt = DateTime.UtcNow;
+                parentPerformance = new StudentQuizPerformance
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    QuizId = parentQuizId,
+                    LinkId = linkId,
+                    SubmittedAnswerId = null, // No specific answer submitted
+                    IsCorrect = true, // Mark as correct since child quiz was answered correctly
+                    PointsEarned = parentQuiz.Points, // Award full points
+                    StartedAt = completedAt, // Use completion time as start time
+                    CompletedAt = completedAt,
+                    TimeSpentSeconds = 0, // No time spent since it was completed via child quiz
+                    AttemptsCount = 1,
+                    LastAttemptAt = completedAt
+                };
+
+                _context.StudentQuizPerformances.Add(parentPerformance);
+                await _context.SaveChangesAsync();
+            }
+        }
+        else if (!parentPerformance.IsCorrect)
+        {
+            // Update existing performance record to mark as correct
+            var parentQuiz = await _context.Quizzes
+                .FirstOrDefaultAsync(q => q.Id == parentQuizId);
+
+            if (parentQuiz != null)
+            {
+                parentPerformance.IsCorrect = true;
+                parentPerformance.PointsEarned = parentQuiz.Points;
+                parentPerformance.CompletedAt = DateTime.UtcNow;
+                parentPerformance.LastAttemptAt = DateTime.UtcNow;
+                parentPerformance.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

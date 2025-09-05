@@ -122,8 +122,10 @@ public class StudentController : ControllerBase
             if (submission.QuizId == Guid.Empty)
                 return BadRequest(new { error = "Valid quiz ID is required" });
 
-            if (string.IsNullOrWhiteSpace(submission.AnswerId))
-                return BadRequest(new { error = "Answer ID is required" });
+            // Validate that at least one answer is provided
+            if (string.IsNullOrWhiteSpace(submission.AnswerId) && 
+                (submission.AnswerIds == null || !submission.AnswerIds.Any()))
+                return BadRequest(new { error = "Either AnswerId or AnswerIds is required" });
 
             // Get the current user's ID from the JWT token
             var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

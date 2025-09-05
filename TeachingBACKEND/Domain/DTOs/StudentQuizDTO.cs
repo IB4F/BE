@@ -10,12 +10,14 @@ namespace TeachingBACKEND.Domain.DTOs
         public string? ExplanationAudioUrl { get; set; }
         public string QuizzTypeName { get; set; }
         public Guid? ParentQuizId { get; set; }
+        public bool MultipleAnswer { get; set; }
     }
 
     public class StudentOptionDTO
     {
         public string Id { get; set; }
         public string OptionText { get; set; }
+        public string? OptionImageId { get; set; }
         public string? OptionImageUrl { get; set; }
         // Note: IsCorrect is intentionally excluded for security
     }
