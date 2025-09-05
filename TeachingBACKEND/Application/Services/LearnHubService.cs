@@ -368,7 +368,13 @@ public class LearnHubService : ILearnHubService
                          (isAuthenticated || lh.IsFree)) // Show all for authenticated users, only free for anonymous
             .Include(lh => lh.Links)
             .ThenInclude(link => link.Quizzes)
-            .Select(lh => new FilteredLearnHubDTO
+            .ToListAsync();
+
+        var result = new List<FilteredLearnHubDTO>();
+
+        foreach (var lh in learnHubs)
+        {
+            var learnHubDto = new FilteredLearnHubDTO
             {
                 Title = lh.Title,
                 Description = lh.Description,
@@ -377,30 +383,32 @@ public class LearnHubService : ILearnHubService
                 IsFree = lh.IsFree,
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
-                Links = lh.Links.Select(link => new LinkDTO
+                Links = new List<LinkDTO>()
+            };
+
+            foreach (var link in lh.Links)
+            {
+                var linkDto = new LinkDTO
                 {
                     Id = link.Id,
                     Title = link.Title,
-                    QuizzesCount = link.Quizzes.Count(q => q.ParentQuizId == null),
-                    Status = null // Will be calculated below
-                }).ToList()
-            })
-            .ToListAsync();
+                    QuizzesCount = link.Quizzes.Count(q => q.ParentQuizId == null)
+                };
 
-        // Calculate progress status for authenticated users
-        if (isAuthenticated && userId.HasValue)
-        {
-            foreach (var learnHub in learnHubs)
-            {
-                foreach (var link in learnHub.Links)
+                // Only add Status property for authenticated users
+                if (isAuthenticated && userId.HasValue)
                 {
                     var linkStatus = await CalculateLinkProgress(userId.Value, link.Id);
-                    link.Status = linkStatus;
+                    linkDto.Status = linkStatus;
                 }
+
+                learnHubDto.Links.Add(linkDto);
             }
+
+            result.Add(learnHubDto);
         }
 
-        return learnHubs;
+        return result;
     }
 
     // ----------------------------
