@@ -39,4 +39,5 @@ public class StudentProgressSummaryDTO
     public int TotalPossiblePoints { get; set; } // New field for total points from all quizzes
     public Guid? LastCompletedQuizId { get; set; }
     public DateTime? LastCompletedAt { get; set; }
+    public int CorrectAnswerQuiz { get; set; } // Count of correctly answered quizzes
 }

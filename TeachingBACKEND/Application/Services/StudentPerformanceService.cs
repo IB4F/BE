@@ -268,6 +268,14 @@ public class StudentPerformanceService : IStudentPerformanceService
                 .FirstOrDefaultAsync(sps => sps.StudentId == studentId && sps.LinkId == linkId);
         }
 
+        // Get all quiz performances for this student and link
+        var allQuizPerformances = await _context.StudentQuizPerformances
+            .Where(sqp => sqp.StudentId == studentId && sqp.LinkId == linkId)
+            .ToListAsync();
+
+        // Get count of correctly answered quizzes
+        var correctAnswerQuizCount = allQuizPerformances.Count(p => p.IsCorrect);
+
         var progress = new StudentProgressSummaryDTO
         {
             TotalQuizzes = parentQuizzes.Count,
@@ -276,7 +284,8 @@ public class StudentPerformanceService : IStudentPerformanceService
             TotalPointsEarned = performanceSummary?.TotalPointsEarned ?? 0,
             TotalPossiblePoints = allQuizzes.Sum(q => q.Points),
             LastCompletedQuizId = null, // Would need to query from performance records
-            LastCompletedAt = performanceSummary?.LastAttemptAt
+            LastCompletedAt = performanceSummary?.LastAttemptAt,
+            CorrectAnswerQuiz = correctAnswerQuizCount
         };
 
         var parentQuizIds = parentQuizzes.Select(q => q.Id).ToList();
