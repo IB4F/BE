@@ -1029,7 +1029,7 @@ public class LearnHubService : ILearnHubService
 
         // Calculate progress
         var totalQuizzes = parentQuizzes.Count;
-        var completedQuizzes = studentPerformances.Count(sqp => sqp.IsCorrect);
+        var completedQuizzes = await CountCompletedParentQuizzesInLearnHub(studentId, linkId, parentQuizzes, studentPerformances);
         var totalPointsEarned = studentPerformances.Sum(sqp => sqp.PointsEarned);
         var lastCompletedAttempt = studentPerformances
             .Where(sqp => sqp.IsCorrect)
@@ -1101,7 +1101,7 @@ public class LearnHubService : ILearnHubService
 
         // Calculate progress
         var totalQuizzes = parentQuizzes.Count;
-        var completedQuizzes = studentPerformances.Count(sqp => sqp.IsCorrect);
+        var completedQuizzes = await CountCompletedParentQuizzesInLearnHub(studentId, linkId, parentQuizzes, studentPerformances);
         var totalPointsEarned = studentPerformances.Sum(sqp => sqp.PointsEarned);
         var totalPossiblePoints = allQuizzes.Sum(q => q.Points); // Total points from ALL quizzes
         var lastCompletedAttempt = studentPerformances
@@ -1201,5 +1201,47 @@ public class LearnHubService : ILearnHubService
         {
             return "In Progress";
         }
+    }
+
+    private async Task<int> CountCompletedParentQuizzesInLearnHub(Guid studentId, Guid linkId, List<Quizz> parentQuizzes, List<StudentQuizPerformance> performances)
+    {
+        int completedCount = 0;
+
+        foreach (var parentQuiz in parentQuizzes)
+        {
+            // Check if parent quiz has been answered directly
+            var parentPerformance = performances.FirstOrDefault(p => p.QuizId == parentQuiz.Id);
+            if (parentPerformance != null)
+            {
+                completedCount++;
+                continue;
+            }
+
+            // Check if parent quiz has child quizzes and all child quizzes have been answered
+            var childQuizzes = await _context.Quizzes
+                .Where(q => q.ParentQuizId == parentQuiz.Id)
+                .ToListAsync();
+
+            if (childQuizzes.Any())
+            {
+                // Get all child quiz performances for this student
+                var childQuizPerformances = await _context.StudentQuizPerformances
+                    .Where(sqp => sqp.StudentId == studentId && 
+                                 childQuizzes.Select(cq => cq.Id).Contains(sqp.QuizId) &&
+                                 sqp.LinkId == linkId)
+                    .ToListAsync();
+
+                // Check if all child quizzes have been answered (regardless of correctness)
+                var allChildQuizzesAnswered = childQuizzes.All(childQuiz => 
+                    childQuizPerformances.Any(perf => perf.QuizId == childQuiz.Id));
+
+                if (allChildQuizzesAnswered)
+                {
+                    completedCount++;
+                }
+            }
+        }
+
+        return completedCount;
     }
 }
