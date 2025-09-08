@@ -452,8 +452,8 @@ namespace TeachingBACKEND.Application.Services
                     Status = MapStripeStatus(subscription.Status),
                     StartDate = subscription.StartDate,
                     EndDate = subscription.EndedAt,
-                    CurrentPeriodStart = subscription.StartDate,
-                    CurrentPeriodEnd = subscription.EndedAt,
+                    CurrentPeriodStart = subscription.Items.Data[0].CurrentPeriodStart,
+                    CurrentPeriodEnd = subscription.Items.Data[0].CurrentPeriodEnd,
                     TrialEnd = subscription.TrialEnd,
                     Currency = subscription.Currency,
                     Amount = subscription.Items.Data[0].Price.UnitAmount ?? 0,
@@ -495,8 +495,8 @@ namespace TeachingBACKEND.Application.Services
                 {
                     subscriptionEntity.Status = MapStripeStatus(subscription.Status);
                     subscriptionEntity.EndDate = subscription.EndedAt;
-                    subscriptionEntity.CurrentPeriodStart = subscription.StartDate;
-                    subscriptionEntity.CurrentPeriodEnd = subscription.EndedAt;
+                    subscriptionEntity.CurrentPeriodStart = subscription.Items.Data[0].CurrentPeriodStart;
+                    subscriptionEntity.CurrentPeriodEnd = subscription.Items.Data[0].CurrentPeriodEnd;
                     subscriptionEntity.TrialEnd = subscription.TrialEnd;
                     subscriptionEntity.UpdatedAt = DateTime.UtcNow;
 
