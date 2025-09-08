@@ -85,7 +85,7 @@ builder.Services.AddHttpContextAccessor(); // Add this for URL generation
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
-builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();

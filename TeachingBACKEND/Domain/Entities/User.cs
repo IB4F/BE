@@ -47,5 +47,15 @@ namespace TeachingBACKEND.Domain.Entities
         public ICollection<Payment> Payments { get; set; } = new List<Payment>(); // Navigation
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
         public Guid? ParentUserId { get; set; }
+        
+        // Subscription Fields
+        public Guid? ActiveSubscriptionId { get; set; }
+        public Subscription? ActiveSubscription { get; set; }
+        public DateTime? SubscriptionExpiresAt { get; set; }
+        public bool HasActiveSubscription => ActiveSubscription?.Status == SubscriptionStatus.Active && 
+                                            SubscriptionExpiresAt > DateTime.UtcNow;
+        
+        // Navigation
+        public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
     }
 }

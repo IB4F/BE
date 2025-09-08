@@ -6,8 +6,7 @@ namespace TeachingBACKEND.Application.Interfaces
 {
     public interface IUserService
     {
-        Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model);
-        Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model); // Registers a school and its students
+        // Note: Registration methods removed - registration now handled by AuthController using SubscriptionService
         //Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId);
         Task<List<UserResponseDTO>> GetStudentsBySchool(Guid schoolId);
         Task<User> GetUserByEmail(string email);
@@ -16,7 +15,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<LoginResponseDTO> Login(LoginDTO model);
         Task<string> Logout(Guid userId);
         Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
-        Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model);
         Task<bool> VerifyFamilyEmailAsync(Guid token);
         Task<List<object>> GetAvailableClasses();
     }

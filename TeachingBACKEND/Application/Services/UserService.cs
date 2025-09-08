@@ -7,6 +7,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
+using System.Text.Json;
 
 namespace TeachingBACKEND.Application.Services
 {
@@ -17,21 +18,21 @@ namespace TeachingBACKEND.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IPasswordService _passwordService;
         private readonly ILogger<UserService> _logger;
-        private readonly IPaymentService _paymentService;
+        private readonly ISubscriptionService _subscriptionService;
 
         public UserService(
             ApplicationDbContext context,
             IConfiguration configuration,
             INotificationService notificationService,
             IPasswordService passwordService,
-            IPaymentService paymentService,
+            ISubscriptionService subscriptionService,
             ILogger<UserService> logger)
         {
             _context = context;
             _notificationService = notificationService;
             _passwordService = passwordService;
             _logger = logger;
-            _paymentService = paymentService;
+            _subscriptionService = subscriptionService;
 
         }
 
@@ -81,211 +82,8 @@ namespace TeachingBACKEND.Application.Services
             return classEntity?.Name;
         }
 
-        public async Task<UserResponseDTO> RegisterStudent(StudentRegistrationDTO model)
-        {
-
-            //_logger.LogInformation("Registering new student: {Email}", model.Email);
-
-            if (!Regex.IsMatch(model.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$"))
-                throw new InvalidOperationException("Password does not meet complexity requirements.");
-
-            var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
-            if (existingStudent != null)
-            {
-              //  _logger.LogWarning("Email already exists: {Email}", model.Email);
-                throw new Exception("Email already exists");
-            }
-
-            var verificationToken = _passwordService.GenerateVerificationToken();
-
-            // Validate and ensure CurrentClass is always a class ID
-            var validatedClassId = await ValidateAndGetClassId(model.CurrentClass);
-
-            var student = new User
-            {
-                Email = model.Email,
-                PasswordHash = _passwordService.HashPassword(model.Password),
-                Role = UserRole.Student,
-                ApprovalStatus = ApprovalStatus.Pending,
-                FirstName = model.FirstName,
-                LastName = model.LastName,
-                DateOfBirth = model.DateOfBirth,
-                CurrentClass = validatedClassId,
-                School = model.School,
-                IsEmailVerified = false,
-                EmailVerificationToken = verificationToken,
-                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
-            };
-
-            _context.Users.Add(student);
-            string sessionId;
-            try
-            {
-                await _context.SaveChangesAsync();
-               // _logger.LogInformation("Student registered successfully: {Email}", model.Email);
-
-                //Create a payment session
-                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
-                {
-                    Email = model.Email,
-                    RegistrationType = "student",
-                    PlanId = model.PlanId,
-                }, student.Id);
-            }
-            catch (Exception ex)
-            {
-               // _logger.LogInformation(ex,"Failed to register student: {Email}", model.Email);
-                Console.WriteLine(ex.InnerException?.Message);
-                throw;
-            }
-
-
-            //Send verification email
-            await _notificationService.SendEmailVerification(model.Email, verificationToken, "student");
-
-
-            return new UserResponseDTO
-            {
-                Id = student.Id,
-                Email = student.Email,
-                FirstName = student.FirstName,
-                LastName = student.LastName,
-                Role = student.Role,
-                ApprovalStatus = student.ApprovalStatus,
-                School = student.School,
-                SessionId = sessionId,
-                VerificationType = "student"
-            };
-        }
-        public async Task<UserResponseDTO> RegisterSchool(SchoolRegistrationDTO model)
-        {
-            var existingSchool = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
-            if (existingSchool != null)
-            {
-                throw new Exception("School already exists in DB");
-            }
-
-            // Fetch the registration plan and max users
-            var plan = await _context.RegistrationPlans.FirstOrDefaultAsync(p => p.Id == model.PlanId);
-            if (plan == null)
-            {
-                throw new Exception("Registration plan not found");
-            }
-            int maxUsers = plan.MaxUsers;
-
-            if (model.Students == null)
-                model.Students = new List<CreateStudentBySchoolDTO>();
-
-            if (model.Students.Count > maxUsers)
-            {
-                throw new Exception($"The selected plan allows a maximum of {maxUsers} students. You provided {model.Students.Count}.");
-            }
-
-            var verificationToken = _passwordService.GenerateVerificationToken();
-
-            var school = new User
-            {
-                Email = model.Email,
-                Role = UserRole.School,
-                ApprovalStatus = ApprovalStatus.Pending,
-                FirstName = model.SchoolName,
-                PhoneNumber = model.PhoneNumber,
-                Profession = model.Profession,
-                City = model.City,
-                PostalCode = model.PostalCode,
-                IsEmailVerified = false,
-                EmailVerificationToken = verificationToken,
-                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
-            };
-
-            _context.Users.Add(school);
-            string sessionId;
-            try
-            {
-                await _context.SaveChangesAsync();
-
-                // Create a payment session for the school
-                sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
-                {
-                    Email = model.Email,
-                    RegistrationType = "school",
-                    PlanId = model.PlanId,
-                }, school.Id);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.InnerException?.Message);
-                throw;
-            }
-
-            // Register students
-            var registeredStudents = new List<UserResponseDTO>();
-            foreach (var studentDto in model.Students)
-            {
-                // Check if student email already exists
-                var existingStudent = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == studentDto.Email.ToLower());
-                if (existingStudent != null)
-                {
-                    // Optionally: skip or throw. Here, skip and continue.
-                    continue;
-                }
-                var studentPassword = _passwordService.GenerateRandomPassword();
-                var studentVerificationToken = _passwordService.GenerateVerificationToken();
-                
-                // Validate and ensure CurrentClass is always a class ID
-                var validatedClassId = await ValidateAndGetClassId(studentDto.CurrentClass);
-                
-                var student = new User
-                {
-                    Email = studentDto.Email,
-                    PasswordHash = _passwordService.HashPassword(studentPassword),
-                    Role = UserRole.Student,
-                    ApprovalStatus = ApprovalStatus.Approved, // Auto-approved since created by school
-                    FirstName = studentDto.FirstName,
-                    LastName = studentDto.LastName,
-                    DateOfBirth = studentDto.DateOfBirth,
-                    CurrentClass = validatedClassId,
-                    School = model.SchoolName,
-                    IsEmailVerified = false,
-                    EmailVerificationToken = studentVerificationToken,
-                    EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
-                };
-                _context.Users.Add(student);
-                await _context.SaveChangesAsync();
-                // Optionally: send verification email to student
-                await _notificationService.SendEmailVerification(student.Email, studentVerificationToken, "student");
-                registeredStudents.Add(new UserResponseDTO
-                {
-                    Id = student.Id,
-                    Email = student.Email,
-                    FirstName = student.FirstName,
-                    LastName = student.LastName,
-                    Role = student.Role,
-                    ApprovalStatus = student.ApprovalStatus,
-                    School = student.School,
-                    CurrentClass = student.CurrentClass,
-                    DateOfBirth = student.DateOfBirth,
-                    IsEmailVerified = student.IsEmailVerified,
-                    VerificationType = "student"
-                });
-            }
-
-            // Send verification email to school
-            await _notificationService.SendEmailVerification(model.Email, verificationToken, "school");
-
-            return new UserResponseDTO
-            {
-                Id = school.Id,
-                Email = school.Email,
-                FirstName = school.FirstName,
-                Role = school.Role,
-                ApprovalStatus = school.ApprovalStatus,
-                School = school.School,
-                SessionId = sessionId,
-                VerificationType = "school",
-                Students = registeredStudents
-            };
-        }
+        // Note: RegisterStudent method removed - registration now handled by AuthController using SubscriptionService
+        // Note: RegisterSchool method removed - registration now handled by AuthController using SubscriptionService
 
         //public async Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId)
         //{
@@ -368,93 +166,7 @@ namespace TeachingBACKEND.Application.Services
         //    };
         //}
 
-        public async Task<UserResponseDTO> RegisterFamily(FamilyRegistrationDTO model)
-        {
-            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == model.Email.ToLower());
-            if (existing != null)
-                throw new Exception("Email already exists");
-
-            var verificationToken = _passwordService.GenerateVerificationToken();
-            var passwordHash = _passwordService.HashPassword(model.Password);
-
-            var primaryUser = new User
-            {
-                Email = model.Email,
-                PasswordHash = passwordHash,
-                Role = UserRole.Family,
-                ApprovalStatus = ApprovalStatus.Pending,
-                PhoneNumber = model.PhoneNumber,
-                FirstName = model.FirstName,
-                LastName = model.LastName,
-                IsEmailVerified = false,
-                EmailVerificationToken = verificationToken,
-                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
-            };
-
-            _context.Users.Add(primaryUser);
-            await _context.SaveChangesAsync();
-
-            foreach (var member in model.FamilyMembers)
-            {
-                // Base email without suffix
-                string baseEmail = $"{member.FirstName.ToLower()}.{member.LastName.ToLower()}@bg.com";
-                string generatedEmail = baseEmail;
-                int suffix = 1;
-
-                // Check if email exists, if yes, add suffix and keep checking
-                while (await _context.Users.AnyAsync(u => u.Email == generatedEmail))
-                {
-                    generatedEmail = $"{member.FirstName.ToLower()}.{member.LastName.ToLower()}{suffix}@bg.com";
-                    suffix++;
-                }
-
-                // Validate and ensure CurrentClass is always a class ID
-                var validatedClassId = await ValidateAndGetClassId(member.CurrentClass);
-
-                var familyMember = new User
-                {
-                    Email = generatedEmail,
-                    PasswordHash = passwordHash,  // same hashed password
-                    Role = UserRole.Family,
-                    ApprovalStatus = ApprovalStatus.Pending,
-                    FirstName = member.FirstName,
-                    LastName = member.LastName,
-                    PhoneNumber = model.PhoneNumber,
-                    IsEmailVerified = false,
-                    EmailVerificationToken = null,
-                    EmailVerificationTokenExpiry = null,
-                    ParentUserId = primaryUser.Id,
-                    CurrentClass = validatedClassId
-                };
-
-                _context.Users.Add(familyMember);
-            }
-
-            await _context.SaveChangesAsync();
-
-            var sessionId = await _paymentService.CreateCheckoutSessionAsync(new PaymentSessionRequestDTO
-            {
-                Email = model.Email,
-                PlanId = Guid.Parse(model.PlanId),
-                RegistrationType = "family",
-                FamilyMemberCount = model.FamilyMembers.Count + 1
-            }, primaryUser.Id);
-
-            var familyNames = model.FamilyMembers.Select(m => $"{m.FirstName} {m.LastName}").ToList();
-            await _notificationService.SendFamilyEmailVerification(model.Email, verificationToken, familyNames, "family");
-
-            return new UserResponseDTO
-            {
-                Id = primaryUser.Id,
-                Email = primaryUser.Email,
-                FirstName = primaryUser.FirstName,
-                LastName = primaryUser.LastName,
-                Role = primaryUser.Role,
-                ApprovalStatus = primaryUser.ApprovalStatus,
-                SessionId = sessionId,
-                VerificationType = "family"
-            };
-        }
+        // Note: RegisterFamily method removed - registration now handled by AuthController using SubscriptionService
 
 
 
@@ -621,5 +333,7 @@ namespace TeachingBACKEND.Application.Services
             
             return classes.Cast<object>().ToList();
         }
+
+        // Note: Payment-First Registration Methods removed - registration now handled by AuthController using SubscriptionService
     }
 }

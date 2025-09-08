@@ -13,6 +13,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<SubscriptionPayment> SubscriptionPayments { get; set; }
     public DbSet<City> Cities { get; set; }
     public DbSet<Class> Classes { get; set; }
     public DbSet<Subjects> Subjects { get; set; }
@@ -80,6 +82,51 @@ public class ApplicationDbContext : DbContext
             .WithMany(p => p.Payments)
             .HasForeignKey(p => p.PlanId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Subscription entity configurations
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            
+            entity.HasOne(s => s.User)
+                .WithMany(u => u.Subscriptions)
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(s => s.Plan)
+                .WithMany(p => p.Subscriptions)
+                .HasForeignKey(s => s.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.Property(s => s.StripeSubscriptionId)
+                .IsRequired()
+                .HasMaxLength(255);
+                
+            entity.Property(s => s.StripeCustomerId)
+                .IsRequired()
+                .HasMaxLength(255);
+                
+            entity.Property(s => s.StripePriceId)
+                .IsRequired()
+                .HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<SubscriptionPayment>(entity =>
+        {
+            entity.HasKey(sp => sp.Id);
+            
+            entity.HasOne(sp => sp.Subscription)
+                .WithMany(s => s.Payments)
+                .HasForeignKey(sp => sp.SubscriptionId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.Property(sp => sp.StripePaymentIntentId)
+                .IsRequired()
+                .HasMaxLength(255);
+                
+            entity.Property(sp => sp.StripeInvoiceId)
+                .HasMaxLength(255);
+        });
 
         modelBuilder.Entity<Option>()
         .HasOne(o => o.Quizz)
@@ -210,10 +257,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Bazë",
         Type = "monthly",
         Price = 2000,
+        MonthlyPrice = 2000,
+        YearlyPrice = 20000,
+        StripeMonthlyPriceId = "price_monthly_baze",
+        StripeYearlyPriceId = "price_yearly_baze",
+        StripeProductId = "prod_student_baze",
         StripeProductName = "Student - Monthly Bazë",
         IsFamilyPlan = false,
         UserType = "student",
-        MaxUsers = 1  
+        MaxUsers = 1,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -221,10 +276,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Standarde",
         Type = "monthly",
         Price = 4000,
+        MonthlyPrice = 4000,
+        YearlyPrice = 40000,
+        StripeMonthlyPriceId = "price_monthly_standarde",
+        StripeYearlyPriceId = "price_yearly_standarde",
+        StripeProductId = "prod_student_standarde",
         StripeProductName = "Student - Monthly Standarde",
         IsFamilyPlan = false,
         UserType = "student",
-        MaxUsers = 1
+        MaxUsers = 1,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -232,10 +295,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Premium",
         Type = "monthly",
         Price = 6000,
+        MonthlyPrice = 6000,
+        YearlyPrice = 60000,
+        StripeMonthlyPriceId = "price_monthly_premium",
+        StripeYearlyPriceId = "price_yearly_premium",
+        StripeProductId = "prod_student_premium",
         StripeProductName = "Student - Monthly Premium",
         IsFamilyPlan = false,
         UserType = "student",
-        MaxUsers = 1
+        MaxUsers = 1,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -243,10 +314,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Bazë",
         Type = "yearly",
         Price = 20000,
+        MonthlyPrice = 2000,
+        YearlyPrice = 20000,
+        StripeMonthlyPriceId = "price_monthly_baze",
+        StripeYearlyPriceId = "price_yearly_baze",
+        StripeProductId = "prod_student_baze",
         StripeProductName = "Student - Yearly Bazë",
         IsFamilyPlan = false,
         UserType = "student",
-        MaxUsers = 1
+        MaxUsers = 1,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -254,10 +333,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Standarde",
         Type = "yearly",
         Price = 40000,
+        MonthlyPrice = 4000,
+        YearlyPrice = 40000,
+        StripeMonthlyPriceId = "price_monthly_standarde",
+        StripeYearlyPriceId = "price_yearly_standarde",
+        StripeProductId = "prod_family_standarde",
         StripeProductName = "Student - Yearly Standarde",
         IsFamilyPlan = true,
         UserType = "family",
-        MaxUsers = 5 
+        MaxUsers = 5,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -265,10 +352,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Premium",
         Type = "yearly",
         Price = 60000,
+        MonthlyPrice = 6000,
+        YearlyPrice = 60000,
+        StripeMonthlyPriceId = "price_monthly_premium",
+        StripeYearlyPriceId = "price_yearly_premium",
+        StripeProductId = "prod_family_premium",
         StripeProductName = "Student - Yearly Premium",
         IsFamilyPlan = true,
         UserType = "family",
-        MaxUsers = 10
+        MaxUsers = 10,
+        IsSubscription = true,
+        TrialDays = 7,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -276,10 +371,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Supervisor - Monthly",
         Type = "monthly",
         Price = 10000,
+        MonthlyPrice = 10000,
+        YearlyPrice = 100000,
+        StripeMonthlyPriceId = "price_supervisor_monthly",
+        StripeYearlyPriceId = "price_supervisor_yearly",
+        StripeProductId = "prod_supervisor",
         StripeProductName = "Supervisor - Monthly Plan",
         IsFamilyPlan = false,
         UserType = "supervisor",
-        MaxUsers = 50  
+        MaxUsers = 50,
+        IsSubscription = true,
+        TrialDays = 14,
+        AllowCancellation = true
     },
     new RegistrationPlan
     {
@@ -287,10 +390,18 @@ public class ApplicationDbContext : DbContext
         RegistrationPlanName = "Supervisor - Yearly",
         Type = "yearly",
         Price = 100000,
+        MonthlyPrice = 10000,
+        YearlyPrice = 100000,
+        StripeMonthlyPriceId = "price_supervisor_monthly",
+        StripeYearlyPriceId = "price_supervisor_yearly",
+        StripeProductId = "prod_supervisor",
         StripeProductName = "Supervisor - Yearly Plan",
         IsFamilyPlan = false,
         UserType = "supervisor",
-        MaxUsers = 500
+        MaxUsers = 500,
+        IsSubscription = true,
+        TrialDays = 14,
+        AllowCancellation = true
     }
 );
         modelBuilder.Entity<Subjects>().HasData(

@@ -18,7 +18,7 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
-    public async Task SendEmailVerification(string email, Guid token, string verificationType)
+    public async Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
         var verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
@@ -28,6 +28,15 @@ public class NotificationService : INotificationService
         var content = @"
         <p>Përshëndetje,</p>
         <p>Faleminderit që u regjistruat! Për të përfunduar procesin, ju lutemi klikoni butonin më poshtë për të verifikuar adresën tuaj të emailit.</p>";
+        
+        // Add password information if provided (for school-registered students)
+        if (!string.IsNullOrEmpty(password))
+        {
+            content += $@"
+            <p><strong>Fjalëkalimi juaj i gjeneruar automatikisht:</strong> {password}</p>
+            <p><em>Ju lutemi ruani këtë fjalëkalim dhe ndryshojeni pas verifikimit të emailit.</em></p>";
+        }
+        
         var ctaText = "Verifiko Emailin Tani";
 
         var body = GenerateHtml(title, content, ctaText, verificationUrl, footerText);

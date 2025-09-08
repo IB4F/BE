@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250907111208_AddRegistrationDataToPayment")]
+    partial class AddRegistrationDataToPayment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Cities", (string)null);
+                    b.ToTable("Cities");
 
                     b.HasData(
                         new
@@ -106,7 +109,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Classes", (string)null);
+                    b.ToTable("Classes");
 
                     b.HasData(
                         new
@@ -205,7 +208,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LearnHubs", (string)null);
+                    b.ToTable("LearnHubs");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
@@ -229,7 +232,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("LearnHubId");
 
-                    b.ToTable("Links", (string)null);
+                    b.ToTable("Links");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Option", b =>
@@ -257,7 +260,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("QuizzId");
 
-                    b.ToTable("Options", (string)null);
+                    b.ToTable("Options");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
@@ -311,7 +314,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.QuizType", b =>
@@ -326,7 +329,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("QuizTypes", (string)null);
+                    b.ToTable("QuizTypes");
 
                     b.HasData(
                         new
@@ -392,7 +395,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("QuizzTypeId");
 
-                    b.ToTable("Quizzes", (string)null);
+                    b.ToTable("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.RegistrationPlan", b =>
@@ -401,20 +404,11 @@ namespace TeachingBACKEND.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool>("AllowCancellation")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsFamilyPlan")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsSubscription")
                         .HasColumnType("bit");
 
                     b.Property<int>("MaxUsers")
                         .HasColumnType("int");
-
-                    b.Property<long>("MonthlyPrice")
-                        .HasColumnType("bigint");
 
                     b.Property<long>("Price")
                         .HasColumnType("bigint");
@@ -423,24 +417,9 @@ namespace TeachingBACKEND.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("StripeMonthlyPriceId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("StripeProductId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("StripeProductName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("StripeYearlyPriceId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TrialDays")
-                        .HasColumnType("int");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -450,165 +429,98 @@ namespace TeachingBACKEND.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<long>("YearlyPrice")
-                        .HasColumnType("bigint");
-
                     b.HasKey("Id");
 
-                    b.ToTable("RegistrationPlans", (string)null);
+                    b.ToTable("RegistrationPlans");
 
                     b.HasData(
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-1111-1111-111111111111"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 1,
-                            MonthlyPrice = 2000L,
                             Price = 2000L,
                             RegistrationPlanName = "Bazë",
-                            StripeMonthlyPriceId = "price_monthly_baze",
-                            StripeProductId = "prod_student_baze",
                             StripeProductName = "Student - Monthly Bazë",
-                            StripeYearlyPriceId = "price_yearly_baze",
-                            TrialDays = 7,
                             Type = "monthly",
-                            UserType = "student",
-                            YearlyPrice = 20000L
+                            UserType = "student"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-2222-2222-222222222222"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 1,
-                            MonthlyPrice = 4000L,
                             Price = 4000L,
                             RegistrationPlanName = "Standarde",
-                            StripeMonthlyPriceId = "price_monthly_standarde",
-                            StripeProductId = "prod_student_standarde",
                             StripeProductName = "Student - Monthly Standarde",
-                            StripeYearlyPriceId = "price_yearly_standarde",
-                            TrialDays = 7,
                             Type = "monthly",
-                            UserType = "student",
-                            YearlyPrice = 40000L
+                            UserType = "student"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-3333-3333-333333333333"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 1,
-                            MonthlyPrice = 6000L,
                             Price = 6000L,
                             RegistrationPlanName = "Premium",
-                            StripeMonthlyPriceId = "price_monthly_premium",
-                            StripeProductId = "prod_student_premium",
                             StripeProductName = "Student - Monthly Premium",
-                            StripeYearlyPriceId = "price_yearly_premium",
-                            TrialDays = 7,
                             Type = "monthly",
-                            UserType = "student",
-                            YearlyPrice = 60000L
+                            UserType = "student"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-4444-4444-444444444444"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 1,
-                            MonthlyPrice = 2000L,
                             Price = 20000L,
                             RegistrationPlanName = "Bazë",
-                            StripeMonthlyPriceId = "price_monthly_baze",
-                            StripeProductId = "prod_student_baze",
                             StripeProductName = "Student - Yearly Bazë",
-                            StripeYearlyPriceId = "price_yearly_baze",
-                            TrialDays = 7,
                             Type = "yearly",
-                            UserType = "student",
-                            YearlyPrice = 20000L
+                            UserType = "student"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-5555-5555-555555555555"),
-                            AllowCancellation = true,
                             IsFamilyPlan = true,
-                            IsSubscription = true,
                             MaxUsers = 5,
-                            MonthlyPrice = 4000L,
                             Price = 40000L,
                             RegistrationPlanName = "Standarde",
-                            StripeMonthlyPriceId = "price_monthly_standarde",
-                            StripeProductId = "prod_family_standarde",
                             StripeProductName = "Student - Yearly Standarde",
-                            StripeYearlyPriceId = "price_yearly_standarde",
-                            TrialDays = 7,
                             Type = "yearly",
-                            UserType = "family",
-                            YearlyPrice = 40000L
+                            UserType = "family"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-6666-6666-666666666666"),
-                            AllowCancellation = true,
                             IsFamilyPlan = true,
-                            IsSubscription = true,
                             MaxUsers = 10,
-                            MonthlyPrice = 6000L,
                             Price = 60000L,
                             RegistrationPlanName = "Premium",
-                            StripeMonthlyPriceId = "price_monthly_premium",
-                            StripeProductId = "prod_family_premium",
                             StripeProductName = "Student - Yearly Premium",
-                            StripeYearlyPriceId = "price_yearly_premium",
-                            TrialDays = 7,
                             Type = "yearly",
-                            UserType = "family",
-                            YearlyPrice = 60000L
+                            UserType = "family"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-7777-7777-777777777777"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 50,
-                            MonthlyPrice = 10000L,
                             Price = 10000L,
                             RegistrationPlanName = "Supervisor - Monthly",
-                            StripeMonthlyPriceId = "price_supervisor_monthly",
-                            StripeProductId = "prod_supervisor",
                             StripeProductName = "Supervisor - Monthly Plan",
-                            StripeYearlyPriceId = "price_supervisor_yearly",
-                            TrialDays = 14,
                             Type = "monthly",
-                            UserType = "supervisor",
-                            YearlyPrice = 100000L
+                            UserType = "supervisor"
                         },
                         new
                         {
                             Id = new Guid("a1a1a1a1-a1a1-8888-8888-888888888888"),
-                            AllowCancellation = true,
                             IsFamilyPlan = false,
-                            IsSubscription = true,
                             MaxUsers = 500,
-                            MonthlyPrice = 10000L,
                             Price = 100000L,
                             RegistrationPlanName = "Supervisor - Yearly",
-                            StripeMonthlyPriceId = "price_supervisor_monthly",
-                            StripeProductId = "prod_supervisor",
                             StripeProductName = "Supervisor - Yearly Plan",
-                            StripeYearlyPriceId = "price_supervisor_yearly",
-                            TrialDays = 14,
                             Type = "yearly",
-                            UserType = "supervisor",
-                            YearlyPrice = 100000L
+                            UserType = "supervisor"
                         });
                 });
 
@@ -666,7 +578,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentPerformanceSummaries", (string)null);
+                    b.ToTable("StudentPerformanceSummaries");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.StudentQuizPerformance", b =>
@@ -726,7 +638,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentQuizPerformances", (string)null);
+                    b.ToTable("StudentQuizPerformances");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.StudentQuizSession", b =>
@@ -777,7 +689,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentQuizSessions", (string)null);
+                    b.ToTable("StudentQuizSessions");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Subjects", b =>
@@ -792,7 +704,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Subjects", (string)null);
+                    b.ToTable("Subjects");
 
                     b.HasData(
                         new
@@ -825,138 +737,6 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("faf6b93a-91d1-4ead-85f5-0120ac85f7d2"),
                             Name = "Shkenca"
                         });
-                });
-
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Subscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<long>("Amount")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("CanceledAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("CurrentPeriodEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("CurrentPeriodStart")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Interval")
-                        .HasColumnType("int");
-
-                    b.Property<int>("IntervalCount")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("PlanId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("RegistrationData")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RegistrationType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StripeCustomerId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("StripePriceId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("StripeSubscriptionId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime?>("TrialEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PlanId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Subscriptions", (string)null);
-                });
-
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.SubscriptionPayment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<long>("Amount")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("PaidAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("PeriodEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("PeriodStart")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StripeInvoiceId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("StripePaymentIntentId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<Guid>("SubscriptionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubscriptionId");
-
-                    b.ToTable("SubscriptionPayments", (string)null);
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.UploadedFile", b =>
@@ -995,19 +775,13 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Files", (string)null);
+                    b.ToTable("Files");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("ActiveSubscriptionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("ActiveSubscriptionId1")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("ApprovalStatus")
@@ -1080,14 +854,9 @@ namespace TeachingBACKEND.Migrations
                     b.Property<string>("School")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("SubscriptionExpiresAt")
-                        .HasColumnType("datetime2");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("ActiveSubscriptionId1");
-
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
 
                     b.HasData(
                         new
@@ -1095,13 +864,13 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2025, 9, 7, 11, 42, 2, 40, DateTimeKind.Utc).AddTicks(8640),
+                            CreateAt = new DateTime(2025, 9, 7, 11, 12, 7, 689, DateTimeKind.Utc).AddTicks(3420),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@teachapp.com",
                             FirstName = "System",
                             IsEmailVerified = true,
                             LastName = "Administrator",
-                            PasswordHash = "$2a$12$9s9szKHkRwZa.8N19J3J2e8HzHGGGKuTNnfiH3SkfnLycP764KZz2",
+                            PasswordHash = "$2a$12$vfsxbdCnRpN0aIl6.AhGgO75hFwSwpoJNs0wtzCcPmp5atDJ6GHda",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),
@@ -1270,45 +1039,6 @@ namespace TeachingBACKEND.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Subscription", b =>
-                {
-                    b.HasOne("TeachingBACKEND.Domain.Entities.RegistrationPlan", "Plan")
-                        .WithMany("Subscriptions")
-                        .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TeachingBACKEND.Domain.Entities.User", "User")
-                        .WithMany("Subscriptions")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Plan");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.SubscriptionPayment", b =>
-                {
-                    b.HasOne("TeachingBACKEND.Domain.Entities.Subscription", "Subscription")
-                        .WithMany("Payments")
-                        .HasForeignKey("SubscriptionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Subscription");
-                });
-
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
-                {
-                    b.HasOne("TeachingBACKEND.Domain.Entities.Subscription", "ActiveSubscription")
-                        .WithMany()
-                        .HasForeignKey("ActiveSubscriptionId1");
-
-                    b.Navigation("ActiveSubscription");
-                });
-
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.LearnHub", b =>
                 {
                     b.Navigation("Links");
@@ -1329,20 +1059,11 @@ namespace TeachingBACKEND.Migrations
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.RegistrationPlan", b =>
                 {
                     b.Navigation("Payments");
-
-                    b.Navigation("Subscriptions");
-                });
-
-            modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Subscription", b =>
-                {
-                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
                 {
                     b.Navigation("Payments");
-
-                    b.Navigation("Subscriptions");
                 });
 #pragma warning restore 612, 618
         }

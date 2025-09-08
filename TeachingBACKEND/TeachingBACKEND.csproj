@@ -45,6 +45,9 @@
     <Content Include="Templates\EmailVerificationTemplate.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Remove="wwwroot\images\ce6a4b73-72cf-441e-84be-a0e0a674a515.png" />
+    <Content Remove="wwwroot\images\83e499dd-0a7c-433c-b10b-24ba9794175b.png" />
+    <Content Remove="wwwroot\audio\9b38df0a-072f-4f11-b932-a57504ad4123.mp3" />
   </ItemGroup>
 
 </Project>

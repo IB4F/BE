@@ -3,11 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
+using System.Text.Json;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Application.Services;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Controllers
 {
@@ -16,28 +18,42 @@ namespace TeachingBACKEND.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ISubscriptionService _subscriptionService;
         private readonly ApplicationDbContext _context;
         private readonly IPasswordService _passwordService;
 
-        public AuthController(IUserService userService, ApplicationDbContext context, IPasswordService passwordService)
+        public AuthController(IUserService userService, ISubscriptionService subscriptionService, ApplicationDbContext context, IPasswordService passwordService)
         {
             _userService = userService;
+            _subscriptionService = subscriptionService;
             _context = context;
             _passwordService = passwordService;
         }
 
         /// <summary>
-        /// Register a student
+        /// Initiate student registration (subscription-first flow)
         /// </summary>
         [AllowAnonymous]
         [HttpPost("register-student")]
         public async Task<IActionResult> RegisterStudent([FromBody] StudentRegistrationDTO model)
         {
-
             try
             {
-                var response = await _userService.RegisterStudent(model);
-                return Created("", new { message = "Student registered successfully", userId = response.Id, sessionId = response.SessionId });
+                var subscriptionRequest = new SubscriptionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "student",
+                    PlanId = model.PlanId,
+                    RegistrationData = JsonSerializer.Serialize(model),
+                    BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
+                };
+
+                var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
+                return Ok(new { 
+                    message = "Student subscription initiated. Please complete payment to start your subscription.", 
+                    sessionId = sessionId,
+                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}" // Frontend should redirect to this
+                });
             }
             catch (Exception ex)
             {
@@ -45,11 +61,10 @@ namespace TeachingBACKEND.Controllers
                 Console.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
                 return BadRequest(new { error = ex.Message });
             }
-
         }
 
         /// <summary>
-        /// Register a school and its students (each student receives a randomly generated password via email)
+        /// Initiate school registration (subscription-first flow)
         /// </summary>
         [AllowAnonymous]
         [HttpPost("register-school")]
@@ -60,19 +75,21 @@ namespace TeachingBACKEND.Controllers
 
             try
             {
-                var response = await _userService.RegisterSchool(model);
-                return Created("", new {
-                    message = "School and students registered successfully",
-                    userId = response.Id,
-                    students = response.Students?.Select(s => new {
-                        s.Id,
-                        s.Email,
-                        s.FirstName,
-                        s.LastName,
-                        s.IsEmailVerified,
-                        s.VerificationType
-                    }),
-                    note = "Each student receives a randomly generated password via email."
+                var subscriptionRequest = new SubscriptionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "school",
+                    PlanId = model.PlanId,
+                    RegistrationData = JsonSerializer.Serialize(model),
+                    BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
+                };
+
+                var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
+                return Ok(new {
+                    message = "School subscription initiated. Please complete payment to start your subscription.",
+                    sessionId = sessionId,
+                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    note = "After payment, school and students will be created. Each student will receive a randomly generated password via email."
                 });
             }
             catch (Exception ex)
@@ -82,6 +99,9 @@ namespace TeachingBACKEND.Controllers
         }
 
 
+        /// <summary>
+        /// Initiate family registration (subscription-first flow)
+        /// </summary>
         [AllowAnonymous]
         [HttpPost("register-family")]
         public async Task<IActionResult> RegisterFamily([FromBody] FamilyRegistrationDTO model)
@@ -91,8 +111,23 @@ namespace TeachingBACKEND.Controllers
 
             try
             {
-                var result = await _userService.RegisterFamily(model);
-                return Ok(result); 
+                var subscriptionRequest = new SubscriptionRequestDTO
+                {
+                    Email = model.Email,
+                    RegistrationType = "family",
+                    PlanId = Guid.Parse(model.PlanId),
+                    RegistrationData = JsonSerializer.Serialize(model),
+                    BillingInterval = BillingInterval.Month, // Default to monthly, can be made configurable
+                    FamilyMemberCount = model.FamilyMembers?.Count ?? 1
+                };
+
+                var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
+                return Ok(new {
+                    message = "Family subscription initiated. Please complete payment to start your subscription.",
+                    sessionId = sessionId,
+                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    note = "After payment, family members will be created and verification email will be sent."
+                }); 
             }
             catch (Exception ex)
             {
