@@ -21,13 +21,15 @@ namespace TeachingBACKEND.Controllers
         private readonly ISubscriptionService _subscriptionService;
         private readonly ApplicationDbContext _context;
         private readonly IPasswordService _passwordService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IUserService userService, ISubscriptionService subscriptionService, ApplicationDbContext context, IPasswordService passwordService)
+        public AuthController(IUserService userService, ISubscriptionService subscriptionService, ApplicationDbContext context, IPasswordService passwordService, ILogger<AuthController> logger)
         {
             _userService = userService;
             _subscriptionService = subscriptionService;
             _context = context;
             _passwordService = passwordService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -37,13 +39,30 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("register-student")]
         public async Task<IActionResult> RegisterStudent([FromBody] StudentRegistrationDTO model)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             try
             {
+                // Validate the subscription package
+                var package = await _context.SubscriptionPackages
+                    .FirstOrDefaultAsync(p => p.Id == model.SubscriptionPackageId);
+
+                if (package == null)
+                {
+                    return BadRequest(new { error = "Subscription package not found." });
+                }
+
+                if (package.UserType != UserType.Student)
+                {
+                    return BadRequest(new { error = "Selected package is not a student package." });
+                }
+
                 var subscriptionRequest = new SubscriptionRequestDTO
                 {
                     Email = model.Email,
                     RegistrationType = "student",
-                    PlanId = model.PlanId,
+                    SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
                     BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
                 };
@@ -52,7 +71,8 @@ namespace TeachingBACKEND.Controllers
                 return Ok(new { 
                     message = "Student subscription initiated. Please complete payment to start your subscription.", 
                     sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}" // Frontend should redirect to this
+                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    packageName = package.Name
                 });
             }
             catch (Exception ex)
@@ -75,11 +95,25 @@ namespace TeachingBACKEND.Controllers
 
             try
             {
+                // Validate the subscription package
+                var package = await _context.SubscriptionPackages
+                    .FirstOrDefaultAsync(p => p.Id == model.SubscriptionPackageId);
+
+                if (package == null)
+                {
+                    return BadRequest(new { error = "Subscription package not found." });
+                }
+
+                if (package.UserType != UserType.Supervisor)
+                {
+                    return BadRequest(new { error = "Selected package is not a school/supervisor package." });
+                }
+
                 var subscriptionRequest = new SubscriptionRequestDTO
                 {
                     Email = model.Email,
                     RegistrationType = "school",
-                    PlanId = model.PlanId,
+                    SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
                     BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
                 };
@@ -89,7 +123,8 @@ namespace TeachingBACKEND.Controllers
                     message = "School subscription initiated. Please complete payment to start your subscription.",
                     sessionId = sessionId,
                     paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
-                    note = "After payment, school and students will be created. Each student will receive a randomly generated password via email."
+                    note = "After payment, school and students will be created. Each student will receive a randomly generated password via email.",
+                    packageName = package.Name
                 });
             }
             catch (Exception ex)
@@ -106,32 +141,137 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("register-family")]
         public async Task<IActionResult> RegisterFamily([FromBody] FamilyRegistrationDTO model)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
+            using var activity = _logger.BeginScope("RegisterFamily");
+            
             try
             {
+                _logger.LogInformation("Starting family registration for email: {Email} with {FamilyMemberCount} family members", 
+                    model.Email, model.FamilyMembers?.Count ?? 0);
+
+                if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("Model validation failed for family registration. Errors: {@ModelState}", ModelState);
+                    return BadRequest(ModelState);
+                }
+
+                _logger.LogInformation("Model validation passed for family registration");
+
+                // Validate family member count (max 10)
+                var totalFamilyMembers = (model.FamilyMembers?.Count ?? 0) + 1; // +1 for main user
+                _logger.LogInformation("Total family members to register: {TotalFamilyMembers}", totalFamilyMembers);
+                
+                if (totalFamilyMembers > 10)
+                {
+                    _logger.LogWarning("Family member count exceeded maximum. Requested: {TotalFamilyMembers}, Max: 10", totalFamilyMembers);
+                    return BadRequest(new { 
+                        error = "Maximum 10 family members allowed. Please reduce the number of family members.",
+                        currentCount = totalFamilyMembers,
+                        maxAllowed = 10
+                    });
+                }
+
+                if (totalFamilyMembers < 1)
+                {
+                    _logger.LogWarning("No family members provided. Total count: {TotalFamilyMembers}", totalFamilyMembers);
+                    return BadRequest(new { 
+                        error = "At least 1 family member is required.",
+                        currentCount = totalFamilyMembers
+                    });
+                }
+
+                // Log family member details
+                if (model.FamilyMembers != null && model.FamilyMembers.Any())
+                {
+                    _logger.LogInformation("Family members to be created: {@FamilyMembers}", 
+                        model.FamilyMembers.Select(fm => new { fm.FirstName, fm.LastName, fm.CurrentClass }));
+                }
+
+                // Get the subscription package to validate it's a family package
+                _logger.LogInformation("Looking up subscription package with ID: {PackageId}", model.SubscriptionPackageId);
+                var package = await _context.SubscriptionPackages
+                    .FirstOrDefaultAsync(p => p.Id == model.SubscriptionPackageId);
+
+                if (package == null)
+                {
+                    _logger.LogWarning("Subscription package not found with ID: {PackageId}", model.SubscriptionPackageId);
+                    return BadRequest(new { error = "Subscription package not found." });
+                }
+
+                _logger.LogInformation("Found subscription package: {PackageName}, UserType: {UserType}, MinFamilyMembers: {MinFamilyMembers}, MaxFamilyMembers: {MaxFamilyMembers}", 
+                    package.Name, package.UserType, package.MinFamilyMembers, package.MaxFamilyMembers);
+
+                if (package.UserType != UserType.Family)
+                {
+                    _logger.LogWarning("Invalid package type. Expected: Family, Actual: {UserType}", package.UserType);
+                    return BadRequest(new { error = "Selected package is not a family package." });
+                }
+
+                // Validate family member count against package limits
+                if (totalFamilyMembers < package.MinFamilyMembers || totalFamilyMembers > package.MaxFamilyMembers)
+                {
+                    _logger.LogWarning("Family member count outside package limits. Requested: {TotalFamilyMembers}, Min: {MinFamilyMembers}, Max: {MaxFamilyMembers}", 
+                        totalFamilyMembers, package.MinFamilyMembers, package.MaxFamilyMembers);
+                    return BadRequest(new { 
+                        error = $"Family members must be between {package.MinFamilyMembers} and {package.MaxFamilyMembers} for this package.",
+                        currentCount = totalFamilyMembers,
+                        minAllowed = package.MinFamilyMembers,
+                        maxAllowed = package.MaxFamilyMembers
+                    });
+                }
+
+                _logger.LogInformation("Creating subscription request for family registration");
+
                 var subscriptionRequest = new SubscriptionRequestDTO
                 {
                     Email = model.Email,
                     RegistrationType = "family",
-                    PlanId = Guid.Parse(model.PlanId),
+                    SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
                     BillingInterval = BillingInterval.Month, // Default to monthly, can be made configurable
-                    FamilyMemberCount = model.FamilyMembers?.Count ?? 1
+                    FamilyMemberCount = totalFamilyMembers
                 };
 
+                _logger.LogInformation("Calling CreateSubscriptionAsync for family registration");
+
                 var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
+                
+                _logger.LogInformation("Family registration initiated successfully. Session ID: {SessionId}", sessionId);
+                
                 return Ok(new {
                     message = "Family subscription initiated. Please complete payment to start your subscription.",
                     sessionId = sessionId,
                     paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
-                    note = "After payment, family members will be created and verification email will be sent."
+                    note = "After payment, family members will be created and verification email will be sent.",
+                    familyMemberCount = totalFamilyMembers,
+                    packageName = package.Name
                 }); 
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message }); 
+                // Log the full exception details for debugging
+                _logger.LogError(ex, "Error in register-family endpoint for email: {Email}. " +
+                    "Family members count: {FamilyMemberCount}. Package ID: {PackageId}. " +
+                    "Exception: {ExceptionMessage}. Inner Exception: {InnerExceptionMessage}. " +
+                    "Stack Trace: {StackTrace}", 
+                    model.Email, 
+                    model.FamilyMembers?.Count ?? 0, 
+                    model.SubscriptionPackageId,
+                    ex.Message,
+                    ex.InnerException?.Message ?? "None",
+                    ex.StackTrace);
+                
+                // Return more detailed error information
+                var errorMessage = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    errorMessage += $" Inner Exception: {ex.InnerException.Message}";
+                }
+                
+                return BadRequest(new { 
+                    message = "An error occurred while saving the entity changes. See the inner exception for details.",
+                    details = errorMessage,
+                    stackTrace = ex.StackTrace
+                }); 
             }
         }
         

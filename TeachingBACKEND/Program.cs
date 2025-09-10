@@ -92,6 +92,9 @@ builder.Services.AddScoped<ILearnHubService, LearnHubService>();
 builder.Services.AddScoped<IStudentPerformanceService, StudentPerformanceService>();
 builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<ISubscriptionPackageService, SubscriptionPackageService>();
+builder.Services.AddScoped<FamilyPricingService>();
+builder.Services.AddScoped<StripePricingService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

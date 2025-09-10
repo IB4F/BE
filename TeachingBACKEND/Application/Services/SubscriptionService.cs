@@ -34,26 +34,40 @@ namespace TeachingBACKEND.Application.Services
 
         public async Task<string> CreateSubscriptionAsync(SubscriptionRequestDTO dto)
         {
+            using var activity = _logger.BeginScope("CreateSubscriptionAsync");
+            
             try
             {
-                // Get the plan
-                var plan = await _context.RegistrationPlans
-                    .FirstOrDefaultAsync(p => p.Id == dto.PlanId);
+                _logger.LogInformation("Starting subscription creation for email: {Email}, RegistrationType: {RegistrationType}, PackageId: {PackageId}", 
+                    dto.Email, dto.RegistrationType, dto.SubscriptionPackageId);
 
-                if (plan == null)
+                // Get the subscription package
+                _logger.LogInformation("Looking up subscription package with ID: {PackageId}", dto.SubscriptionPackageId);
+                var package = await _context.SubscriptionPackages
+                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId);
+
+                if (package == null)
                 {
-                    throw new ArgumentException("Plan not found");
+                    _logger.LogError("Subscription package not found with ID: {PackageId}", dto.SubscriptionPackageId);
+                    throw new ArgumentException("Subscription package not found");
                 }
+
+                _logger.LogInformation("Found subscription package: {PackageName}, UserType: {UserType}, TrialDays: {TrialDays}", 
+                    package.Name, package.UserType, package.TrialDays);
 
                 // Determine the Stripe Price ID based on billing interval
                 string stripePriceId = dto.BillingInterval switch
                 {
-                    BillingInterval.Month => plan.StripeMonthlyPriceId,
-                    BillingInterval.Year => plan.StripeYearlyPriceId,
-                    _ => plan.StripeMonthlyPriceId
+                    BillingInterval.Month => package.StripeMonthlyPriceId,
+                    BillingInterval.Year => package.StripeYearlyPriceId,
+                    _ => package.StripeMonthlyPriceId
                 };
 
+                _logger.LogInformation("Using Stripe Price ID: {StripePriceId} for billing interval: {BillingInterval}", 
+                    stripePriceId, dto.BillingInterval);
+
                 // Create Stripe checkout session for subscription
+                _logger.LogInformation("Configuring Stripe API key");
                 StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
 
                 var subscriptionData = new SessionSubscriptionDataOptions
@@ -62,16 +76,20 @@ namespace TeachingBACKEND.Application.Services
                     {
                         { "registration_type", dto.RegistrationType },
                         { "registration_data", dto.RegistrationData },
-                        { "plan_id", dto.PlanId.ToString() },
+                        { "subscription_package_id", dto.SubscriptionPackageId.ToString() },
                         { "billing_interval", dto.BillingInterval.ToString() }
                     }
                 };
 
                 // Only set trial period if TrialDays > 0
-                if (plan.TrialDays > 0)
+                if (package.TrialDays > 0)
                 {
-                    subscriptionData.TrialPeriodDays = plan.TrialDays;
+                    subscriptionData.TrialPeriodDays = package.TrialDays;
+                    _logger.LogInformation("Setting trial period to {TrialDays} days", package.TrialDays);
                 }
+
+                _logger.LogInformation("Creating Stripe checkout session with SuccessUrl: {SuccessUrl}, CancelUrl: {CancelUrl}", 
+                    _configuration["STRIPE_SUCCESS_URL"], _configuration["STRIPE_CANCEL_URL"]);
 
                 var options = new SessionCreateOptions
                 {
@@ -91,10 +109,14 @@ namespace TeachingBACKEND.Application.Services
                     SubscriptionData = subscriptionData
                 };
 
+                _logger.LogInformation("Calling Stripe SessionService.CreateAsync");
                 var service = new SessionService();
                 var session = await service.CreateAsync(options);
 
+                _logger.LogInformation("Stripe session created successfully with ID: {SessionId}", session.Id);
+
                 // Create Payment record for tracking
+                _logger.LogInformation("Creating Payment record for tracking");
                 var payment = new Payment
                 {
                     Email = dto.Email,
@@ -104,19 +126,23 @@ namespace TeachingBACKEND.Application.Services
                     Amount = 0, // Will be set by subscription
                     Currency = "eur",
                     Status = "pending",
-                    PlanId = dto.PlanId
+                    SubscriptionPackageId = dto.SubscriptionPackageId
                 };
 
+                _logger.LogInformation("Adding Payment record to context and saving changes");
                 _context.Payments.Add(payment);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Created Stripe subscription session: {SessionId} and Payment record", session.Id);
+                _logger.LogInformation("Successfully created Stripe subscription session: {SessionId} and Payment record", session.Id);
 
                 return session.Id;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating subscription session for email: {Email}", dto.Email);
+                _logger.LogError(ex, "Error creating subscription session for email: {Email}, RegistrationType: {RegistrationType}, PackageId: {PackageId}. " +
+                    "Exception: {ExceptionMessage}. Inner Exception: {InnerExceptionMessage}. Stack Trace: {StackTrace}", 
+                    dto.Email, dto.RegistrationType, dto.SubscriptionPackageId, ex.Message, 
+                    ex.InnerException?.Message ?? "None", ex.StackTrace);
                 throw;
             }
         }
@@ -124,7 +150,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<SubscriptionResponseDTO> GetSubscriptionAsync(Guid subscriptionId)
         {
             var subscription = await _context.Subscriptions
-                .Include(s => s.Plan)
+                .Include(s => s.SubscriptionPackage)
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
@@ -139,7 +165,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<SubscriptionResponseDTO> GetUserActiveSubscriptionAsync(Guid userId)
         {
             var subscription = await _context.Subscriptions
-                .Include(s => s.Plan)
+                .Include(s => s.SubscriptionPackage)
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Status == SubscriptionStatus.Active);
 
@@ -278,7 +304,7 @@ namespace TeachingBACKEND.Application.Services
             try
             {
                 var subscription = await _context.Subscriptions
-                    .Include(s => s.Plan)
+                    .Include(s => s.SubscriptionPackage)
                     .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
                 if (subscription == null)
@@ -286,10 +312,10 @@ namespace TeachingBACKEND.Application.Services
                     return false;
                 }
 
-                var newPlan = await _context.RegistrationPlans
+                var newPackage = await _context.SubscriptionPackages
                     .FirstOrDefaultAsync(p => p.Id == dto.NewPlanId);
 
-                if (newPlan == null)
+                if (newPackage == null)
                 {
                     return false;
                 }
@@ -297,9 +323,9 @@ namespace TeachingBACKEND.Application.Services
                 // Determine the new Stripe Price ID
                 string newStripePriceId = dto.BillingInterval switch
                 {
-                    BillingInterval.Month => newPlan.StripeMonthlyPriceId,
-                    BillingInterval.Year => newPlan.StripeYearlyPriceId,
-                    _ => newPlan.StripeMonthlyPriceId
+                    BillingInterval.Month => newPackage.StripeMonthlyPriceId,
+                    BillingInterval.Year => newPackage.StripeYearlyPriceId,
+                    _ => newPackage.StripeMonthlyPriceId
                 };
 
                 // Update in Stripe
@@ -322,7 +348,7 @@ namespace TeachingBACKEND.Application.Services
                 await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
 
                 // Update local subscription
-                subscription.PlanId = dto.NewPlanId;
+                subscription.SubscriptionPackageId = dto.NewPlanId;
                 subscription.StripePriceId = newStripePriceId;
                 subscription.Interval = dto.BillingInterval;
                 subscription.UpdatedAt = DateTime.UtcNow;
@@ -403,7 +429,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<List<SubscriptionResponseDTO>> GetUserSubscriptionsAsync(Guid userId)
         {
             var subscriptions = await _context.Subscriptions
-                .Include(s => s.Plan)
+                .Include(s => s.SubscriptionPackage)
                 .Include(s => s.User)
                 .Where(s => s.UserId == userId)
                 .OrderByDescending(s => s.CreatedAt)
@@ -424,7 +450,7 @@ namespace TeachingBACKEND.Application.Services
                 // Get metadata
                 var registrationType = subscription.Metadata.GetValueOrDefault("registration_type");
                 var registrationData = subscription.Metadata.GetValueOrDefault("registration_data");
-                var planIdString = subscription.Metadata.GetValueOrDefault("plan_id");
+                var planIdString = subscription.Metadata.GetValueOrDefault("subscription_package_id");
                 
                 _logger.LogInformation("Metadata - RegistrationType: {RegistrationType}, RegistrationData: {RegistrationData}, PlanId: {PlanId}", 
                     registrationType, registrationData, planIdString);
@@ -448,7 +474,7 @@ namespace TeachingBACKEND.Application.Services
                     StripeSubscriptionId = subscription.Id,
                     StripeCustomerId = subscription.CustomerId,
                     StripePriceId = subscription.Items.Data[0].Price.Id,
-                    PlanId = planId,
+                    SubscriptionPackageId = planId,
                     Status = MapStripeStatus(subscription.Status),
                     StartDate = subscription.StartDate,
                     EndDate = subscription.EndedAt,
@@ -785,15 +811,24 @@ namespace TeachingBACKEND.Application.Services
         {
             var dto = JsonSerializer.Deserialize<FamilyRegistrationDTO>(registrationData);
             
+            // Check if main user email already exists
+            var existingMainUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (existingMainUser != null)
+            {
+                throw new InvalidOperationException($"User with email {dto.Email} already exists");
+            }
+            
+            // Create the main family user (parent/guardian)
             var user = new User
             {
                 Id = Guid.NewGuid(),
                 Email = dto.Email,
                 PasswordHash = _passwordService.HashPassword(dto.Password),
-                Role = UserRole.Student,
+                Role = UserRole.Student, // Main family user is also a student
                 ApprovalStatus = ApprovalStatus.Approved,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
+                PhoneNumber = dto.PhoneNumber,
                 IsEmailVerified = false,
                 EmailVerificationToken = Guid.NewGuid(),
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddDays(7),
@@ -803,7 +838,64 @@ namespace TeachingBACKEND.Application.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Send verification email
+            // Create family members
+            if (dto.FamilyMembers != null && dto.FamilyMembers.Any())
+            {
+                foreach (var familyMember in dto.FamilyMembers)
+                {
+                    // Generate a unique email for each family member
+                    var familyMemberEmail = $"{familyMember.FirstName.ToLower()}.{familyMember.LastName.ToLower()}.{user.Id.ToString("N")[..8]}@family.teachapp.com";
+                    
+                    // Validate email length (max 256 characters)
+                    if (familyMemberEmail.Length > 256)
+                    {
+                        throw new InvalidOperationException($"Generated email for {familyMember.FirstName} {familyMember.LastName} is too long: {familyMemberEmail}");
+                    }
+                    
+                    // Check if family member email already exists
+                    var existingFamilyMember = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == familyMemberEmail.ToLower());
+                    if (existingFamilyMember != null)
+                    {
+                        throw new InvalidOperationException($"Family member email {familyMemberEmail} already exists");
+                    }
+                    
+                    // Validate CurrentClass is a valid GUID
+                    if (!string.IsNullOrEmpty(familyMember.CurrentClass) && !Guid.TryParse(familyMember.CurrentClass, out _))
+                    {
+                        throw new InvalidOperationException($"Invalid CurrentClass format for {familyMember.FirstName} {familyMember.LastName}: {familyMember.CurrentClass}");
+                    }
+                    
+                    // Generate a random password for family member
+                    var familyMemberPassword = _passwordService.GenerateRandomPassword();
+                    var familyMemberVerificationToken = _passwordService.GenerateVerificationToken();
+                    
+                    var familyMemberUser = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        Email = familyMemberEmail,
+                        PasswordHash = _passwordService.HashPassword(familyMemberPassword),
+                        Role = UserRole.Student,
+                        ApprovalStatus = ApprovalStatus.Approved,
+                        FirstName = familyMember.FirstName,
+                        LastName = familyMember.LastName,
+                        CurrentClass = familyMember.CurrentClass,
+                        ParentUserId = user.Id, // Link to main family user
+                        IsEmailVerified = false,
+                        EmailVerificationToken = familyMemberVerificationToken,
+                        EmailVerificationTokenExpiry = DateTime.UtcNow.AddDays(7),
+                        CreateAt = DateTime.UtcNow
+                    };
+
+                    _context.Users.Add(familyMemberUser);
+                    
+                    // Send verification email to family member with their generated password
+                    await _notificationService.SendEmailVerification(familyMemberEmail, familyMemberVerificationToken, "family", familyMemberPassword);
+                }
+                
+                await _context.SaveChangesAsync();
+            }
+
+            // Send verification email to main family user
             if (user.EmailVerificationToken.HasValue)
             {
                 await _notificationService.SendEmailVerification(user.Email, user.EmailVerificationToken.Value, "email");
@@ -882,8 +974,8 @@ namespace TeachingBACKEND.Application.Services
                 UserId = subscription.UserId,
                 StripeSubscriptionId = subscription.StripeSubscriptionId,
                 StripeCustomerId = subscription.StripeCustomerId,
-                PlanId = subscription.PlanId,
-                PlanName = subscription.Plan?.RegistrationPlanName ?? "",
+                PlanId = subscription.SubscriptionPackageId,
+                PlanName = subscription.SubscriptionPackage?.Name ?? "",
                 Status = subscription.Status,
                 StartDate = subscription.StartDate,
                 EndDate = subscription.EndDate,

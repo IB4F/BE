@@ -21,7 +21,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<LearnHub> LearnHubs { get; set; }
     public DbSet<Link> Links { get; set; }
     public DbSet<Quizz> Quizzes { get; set; }
-    public DbSet<RegistrationPlan> RegistrationPlans { get; set; }
+    public DbSet<SubscriptionPackage> SubscriptionPackages { get; set; }
     public DbSet<Option> Options { get; set; }
     public DbSet<QuizType> QuizTypes { get; set; }
     public DbSet<UploadedFile> Files { get; set; }
@@ -57,13 +57,28 @@ public class ApplicationDbContext : DbContext
             // PasswordHash is required
             entity.Property(u => u.PasswordHash)
                 .IsRequired();
+                
+            // Configure ActiveSubscription relationship
+            entity.HasOne(u => u.ActiveSubscription)
+                .WithOne()
+                .HasForeignKey<User>(u => u.ActiveSubscriptionId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<Payment>()
-            .HasOne(p => p.User)
-            .WithMany(u => u.Payments)
-            .HasForeignKey(p => p.UserId)
-            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            
+            entity.HasOne(p => p.User)
+                .WithMany(u => u.Payments)
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(p => p.SubscriptionPackage)
+                .WithMany(sp => sp.Payments)
+                .HasForeignKey(p => p.SubscriptionPackageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<Link>()
             .HasOne(link => link.LearnHub)
@@ -77,12 +92,6 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(quizz => quizz.LinkId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Payment>()
-            .HasOne(p => p.Plan)
-            .WithMany(p => p.Payments)
-            .HasForeignKey(p => p.PlanId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         // Subscription entity configurations
         modelBuilder.Entity<Subscription>(entity =>
         {
@@ -93,9 +102,9 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(s => s.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
-            entity.HasOne(s => s.Plan)
-                .WithMany(p => p.Subscriptions)
-                .HasForeignKey(s => s.PlanId)
+            entity.HasOne(s => s.SubscriptionPackage)
+                .WithMany(sp => sp.Subscriptions)
+                .HasForeignKey(s => s.SubscriptionPackageId)
                 .OnDelete(DeleteBehavior.Restrict);
                 
             entity.Property(s => s.StripeSubscriptionId)
@@ -250,160 +259,364 @@ public class ApplicationDbContext : DbContext
             new Class { Id = Guid.Parse("013d0df5-50ef-4269-8a12-9b4f91ef07e1"), Name = "Klasa 12" }
         );
 
-        modelBuilder.Entity<RegistrationPlan>().HasData(
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-1111-1111-111111111111"),
-        RegistrationPlanName = "Bazë",
-        Type = "monthly",
-        Price = 2000,
-        MonthlyPrice = 2000,
-        YearlyPrice = 20000,
-        StripeMonthlyPriceId = "price_monthly_baze",
-        StripeYearlyPriceId = "price_yearly_baze",
-        StripeProductId = "prod_student_baze",
-        StripeProductName = "Student - Monthly Bazë",
-        IsFamilyPlan = false,
-        UserType = "student",
-        MaxUsers = 1,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-2222-2222-222222222222"),
-        RegistrationPlanName = "Standarde",
-        Type = "monthly",
-        Price = 4000,
-        MonthlyPrice = 4000,
-        YearlyPrice = 40000,
-        StripeMonthlyPriceId = "price_monthly_standarde",
-        StripeYearlyPriceId = "price_yearly_standarde",
-        StripeProductId = "prod_student_standarde",
-        StripeProductName = "Student - Monthly Standarde",
-        IsFamilyPlan = false,
-        UserType = "student",
-        MaxUsers = 1,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-3333-3333-333333333333"),
-        RegistrationPlanName = "Premium",
-        Type = "monthly",
-        Price = 6000,
-        MonthlyPrice = 6000,
-        YearlyPrice = 60000,
-        StripeMonthlyPriceId = "price_monthly_premium",
-        StripeYearlyPriceId = "price_yearly_premium",
-        StripeProductId = "prod_student_premium",
-        StripeProductName = "Student - Monthly Premium",
-        IsFamilyPlan = false,
-        UserType = "student",
-        MaxUsers = 1,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-4444-4444-444444444444"),
-        RegistrationPlanName = "Bazë",
-        Type = "yearly",
-        Price = 20000,
-        MonthlyPrice = 2000,
-        YearlyPrice = 20000,
-        StripeMonthlyPriceId = "price_monthly_baze",
-        StripeYearlyPriceId = "price_yearly_baze",
-        StripeProductId = "prod_student_baze",
-        StripeProductName = "Student - Yearly Bazë",
-        IsFamilyPlan = false,
-        UserType = "student",
-        MaxUsers = 1,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-5555-5555-555555555555"),
-        RegistrationPlanName = "Standarde",
-        Type = "yearly",
-        Price = 40000,
-        MonthlyPrice = 4000,
-        YearlyPrice = 40000,
-        StripeMonthlyPriceId = "price_monthly_standarde",
-        StripeYearlyPriceId = "price_yearly_standarde",
-        StripeProductId = "prod_family_standarde",
-        StripeProductName = "Student - Yearly Standarde",
-        IsFamilyPlan = true,
-        UserType = "family",
-        MaxUsers = 5,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-6666-6666-666666666666"),
-        RegistrationPlanName = "Premium",
-        Type = "yearly",
-        Price = 60000,
-        MonthlyPrice = 6000,
-        YearlyPrice = 60000,
-        StripeMonthlyPriceId = "price_monthly_premium",
-        StripeYearlyPriceId = "price_yearly_premium",
-        StripeProductId = "prod_family_premium",
-        StripeProductName = "Student - Yearly Premium",
-        IsFamilyPlan = true,
-        UserType = "family",
-        MaxUsers = 10,
-        IsSubscription = true,
-        TrialDays = 7,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-7777-7777-777777777777"),
-        RegistrationPlanName = "Supervisor - Monthly",
-        Type = "monthly",
-        Price = 10000,
-        MonthlyPrice = 10000,
-        YearlyPrice = 100000,
-        StripeMonthlyPriceId = "price_supervisor_monthly",
-        StripeYearlyPriceId = "price_supervisor_yearly",
-        StripeProductId = "prod_supervisor",
-        StripeProductName = "Supervisor - Monthly Plan",
-        IsFamilyPlan = false,
-        UserType = "supervisor",
-        MaxUsers = 50,
-        IsSubscription = true,
-        TrialDays = 14,
-        AllowCancellation = true
-    },
-    new RegistrationPlan
-    {
-        Id = Guid.Parse("a1a1a1a1-a1a1-8888-8888-888888888888"),
-        RegistrationPlanName = "Supervisor - Yearly",
-        Type = "yearly",
-        Price = 100000,
-        MonthlyPrice = 10000,
-        YearlyPrice = 100000,
-        StripeMonthlyPriceId = "price_supervisor_monthly",
-        StripeYearlyPriceId = "price_supervisor_yearly",
-        StripeProductId = "prod_supervisor",
-        StripeProductName = "Supervisor - Yearly Plan",
-        IsFamilyPlan = false,
-        UserType = "supervisor",
-        MaxUsers = 500,
-        IsSubscription = true,
-        TrialDays = 14,
-        AllowCancellation = true
-    }
-);
+
+        // SubscriptionPackage Seed Data - 18 packages total
+        modelBuilder.Entity<SubscriptionPackage>().HasData(
+            // Student Packages (Fixed Pricing)
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Name = "Student Basic Monthly",
+                Description = "Basic student package with monthly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 2000, // €20.00
+                YearlyPrice = 20000, // €200.00
+                StripeMonthlyPriceId = "price_student_basic_monthly",
+                StripeYearlyPriceId = "price_student_basic_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("11111111-1111-2222-2222-222222222222"),
+                Name = "Student Basic Yearly",
+                Description = "Basic student package with yearly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 2000, // €20.00
+                YearlyPrice = 20000, // €200.00
+                StripeMonthlyPriceId = "price_student_basic_monthly",
+                StripeYearlyPriceId = "price_student_basic_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("22222222-2222-1111-1111-111111111111"),
+                Name = "Student Standard Monthly",
+                Description = "Standard student package with monthly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 4000, // €40.00
+                YearlyPrice = 40000, // €400.00
+                StripeMonthlyPriceId = "price_student_standard_monthly",
+                StripeYearlyPriceId = "price_student_standard_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                Name = "Student Standard Yearly",
+                Description = "Standard student package with yearly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 4000, // €40.00
+                YearlyPrice = 40000, // €400.00
+                StripeMonthlyPriceId = "price_student_standard_monthly",
+                StripeYearlyPriceId = "price_student_standard_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("33333333-3333-1111-1111-111111111111"),
+                Name = "Student Premium Monthly",
+                Description = "Premium student package with monthly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 6000, // €60.00
+                YearlyPrice = 60000, // €600.00
+                StripeMonthlyPriceId = "price_student_premium_monthly",
+                StripeYearlyPriceId = "price_student_premium_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("33333333-3333-2222-2222-222222222222"),
+                Name = "Student Premium Yearly",
+                Description = "Premium student package with yearly billing",
+                UserType = UserType.Student,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 6000, // €60.00
+                YearlyPrice = 60000, // €600.00
+                StripeMonthlyPriceId = "price_student_premium_monthly",
+                StripeYearlyPriceId = "price_student_premium_yearly",
+                MaxUsers = 1,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+
+            // Family Packages (Dynamic Pricing)
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("44444444-4444-1111-1111-111111111111"),
+                Name = "Family Basic Monthly",
+                Description = "Basic family package with monthly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 3000, // €30.00 base
+                YearlyPrice = 30000, // €300.00 base
+                BasePrice = 3000, // €30.00 base price
+                PricePerAdditionalMember = 1000, // €10.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_basic_monthly",
+                StripeYearlyPriceId = "price_family_basic_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("44444444-4444-2222-2222-222222222222"),
+                Name = "Family Basic Yearly",
+                Description = "Basic family package with yearly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 3000, // €30.00 base
+                YearlyPrice = 30000, // €300.00 base
+                BasePrice = 30000, // €300.00 base price
+                PricePerAdditionalMember = 2000, // €20.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_basic_monthly",
+                StripeYearlyPriceId = "price_family_basic_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("55555555-5555-1111-1111-111111111111"),
+                Name = "Family Standard Monthly",
+                Description = "Standard family package with monthly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 5000, // €50.00 base
+                YearlyPrice = 50000, // €500.00 base
+                BasePrice = 5000, // €50.00 base price
+                PricePerAdditionalMember = 1000, // €10.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_standard_monthly",
+                StripeYearlyPriceId = "price_family_standard_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("55555555-5555-2222-2222-222222222222"),
+                Name = "Family Standard Yearly",
+                Description = "Standard family package with yearly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 5000, // €50.00 base
+                YearlyPrice = 50000, // €500.00 base
+                BasePrice = 50000, // €500.00 base price
+                PricePerAdditionalMember = 2000, // €20.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_standard_monthly",
+                StripeYearlyPriceId = "price_family_standard_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("66666666-6666-1111-1111-111111111111"),
+                Name = "Family Premium Monthly",
+                Description = "Premium family package with monthly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 8000, // €80.00 base
+                YearlyPrice = 80000, // €800.00 base
+                BasePrice = 8000, // €80.00 base price
+                PricePerAdditionalMember = 1000, // €10.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_premium_monthly",
+                StripeYearlyPriceId = "price_family_premium_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("66666666-6666-2222-2222-222222222222"),
+                Name = "Family Premium Yearly",
+                Description = "Premium family package with yearly billing - dynamic pricing based on family size",
+                UserType = UserType.Family,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 8000, // €80.00 base
+                YearlyPrice = 80000, // €800.00 base
+                BasePrice = 80000, // €800.00 base price
+                PricePerAdditionalMember = 2000, // €20.00 per additional member
+                MinFamilyMembers = 1,
+                MaxFamilyMembers = 10,
+                StripeMonthlyPriceId = "price_family_premium_monthly",
+                StripeYearlyPriceId = "price_family_premium_yearly",
+                MaxUsers = 10,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+
+            // Supervisor Packages (Fixed Pricing)
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("77777777-7777-1111-1111-111111111111"),
+                Name = "Supervisor Basic Monthly",
+                Description = "Basic supervisor package with monthly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 10000, // €100.00
+                YearlyPrice = 100000, // €1000.00
+                StripeMonthlyPriceId = "price_supervisor_basic_monthly",
+                StripeYearlyPriceId = "price_supervisor_basic_yearly",
+                MaxUsers = 50,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("77777777-7777-2222-2222-222222222222"),
+                Name = "Supervisor Basic Yearly",
+                Description = "Basic supervisor package with yearly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Basic,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 10000, // €100.00
+                YearlyPrice = 100000, // €1000.00
+                StripeMonthlyPriceId = "price_supervisor_basic_monthly",
+                StripeYearlyPriceId = "price_supervisor_basic_yearly",
+                MaxUsers = 50,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("88888888-8888-1111-1111-111111111111"),
+                Name = "Supervisor Standard Monthly",
+                Description = "Standard supervisor package with monthly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 20000, // €200.00
+                YearlyPrice = 200000, // €2000.00
+                StripeMonthlyPriceId = "price_supervisor_standard_monthly",
+                StripeYearlyPriceId = "price_supervisor_standard_yearly",
+                MaxUsers = 100,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("88888888-8888-2222-2222-222222222222"),
+                Name = "Supervisor Standard Yearly",
+                Description = "Standard supervisor package with yearly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Standard,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 20000, // €200.00
+                YearlyPrice = 200000, // €2000.00
+                StripeMonthlyPriceId = "price_supervisor_standard_monthly",
+                StripeYearlyPriceId = "price_supervisor_standard_yearly",
+                MaxUsers = 100,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("99999999-9999-1111-1111-111111111111"),
+                Name = "Supervisor Premium Monthly",
+                Description = "Premium supervisor package with monthly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Month,
+                MonthlyPrice = 30000, // €300.00
+                YearlyPrice = 300000, // €3000.00
+                StripeMonthlyPriceId = "price_supervisor_premium_monthly",
+                StripeYearlyPriceId = "price_supervisor_premium_yearly",
+                MaxUsers = 500,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new SubscriptionPackage
+            {
+                Id = Guid.Parse("99999999-9999-2222-2222-222222222222"),
+                Name = "Supervisor Premium Yearly",
+                Description = "Premium supervisor package with yearly billing",
+                UserType = UserType.Supervisor,
+                Tier = PackageTier.Premium,
+                BillingInterval = BillingInterval.Year,
+                MonthlyPrice = 30000, // €300.00
+                YearlyPrice = 300000, // €3000.00
+                StripeMonthlyPriceId = "price_supervisor_premium_monthly",
+                StripeYearlyPriceId = "price_supervisor_premium_yearly",
+                MaxUsers = 500,
+                TrialDays = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
+        );
+
         modelBuilder.Entity<Subjects>().HasData(
             new Subjects { Id = Guid.Parse("dbe6757d-2138-463a-bee7-5d07a6d7b320"), Name = "Letërsi" },
             new Subjects { Id = Guid.Parse("616273bd-2a2a-4894-b689-57fe86702ae0"), Name = "Matematik" },

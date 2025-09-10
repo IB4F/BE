@@ -15,7 +15,7 @@
         public string Status { get; set; } = "pending";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public Guid? PlanId { get; set; }
-        public RegistrationPlan Plan { get; set; }
+        public Guid? SubscriptionPackageId { get; set; }
+        public SubscriptionPackage? SubscriptionPackage { get; set; }
     }
 }

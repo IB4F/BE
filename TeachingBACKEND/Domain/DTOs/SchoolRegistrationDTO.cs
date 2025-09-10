@@ -23,7 +23,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public string PostalCode { get; set; }
 
         [Required, StringLength(20)]
-        public Guid PlanId { get; set; }
+        public Guid SubscriptionPackageId { get; set; }
 
         [Required]
         public List<CreateStudentBySchoolDTO> Students { get; set; }

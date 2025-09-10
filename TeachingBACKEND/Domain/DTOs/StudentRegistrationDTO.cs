@@ -36,6 +36,6 @@ namespace TeachingBACKEND.Domain.DTOs
         public string Password { get; set; }
 
 
-        public Guid PlanId { get; set; }
+        public Guid SubscriptionPackageId { get; set; }
     }
 }

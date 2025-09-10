@@ -14,8 +14,8 @@ namespace TeachingBACKEND.Domain.Entities
         public string StripePriceId { get; set; }
         
         // Subscription Details
-        public Guid PlanId { get; set; }
-        public RegistrationPlan Plan { get; set; }
+        public Guid SubscriptionPackageId { get; set; }
+        public SubscriptionPackage SubscriptionPackage { get; set; }
         
         // Status & Dates
         public SubscriptionStatus Status { get; set; }

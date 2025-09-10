@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250910140503_UpdateFamilyMaxUsersTo10")]
+    partial class UpdateFamilyMaxUsersTo10
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Cities", (string)null);
+                    b.ToTable("Cities");
 
                     b.HasData(
                         new
@@ -106,7 +109,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Classes", (string)null);
+                    b.ToTable("Classes");
 
                     b.HasData(
                         new
@@ -205,7 +208,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LearnHubs", (string)null);
+                    b.ToTable("LearnHubs");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Link", b =>
@@ -229,7 +232,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("LearnHubId");
 
-                    b.ToTable("Links", (string)null);
+                    b.ToTable("Links");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Option", b =>
@@ -257,7 +260,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("QuizzId");
 
-                    b.ToTable("Options", (string)null);
+                    b.ToTable("Options");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Payment", b =>
@@ -316,7 +319,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.QuizType", b =>
@@ -331,7 +334,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("QuizTypes", (string)null);
+                    b.ToTable("QuizTypes");
 
                     b.HasData(
                         new
@@ -397,7 +400,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("QuizzTypeId");
 
-                    b.ToTable("Quizzes", (string)null);
+                    b.ToTable("Quizzes");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.StudentPerformanceSummary", b =>
@@ -454,7 +457,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentPerformanceSummaries", (string)null);
+                    b.ToTable("StudentPerformanceSummaries");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.StudentQuizPerformance", b =>
@@ -514,7 +517,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentQuizPerformances", (string)null);
+                    b.ToTable("StudentQuizPerformances");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.StudentQuizSession", b =>
@@ -565,7 +568,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentQuizSessions", (string)null);
+                    b.ToTable("StudentQuizSessions");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.Subjects", b =>
@@ -580,7 +583,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Subjects", (string)null);
+                    b.ToTable("Subjects");
 
                     b.HasData(
                         new
@@ -701,7 +704,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Subscriptions", (string)null);
+                    b.ToTable("Subscriptions");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.SubscriptionPackage", b =>
@@ -770,7 +773,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SubscriptionPackages", (string)null);
+                    b.ToTable("SubscriptionPackages");
 
                     b.HasData(
                         new
@@ -1168,7 +1171,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("SubscriptionId");
 
-                    b.ToTable("SubscriptionPayments", (string)null);
+                    b.ToTable("SubscriptionPayments");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.UploadedFile", b =>
@@ -1207,7 +1210,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Files", (string)null);
+                    b.ToTable("Files");
                 });
 
             modelBuilder.Entity("TeachingBACKEND.Domain.Entities.User", b =>
@@ -1299,7 +1302,7 @@ namespace TeachingBACKEND.Migrations
 
                     b.HasIndex("ActiveSubscriptionId1");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
 
                     b.HasData(
                         new

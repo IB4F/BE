@@ -12,7 +12,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public string RegistrationType { get; set; } // student, school, family
         
         [Required]
-        public Guid PlanId { get; set; }
+        public Guid SubscriptionPackageId { get; set; }
         
         [Required]
         public string RegistrationData { get; set; } // JSON string of registration data

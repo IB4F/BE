@@ -24,7 +24,7 @@ public class FamilyRegistrationDTO
     public string LastName { get; set; } // main user
 
     [Required]
-    public string PlanId { get; set; }
+    public Guid SubscriptionPackageId { get; set; }
 
     [Required]
     public List<FamilyMemberInput> FamilyMembers { get; set; } // family members to create

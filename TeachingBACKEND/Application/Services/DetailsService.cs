@@ -53,14 +53,14 @@ namespace TeachingBACKEND.Application.Services
                 ? quizTypes
                 : new List<QuizType>();
         }
-        public async Task<List<RegistrationPlan>> GetAllPlansAsync()
+        public async Task<List<SubscriptionPackage>> GetAllPlansAsync()
         {
-            return await _context.RegistrationPlans.ToListAsync();
+            return await _context.SubscriptionPackages.ToListAsync();
         }
 
-        public async Task<RegistrationPlan?> GetPlanByIdAsync(Guid id)
+        public async Task<SubscriptionPackage?> GetPlanByIdAsync(Guid id)
         {
-            return await _context.RegistrationPlans.FirstOrDefaultAsync(p => p.Id == id);
+            return await _context.SubscriptionPackages.FirstOrDefaultAsync(p => p.Id == id);
         }
     }
 }
