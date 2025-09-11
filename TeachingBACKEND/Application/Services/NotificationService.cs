@@ -21,7 +21,7 @@ public class NotificationService : INotificationService
     public async Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null)
     {
         _logger.LogInformation("Starting email-verification workflow for {Email}", email);
-        var verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
+        var verificationUrl = $"https://braingainalbania.al/verify-email?token={token}&verificationType={verificationType}";
         var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
 
         var title = "Verifikoni adresën tuaj të emailit";
@@ -47,7 +47,7 @@ public class NotificationService : INotificationService
         string verificationType)
     {
         _logger.LogInformation("Starting family email-verification workflow for {Email}", email);
-        var verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
+        var verificationUrl = $"https://braingainalbania.al//verify-email?token={token}&verificationType={verificationType}";
         var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
 
         var familyNamesFormatted = string.Join(", ", familyMemberNames);
@@ -65,7 +65,7 @@ public class NotificationService : INotificationService
     public async Task SendPasswordResetEmail(string email, Guid resetToken)
     {
         _logger.LogInformation("Starting password-reset workflow for {Email}", email);
-        var resetLink = $"http://localhost:4200/reset-password?token={resetToken}";
+        var resetLink = $"https://braingainalbania.al//reset-password?token={resetToken}";
         var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
 
         var title = "Kërkesë për rivendosje të fjalëkalimit";
@@ -82,7 +82,7 @@ public class NotificationService : INotificationService
         string lastName, string verificationType)
     {
         _logger.LogInformation("Starting student-creation email workflow for {Email}", email);
-        var verificationUrl = $"http://localhost:4200/verify-email?token={token}&verificationType={verificationType}";
+        var verificationUrl = $"https://braingainalbania.al//verify-email?token={token}&verificationType={verificationType}";
         var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
 
         var title = "Llogaria e nxënësit është krijuar nga shkolla";

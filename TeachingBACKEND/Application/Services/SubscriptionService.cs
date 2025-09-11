@@ -843,20 +843,13 @@ namespace TeachingBACKEND.Application.Services
             {
                 foreach (var familyMember in dto.FamilyMembers)
                 {
-                    // Generate a unique email for each family member
-                    var familyMemberEmail = $"{familyMember.FirstName.ToLower()}.{familyMember.LastName.ToLower()}.{user.Id.ToString("N")[..8]}@family.teachapp.com";
+                    // Generate a unique email for each family member using the new format
+                    var familyMemberEmail = await GenerateUniqueFamilyMemberEmail(familyMember.FirstName, familyMember.LastName);
                     
                     // Validate email length (max 256 characters)
                     if (familyMemberEmail.Length > 256)
                     {
                         throw new InvalidOperationException($"Generated email for {familyMember.FirstName} {familyMember.LastName} is too long: {familyMemberEmail}");
-                    }
-                    
-                    // Check if family member email already exists
-                    var existingFamilyMember = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == familyMemberEmail.ToLower());
-                    if (existingFamilyMember != null)
-                    {
-                        throw new InvalidOperationException($"Family member email {familyMemberEmail} already exists");
                     }
                     
                     // Validate CurrentClass is a valid GUID
@@ -895,13 +888,39 @@ namespace TeachingBACKEND.Application.Services
                 await _context.SaveChangesAsync();
             }
 
-            // Send verification email to main family user
+            // Send verification email to main family user using the family-specific method
             if (user.EmailVerificationToken.HasValue)
             {
-                await _notificationService.SendEmailVerification(user.Email, user.EmailVerificationToken.Value, "email");
+                var familyMemberNames = dto.FamilyMembers?.Select(fm => $"{fm.FirstName} {fm.LastName}").ToList() ?? new List<string>();
+                await _notificationService.SendFamilyEmailVerification(user.Email, user.EmailVerificationToken.Value, familyMemberNames, "family");
             }
 
             return user;
+        }
+
+        private async Task<string> GenerateUniqueFamilyMemberEmail(string firstName, string lastName)
+        {
+            var baseEmail = $"{firstName.ToLower()}.{lastName.ToLower()}@bga.al";
+            
+            // Check if the base email already exists
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == baseEmail.ToLower());
+            if (existingUser == null)
+            {
+                return baseEmail;
+            }
+            
+            // If it exists, try with numbers
+            for (int i = 1; i <= 999; i++)
+            {
+                var numberedEmail = $"{firstName.ToLower()}.{lastName.ToLower()}{i}@bga.al";
+                var existingNumberedUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == numberedEmail.ToLower());
+                if (existingNumberedUser == null)
+                {
+                    return numberedEmail;
+                }
+            }
+            
+            throw new InvalidOperationException($"Unable to generate unique email for {firstName} {lastName} after trying 999 variations");
         }
 
         private SubscriptionStatus MapStripeStatus(string stripeStatus)
