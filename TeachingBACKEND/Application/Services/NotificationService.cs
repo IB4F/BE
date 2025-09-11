@@ -44,7 +44,7 @@ public class NotificationService : INotificationService
     }
 
     public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames,
-        string verificationType)
+        string verificationType, List<(string Name, string Email, string Password)>? familyMemberCredentials = null)
     {
         _logger.LogInformation("Starting family email-verification workflow for {Email}", email);
         var verificationUrl = $"https://braingainalbania.al//verify-email?token={token}&verificationType={verificationType}";
@@ -56,6 +56,27 @@ public class NotificationService : INotificationService
         var content = $@"
         <p>Përshëndetje,</p>
         <p>Ju lutemi verifikoni llogarinë tuaj familjare duke klikuar butonin më poshtë. Kjo do të verifikojë ju dhe anëtarët e familjes në vijim: <strong>{familyNamesFormatted}</strong>.</p>";
+
+        // Add family member credentials if provided
+        if (familyMemberCredentials != null && familyMemberCredentials.Any())
+        {
+            content += @"
+            <p><strong>Kredencialet e anëtarëve të familjes:</strong></p>
+            <ul>";
+            
+            foreach (var (name, memberEmail, password) in familyMemberCredentials)
+            {
+                content += $@"
+                <li><strong>{name}:</strong><br/>
+                    Email: {memberEmail}<br/>
+                    Fjalëkalimi: {password}</li>";
+            }
+            
+            content += @"
+            </ul>
+            <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimet pas verifikimit të emailit.</em></p>";
+        }
+
         var ctaText = "Verifiko Llogarinë Familjare";
 
         var body = GenerateHtml(title, content, ctaText, verificationUrl, footerText);

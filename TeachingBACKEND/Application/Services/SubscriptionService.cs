@@ -838,7 +838,9 @@ namespace TeachingBACKEND.Application.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Create family members
+            // Create family members and collect their passwords
+            var familyMemberCredentials = new List<(string Name, string Email, string Password)>();
+            
             if (dto.FamilyMembers != null && dto.FamilyMembers.Any())
             {
                 foreach (var familyMember in dto.FamilyMembers)
@@ -881,8 +883,8 @@ namespace TeachingBACKEND.Application.Services
 
                     _context.Users.Add(familyMemberUser);
                     
-                    // Send verification email to family member with their generated password
-                    await _notificationService.SendEmailVerification(familyMemberEmail, familyMemberVerificationToken, "family", familyMemberPassword);
+                    // Store family member credentials to send to main user
+                    familyMemberCredentials.Add(($"{familyMember.FirstName} {familyMember.LastName}", familyMemberEmail, familyMemberPassword));
                 }
                 
                 await _context.SaveChangesAsync();
@@ -892,7 +894,7 @@ namespace TeachingBACKEND.Application.Services
             if (user.EmailVerificationToken.HasValue)
             {
                 var familyMemberNames = dto.FamilyMembers?.Select(fm => $"{fm.FirstName} {fm.LastName}").ToList() ?? new List<string>();
-                await _notificationService.SendFamilyEmailVerification(user.Email, user.EmailVerificationToken.Value, familyMemberNames, "family");
+                await _notificationService.SendFamilyEmailVerification(user.Email, user.EmailVerificationToken.Value, familyMemberNames, "family", familyMemberCredentials);
             }
 
             return user;
