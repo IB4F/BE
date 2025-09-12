@@ -99,6 +99,23 @@ public class NotificationService : INotificationService
         await SendEmail(email, "Rivendosja e Fjalëkalimit", body);
     }
 
+    public async Task SendChildPasswordResetEmail(string parentEmail, string childFirstName, string childLastName, Guid resetToken)
+    {
+        _logger.LogInformation("Starting child password-reset workflow for parent {ParentEmail}, child {ChildFirstName} {ChildLastName}", parentEmail, childFirstName, childLastName);
+        var resetLink = $"https://braingainalbania.al//reset-password?token={resetToken}";
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Kërkesë për rivendosje të fjalëkalimit të fëmijës";
+        var content = $@"
+        <p>Përshëndetje,</p>
+        <p>Ne morëm një kërkesë për të rivendosur fjalëkalimin e fëmijës tuaj <strong>{childFirstName} {childLastName}</strong>. Për të vazhduar, ju lutemi klikoni butonin më poshtë.</p>
+        <p><em>Shënim: Kjo kërkesë është dërguar tek ju sepse fëmija juaj ka një adresë email të krijuar automatikisht që nuk mund të marrë email-e.</em></p>";
+        var ctaText = "Rivendos Fjalëkalimin e Fëmijës";
+
+        var body = GenerateHtml(title, content, ctaText, resetLink, footerText);
+        await SendEmail(parentEmail, "Rivendosja e Fjalëkalimit të Fëmijës", body);
+    }
+
     public async Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName,
         string lastName, string verificationType)
     {

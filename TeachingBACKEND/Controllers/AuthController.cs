@@ -404,6 +404,38 @@ namespace TeachingBACKEND.Controllers
 
         }
 
+        /// <summary>
+        /// Change password for authenticated user
+        /// </summary>
+        [Authorize]
+        [HttpPost("change-password")]
+        [SwaggerOperation(Summary = "Change Password for Authenticated User")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                // Get user ID from JWT token
+                var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+                
+                var result = await _passwordService.ChangePassword(userId, model.CurrentPassword, model.NewPassword);
+                
+                if (result == "Password changed successfully.")
+                {
+                    return Ok(new { message = result });
+                }
+                
+                return BadRequest(new { message = result });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error changing password for user");
+                return BadRequest(new { message = "An error occurred while changing the password." });
+            }
+        }
+
 
         [Authorize]
         [HttpPost("logout")]

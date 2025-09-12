@@ -39,8 +39,24 @@ namespace TeachingBACKEND.Application.Services
 
                 await _context.SaveChangesAsync();
 
-                //Send Email
-                await _notificationService.SendPasswordResetEmail(email, resetToken);
+                // Determine the email address to send the reset email to
+                string emailToSendTo = email;
+                
+                // If this is a child user (has a parent), send the reset email to the parent instead
+                if (user.ParentUserId.HasValue)
+                {
+                    var parent = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.ParentUserId.Value);
+                    if (parent != null)
+                    {
+                        emailToSendTo = parent.Email;
+                        // Send a special notification to the parent about their child's password reset
+                        await _notificationService.SendChildPasswordResetEmail(parent.Email, user.FirstName, user.LastName, resetToken);
+                        return; // Exit early since we've sent the parent-specific email
+                    }
+                }
+
+                //Send Email to the user directly (for non-child users)
+                await _notificationService.SendPasswordResetEmail(emailToSendTo, resetToken);
             }
         }
         public async Task<string> ResetPassword(Guid token, string newPassword)
@@ -245,6 +261,37 @@ namespace TeachingBACKEND.Application.Services
             }
             
             return password;
+        }
+
+        public async Task<string> ChangePassword(Guid userId, string currentPassword, string newPassword)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return "User not found.";
+            }
+
+            // Verify current password
+            if (!VerifyPassword(currentPassword, user.PasswordHash))
+            {
+                return "Current password is incorrect.";
+            }
+
+            // Check if new password is different from current password
+            if (VerifyPassword(newPassword, user.PasswordHash))
+            {
+                return "New password must be different from the current password.";
+            }
+
+            // Validate new password
+            if (!_passwordValidation.IsValid(newPassword, out var error))
+                return error;
+
+            // Update password
+            user.PasswordHash = HashPassword(newPassword);
+            await _context.SaveChangesAsync();
+
+            return "Password changed successfully.";
         }
     }
 }
