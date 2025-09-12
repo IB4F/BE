@@ -94,6 +94,7 @@ builder.Services.AddScoped<IPasswordValidationService, PasswordValidationService
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<ISubscriptionPackageService, SubscriptionPackageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 builder.Services.AddScoped<FamilyPricingService>();
 builder.Services.AddScoped<StripePricingService>();
 builder.Services.AddControllers()
