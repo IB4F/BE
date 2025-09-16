@@ -2,9 +2,9 @@
 {
     public enum UserRole
     {
-       Admin,    //0
-       School,   //1
-       Student,  //2
-       Family    //3
+       Admin,      //0
+       Supervisor, //1 - Changed from School
+       Student,    //2
+       Family      //3
     }
 }

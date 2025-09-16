@@ -26,12 +26,23 @@ namespace TeachingBACKEND.Domain.Entities
         public DateTime? DateOfBirth { get; set; }
         public string? CurrentClass { get; set; }
 
-        // School-Specific Fields 
+        // Supervisor-Specific Fields (formerly School)
         public string? School { get; set; }
         public string? PhoneNumber { get; set; }
         public string? Profession { get; set; }
         public string? City { get; set; }
         public string? PostalCode { get; set; }
+        
+        
+        // One Time Login Status (for students created by supervisor)
+        public bool IsOneTimeLoginUsed { get; set; } = false;
+        public bool MustChangePasswordOnNextLogin { get; set; } = false;
+        public string? OriginalGeneratedPassword { get; set; } // Store original password until first login (only for students under supervisor)
+        
+        // Supervisor-Student Relationship
+        public Guid? SupervisorId { get; set; }        // For students: link to supervisor
+        public User? Supervisor { get; set; }          // Navigation property for supervisor
+        public ICollection<User> SupervisedUsers { get; set; } = new List<User>(); // For supervisors: supervised students
 
 
         //Reset Password

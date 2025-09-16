@@ -12,6 +12,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<SupervisorApplication> SupervisorApplications { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
     public DbSet<SubscriptionPayment> SubscriptionPayments { get; set; }
@@ -63,6 +64,72 @@ public class ApplicationDbContext : DbContext
                 .WithOne()
                 .HasForeignKey<User>(u => u.ActiveSubscriptionId)
                 .OnDelete(DeleteBehavior.SetNull);
+                
+            // Configure Supervisor-Student relationship
+            entity.HasOne(u => u.Supervisor)
+                .WithMany(s => s.SupervisedUsers)
+                .HasForeignKey(u => u.SupervisorId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            // Add indexes for performance
+            entity.HasIndex(u => u.Email)
+                .IsUnique();
+                
+            entity.HasIndex(u => u.SupervisorId);
+            
+            entity.HasIndex(u => new { u.SupervisorId, u.Role });
+        });
+
+        modelBuilder.Entity<SupervisorApplication>(entity =>
+        {
+            // Primary key
+            entity.HasKey(sa => sa.Id);
+
+            // Required fields
+            entity.Property(sa => sa.SchoolName)
+                .IsRequired()
+                .HasMaxLength(256);
+                
+            entity.Property(sa => sa.ContactPersonFirstName)
+                .IsRequired()
+                .HasMaxLength(100);
+                
+            entity.Property(sa => sa.ContactPersonLastName)
+                .IsRequired()
+                .HasMaxLength(100);
+                
+            entity.Property(sa => sa.ContactPersonEmail)
+                .IsRequired()
+                .HasMaxLength(256);
+                
+            entity.Property(sa => sa.ContactPersonPhone)
+                .IsRequired()
+                .HasMaxLength(20);
+                
+            entity.Property(sa => sa.City)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            // Optional fields
+            entity.Property(sa => sa.Address)
+                .HasMaxLength(500);
+                
+            entity.Property(sa => sa.AdditionalInfo)
+                .HasMaxLength(1000);
+                
+            entity.Property(sa => sa.RejectionReason)
+                .HasMaxLength(1000);
+
+            // Configure relationship with User (if approved)
+            entity.HasOne(sa => sa.ApprovedUser)
+                .WithOne()
+                .HasForeignKey<SupervisorApplication>(sa => sa.ApprovedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Add indexes for performance
+            entity.HasIndex(sa => sa.ContactPersonEmail);
+            entity.HasIndex(sa => sa.ApprovalStatus);
+            entity.HasIndex(sa => sa.ApplicationDate);
         });
 
         modelBuilder.Entity<Payment>(entity =>

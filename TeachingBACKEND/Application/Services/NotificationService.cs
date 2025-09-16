@@ -5,6 +5,7 @@ using TeachingBACKEND.Application.Interfaces;
 public class NotificationService : INotificationService
 {
     private readonly ILogger<NotificationService> _logger;
+    private readonly IConfiguration _configuration;
     private static readonly string _emailTemplate;
 
     static NotificationService()
@@ -13,9 +14,10 @@ public class NotificationService : INotificationService
         _emailTemplate = File.ReadAllText(templatePath);
     }
 
-    public NotificationService(ILogger<NotificationService> logger)
+    public NotificationService(ILogger<NotificationService> logger, IConfiguration configuration)
     {
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null)
@@ -192,5 +194,132 @@ public class NotificationService : INotificationService
                 }
             }
         }
+    }
+
+    // Supervisor Flow Methods
+    public async Task SendSupervisorApplicationNotification(string supervisorEmail, string supervisorName, string schoolName)
+    {
+        _logger.LogInformation("Starting supervisor application notification for {SupervisorEmail}", supervisorEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        // Get admin panel URL from configuration
+        var adminPanelUrl = _configuration["AppSettings:AdminPanelUrl"] ?? "https://braingainalbania.al/admin/supervisor-applications";
+        
+        var title = "Aplikim i ri i Supervizorit";
+        var content = $@"
+        <p>Përshëndetje Admin,</p>
+        <p>Një supervizor i ri ka aplikuar për të hyrë në platformë:</p>
+        <ul>
+            <li><strong>Emri:</strong> {supervisorName}</li>
+            <li><strong>Email:</strong> {supervisorEmail}</li>
+            <li><strong>Shkolla:</strong> {schoolName}</li>
+        </ul>
+        <p>Ju lutemi shqyrtoni aplikimin dhe merrni vendimin përkatës në panelin e administrimit.</p>";
+
+        var ctaText = "Shiko Aplikimet e Supervizorëve";
+        var body = GenerateHtml(title, content, ctaText, adminPanelUrl, footerText);
+        await SendEmail("fabiano.meoo98@gmail.com", "Aplikim i ri i Supervizorit", body);
+    }
+
+    public async Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string temporaryPassword)
+    {
+        _logger.LogInformation("Starting supervisor approval email for {SupervisorEmail}", supervisorEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Aplikimi juaj është pranuar!";
+        var content = $@"
+        <p>Përshëndetje {supervisorName},</p>
+        <p>Urime! Aplikimi juaj për të u bërë supervizor është pranuar nga administrata.</p>
+        <p><strong>Kredencialet tuaja të hyrjes:</strong></p>
+        <ul>
+            <li><strong>Email:</strong> {supervisorEmail}</li>
+            <li><strong>Fjalëkalimi i përkohshëm:</strong> {temporaryPassword}</li>
+        </ul>
+        <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimin pas hyrjes së parë për siguri.</em></p>
+        <p>Tani mund të zgjidhni paketën e subscriptionit tuaj dhe të filloni të menaxhoni nxënësit tuaj.</p>";
+        var ctaText = "Zgjidh Paketën e Subscriptionit";
+
+        var body = GenerateHtml(title, content, ctaText, packageSelectionLink, footerText);
+        await SendEmail(supervisorEmail, "Aplikimi juaj është pranuar", body);
+    }
+
+    public async Task SendSupervisorRejectionEmail(string supervisorEmail, string supervisorName, string reason)
+    {
+        _logger.LogInformation("Starting supervisor rejection email for {SupervisorEmail}", supervisorEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Aplikimi juaj nuk është pranuar";
+        var content = $@"
+        <p>Përshëndetje {supervisorName},</p>
+        <p>Faleminderit për interesimin tuaj për të u bërë supervizor në platformën tonë.</p>
+        <p>Fatkeqësisht, aplikimi juaj nuk është pranuar për arsyen e mëposhtme:</p>
+        <p><strong>{reason}</strong></p>
+        <p>Nëse keni pyetje ose dëshironi të aplikoni përsëri në të ardhmen, ju lutemi na kontaktoni.</p>";
+
+        var body = GenerateHtml(title, content, "", "", footerText);
+        await SendEmail(supervisorEmail, "Aplikimi juaj nuk është pranuar", body);
+    }
+
+    public async Task SendNewPasswordSetEmail(string studentEmail, string studentName, string newPassword)
+    {
+        _logger.LogInformation("Starting new password set email for {StudentEmail}", studentEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Fjalëkalimi juaj është rivendosur";
+        var content = $@"
+        <p>Përshëndetje {studentName},</p>
+        <p>Supervizori juaj ka rivendosur fjalëkalimin tuaj. Këtu janë kredencialet tuaja të reja:</p>
+        <p><strong>Email:</strong> {studentEmail}</p>
+        <p><strong>Fjalëkalimi i ri:</strong> {newPassword}</p>
+        <p>Ju lutemi kyçuni në platformë dhe ndryshoni fjalëkalimin për siguri më të mirë.</p>";
+
+        var body = GenerateHtml(title, content, "", "", footerText);
+        await SendEmail(studentEmail, "Fjalëkalimi juaj është rivendosur", body);
+    }
+
+    public async Task SendStudentPasswordResetRequestToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, Guid resetToken)
+    {
+        _logger.LogInformation("Starting student password reset request notification for supervisor {SupervisorEmail}, student {StudentEmail}", supervisorEmail, studentEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        // Get supervisor panel URL from configuration
+        var supervisorPanelUrl = _configuration["AppSettings:SupervisorPanelUrl"] ?? "https://braingainalbania.al/supervisor/password-reset-requests";
+        
+        var title = "Kërkesë për rivendosje të fjalëkalimit të nxënësit";
+        var content = $@"
+        <p>Përshëndetje {supervisorName},</p>
+        <p>Një nxënës i juaj ka kërkuar rivendosje të fjalëkalimit:</p>
+        <ul>
+            <li><strong>Emri i nxënësit:</strong> {studentName}</li>
+            <li><strong>Email i nxënësit:</strong> {studentEmail}</li>
+            <li><strong>Data e kërkesës:</strong> {DateTime.UtcNow:dd/MM/yyyy HH:mm}</li>
+        </ul>
+        <p>Ju lutemi shqyrtoni kërkesën dhe merrni vendimin përkatës në panelin e supervizorit.</p>
+        <p><em>Shënim: Kjo kërkesë është dërguar tek ju sepse nxënësi ka një adresë email të krijuar automatikisht (@bga.al) që nuk mund të marrë email-e.</em></p>";
+
+        var ctaText = "Shiko Kërkesat për Rivendosje të Fjalëkalimit";
+        var body = GenerateHtml(title, content, ctaText, supervisorPanelUrl, footerText);
+        await SendEmail(supervisorEmail, "Kërkesë për rivendosje të fjalëkalimit të nxënësit", body);
+    }
+
+    public async Task SendNewPasswordToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, string newPassword)
+    {
+        _logger.LogInformation("Starting new password notification to supervisor {SupervisorEmail} for student {StudentEmail}", supervisorEmail, studentEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Fjalëkalimi i ri i nxënësit është gjeneruar";
+        var content = $@"
+        <p>Përshëndetje {supervisorName},</p>
+        <p>Ju keni miratuar kërkesën për rivendosje të fjalëkalimit për nxënësin tuaj. Këtu janë kredencialet e reja:</p>
+        <ul>
+            <li><strong>Emri i nxënësit:</strong> {studentName}</li>
+            <li><strong>Email i nxënësit:</strong> {studentEmail}</li>
+            <li><strong>Fjalëkalimi i ri:</strong> {newPassword}</li>
+        </ul>
+        <p><em>Ju lutemi jepni këto kredenciale nxënësit dhe këshillojeni që të ndryshojë fjalëkalimin pas hyrjes së parë për siguri.</em></p>
+        <p><strong>Shënim:</strong> Fjalëkalimi u dërgua tek ju sepse nxënësi ka një adresë email të krijuar automatikisht (@bga.al) që nuk mund të marrë email-e.</p>";
+
+        var body = GenerateHtml(title, content, "", "", footerText);
+        await SendEmail(supervisorEmail, "Fjalëkalimi i ri i nxënësit është gjeneruar", body);
     }
 }

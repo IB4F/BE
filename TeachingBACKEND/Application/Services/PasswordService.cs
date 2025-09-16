@@ -28,16 +28,52 @@ namespace TeachingBACKEND.Application.Services
             _passwordValidation = passwordValidation;
         }
 
-        public async Task RequestPasswordReset(string email)
+        public async Task<string> RequestPasswordReset(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user != null)
             {
+                // Check if there's already a pending password reset request
+                if (user.PasswordResetToken.HasValue && user.PasswordResetTokenExpiry.HasValue && 
+                    user.PasswordResetTokenExpiry > DateTime.UtcNow)
+                {
+                    // Check if this is a student created by supervisor
+                    if (email.EndsWith("@bga.al") && user.SupervisorId.HasValue)
+                    {
+                        return "Supervizori juaj ka marrë tashmë kërkesën tuaj për rivendosjen e fjalëkalimit dhe do ta aprovojë së shpejti. Ju lutemi prisni përgjigjen e tyre.";
+                    }
+                    else
+                    {
+                        return "Një kërkesë për rivendosjen e fjalëkalimit është tashmë në pritje. Ju lutemi kontrolloni email-in tuaj ose prisni para se të bëni një kërkesë tjetër.";
+                    }
+                }
+
                 var resetToken = Guid.NewGuid();
                 user.PasswordResetToken = resetToken;
                 user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
 
                 await _context.SaveChangesAsync();
+
+                // Check if this is a @bga.al email (student created by supervisor)
+                if (email.EndsWith("@bga.al"))
+                {
+                    // Find the supervisor for this student
+                    if (user.SupervisorId.HasValue)
+                    {
+                        var supervisor = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.SupervisorId.Value);
+                        if (supervisor != null)
+                        {
+                            // Send notification to supervisor instead of student
+                            await _notificationService.SendStudentPasswordResetRequestToSupervisor(
+                                supervisor.Email, 
+                                $"{supervisor.FirstName} {supervisor.LastName}", 
+                                $"{user.FirstName} {user.LastName}", 
+                                user.Email, 
+                                resetToken);
+                            return "Kërkesa për rivendosjen e fjalëkalimit është dërguar te supervizori juaj. Ai do ta aprovojë së shpejti.";
+                        }
+                    }
+                }
 
                 // Determine the email address to send the reset email to
                 string emailToSendTo = email;
@@ -51,13 +87,16 @@ namespace TeachingBACKEND.Application.Services
                         emailToSendTo = parent.Email;
                         // Send a special notification to the parent about their child's password reset
                         await _notificationService.SendChildPasswordResetEmail(parent.Email, user.FirstName, user.LastName, resetToken);
-                        return; // Exit early since we've sent the parent-specific email
+                        return "Kërkesa për rivendosjen e fjalëkalimit është dërguar në adresën e email-it të prindit tuaj.";
                     }
                 }
 
                 //Send Email to the user directly (for non-child users)
                 await _notificationService.SendPasswordResetEmail(emailToSendTo, resetToken);
+                return "Lidhja për rivendosjen e fjalëkalimit është dërguar në adresën tuaj të email-it.";
             }
+            
+            return "Nëse ekziston një llogari me atë email, një lidhje për rivendosjen e fjalëkalimit është dërguar.";
         }
         public async Task<string> ResetPassword(Guid token, string newPassword)
         {
@@ -87,7 +126,7 @@ namespace TeachingBACKEND.Application.Services
         {
             var school = await _context.Users.FirstOrDefaultAsync(u =>
                 u.Id == schoolId &&
-                u.Role == UserRole.School &&
+                u.Role == UserRole.Supervisor &&
                 u.ApprovalStatus == ApprovalStatus.Approved &&
                 u.IsEmailVerified);
 
@@ -289,6 +328,13 @@ namespace TeachingBACKEND.Application.Services
 
             // Update password
             user.PasswordHash = HashPassword(newPassword);
+            
+            // Clear the must change password flag if it was set
+            if (user.MustChangePasswordOnNextLogin)
+            {
+                user.MustChangePasswordOnNextLogin = false;
+            }
+            
             await _context.SaveChangesAsync();
 
             return "Password changed successfully.";

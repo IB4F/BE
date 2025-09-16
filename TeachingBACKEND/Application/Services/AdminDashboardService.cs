@@ -47,7 +47,7 @@ namespace TeachingBACKEND.Application.Services
                 .Where(u => u.Role == UserRole.Admin)
                 .CountAsync();
             var totalSchools = await _context.Users
-                .Where(u => u.Role == UserRole.School)
+                .Where(u => u.Role == UserRole.Supervisor)
                 .CountAsync();
             var totalStudents = await _context.Users
                 .Where(u => u.Role == UserRole.Student)
@@ -531,7 +531,7 @@ namespace TeachingBACKEND.Application.Services
                 {
                     City = g.Key,
                     UserCount = g.Count(),
-                    SchoolCount = g.Count(u => u.Role == UserRole.School),
+                    SchoolCount = g.Count(u => u.Role == UserRole.Supervisor),
                     Revenue = 0 // You might want to calculate this based on subscriptions
                 })
                 .OrderByDescending(s => s.UserCount)

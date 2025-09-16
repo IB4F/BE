@@ -374,8 +374,8 @@ namespace TeachingBACKEND.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            await _passwordService.RequestPasswordReset(model.Email);
-            return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
+            var message = await _passwordService.RequestPasswordReset(model.Email);
+            return Ok(new { message = message });
         }
 
 

@@ -24,6 +24,12 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "TeachingBACKEND API", Version = "v1" });
     c.EnableAnnotations();
+    
+    // Include XML comments for API documentation
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -95,6 +101,8 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<ISubscriptionPackageService, SubscriptionPackageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+builder.Services.AddScoped<ISupervisorService, SupervisorService>();
+builder.Services.AddScoped<IStudentProgressService, StudentProgressService>();
 builder.Services.AddScoped<FamilyPricingService>();
 builder.Services.AddScoped<StripePricingService>();
 builder.Services.AddControllers()

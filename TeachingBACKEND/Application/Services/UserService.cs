@@ -88,7 +88,7 @@ namespace TeachingBACKEND.Application.Services
         //public async Task<UserResponseDTO> CreateStudentBySchool(CreateStudentBySchoolDTO model, Guid schoolId)
         //{
         //    // Verify the school exists and is approved
-        //    var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
+        //    var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.Supervisor);
         //    if (school == null)
         //    {
         //        throw new Exception("School not found");
@@ -219,6 +219,16 @@ namespace TeachingBACKEND.Application.Services
                 throw new Exception("Email is not verified! Please check your inbox.");
             }
 
+            // Check if this is a first-time login for supervisor-created user
+            bool isFirstTimeLogin = user.Role == UserRole.Student && user.SupervisorId.HasValue && !user.IsOneTimeLoginUsed;
+
+            // If this is a student created by a supervisor who hasn't logged in before, mark the one-time login as used
+            if (isFirstTimeLogin)
+            {
+                user.IsOneTimeLoginUsed = true;
+                user.OriginalGeneratedPassword = null; // Clear the original password for security
+            }
+
             var accessToken = _passwordService.GenerateJwtToken(user);
             var refreshToken = _passwordService.GenerateRefreshToken();
 
@@ -230,7 +240,9 @@ namespace TeachingBACKEND.Application.Services
             return new LoginResponseDTO
             {
                 AccessToken = accessToken,
-                RefreshToken = refreshToken
+                RefreshToken = refreshToken,
+                IsFirstTimeLogin = isFirstTimeLogin,
+                MustChangePassword = user.MustChangePasswordOnNextLogin
             };
         }
         public async Task<User> GetUserByEmail(string email)
@@ -290,7 +302,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<List<UserResponseDTO>> GetStudentsBySchool(Guid schoolId)
         {
             // Verify the school exists and is approved
-            var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.School);
+            var school = await _context.Users.FirstOrDefaultAsync(u => u.Id == schoolId && u.Role == UserRole.Supervisor);
             if (school == null)
             {
                 throw new Exception("School not found");

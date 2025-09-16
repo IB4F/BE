@@ -736,7 +736,7 @@ namespace TeachingBACKEND.Application.Services
                 Id = Guid.NewGuid(),
                 Email = dto.Email,
                 PasswordHash = _passwordService.HashPassword(tempPassword),
-                Role = UserRole.School,
+                Role = UserRole.Supervisor,
                 ApprovalStatus = ApprovalStatus.Approved,
                 FirstName = "School", // Default values since SchoolRegistrationDTO doesn't have these
                 LastName = "User",

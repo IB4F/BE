@@ -10,18 +10,20 @@ namespace TeachingBACKEND.Application.Services;
 /// <summary>
 /// Scalable service for managing student performance tracking
 /// </summary>
-public class StudentPerformanceService : IStudentPerformanceService
-{
-    private readonly ApplicationDbContext _context;
-    private readonly ILogger<StudentPerformanceService> _logger;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public StudentPerformanceService(ApplicationDbContext context, ILogger<StudentPerformanceService> logger, IHttpContextAccessor httpContextAccessor)
+    public class StudentPerformanceService : IStudentPerformanceService
     {
-        _context = context;
-        _logger = logger;
-        _httpContextAccessor = httpContextAccessor;
-    }
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger<StudentPerformanceService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IStudentProgressService _studentProgressService;
+
+        public StudentPerformanceService(ApplicationDbContext context, ILogger<StudentPerformanceService> logger, IHttpContextAccessor httpContextAccessor, IStudentProgressService studentProgressService)
+        {
+            _context = context;
+            _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
+            _studentProgressService = studentProgressService;
+        }
 
     private string GetFullUrl(string relativeUrl)
     {
@@ -451,6 +453,9 @@ public class StudentPerformanceService : IStudentPerformanceService
         summary.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        
+        // Update the progress calculation service as well
+        await _studentProgressService.UpdateStudentPerformanceSummaryAsync(studentId, linkId);
     }
 
     private async Task<Guid?> DetermineNextQuiz(Quizz currentQuiz, bool isCorrect)
