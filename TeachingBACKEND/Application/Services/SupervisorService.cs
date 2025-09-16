@@ -99,45 +99,17 @@ namespace TeachingBACKEND.Application.Services
 
                 if (model.IsApproved)
                 {
-                    // Create a new User from the approved application
-                    var tempPasswordHash = _passwordService.HashPassword(supervisorApplication.TemporaryPassword ?? "");
-
-                    var supervisor = new User
-                    {
-                        Id = Guid.NewGuid(),
-                        Email = supervisorApplication.ContactPersonEmail,
-                        FirstName = supervisorApplication.ContactPersonFirstName,
-                        LastName = supervisorApplication.ContactPersonLastName,
-                        School = supervisorApplication.SchoolName,
-                        City = supervisorApplication.City,
-                        PhoneNumber = supervisorApplication.ContactPersonPhone,
-                        Role = UserRole.Supervisor,
-                        ApprovalStatus = ApprovalStatus.Approved,
-                        IsEmailVerified = true,
-                        PasswordHash = tempPasswordHash,
-                        CreateAt = DateTime.UtcNow
-                    };
-
-                    _context.Users.Add(supervisor);
-                    await _context.SaveChangesAsync();
-
-                    // Update the application with approval details
+                    // Update the application with approval details (but don't create user yet)
                     supervisorApplication.ApprovalStatus = ApprovalStatus.Approved;
                     supervisorApplication.ApprovalDate = DateTime.UtcNow;
-                    supervisorApplication.ApprovedUserId = supervisor.Id;
                     supervisorApplication.UpdatedAt = DateTime.UtcNow;
 
-                    // Send approval email with package selection link and temporary password
-                    var packageSelectionLink = $"https://braingainalbania.al/subscription-packages?supervisorId={supervisor.Id}";
-                    var temporaryPassword = supervisorApplication.TemporaryPassword ?? "PASSWORD_NOT_FOUND";
+                    // Send approval email with package selection link (no credentials yet)
+                    var packageSelectionLink = $"https://braingainalbania.al/subscription-packages?supervisorApplicationId={supervisorApplication.Id}";
                     await _notificationService.SendSupervisorApprovalEmail(
                         supervisorApplication.ContactPersonEmail, 
                         $"{supervisorApplication.ContactPersonFirstName} {supervisorApplication.ContactPersonLastName}", 
-                        packageSelectionLink, 
-                        temporaryPassword);
-                    
-                    // Clear the temporary password after sending it
-                    supervisorApplication.TemporaryPassword = null;
+                        packageSelectionLink);
                 }
                 else
                 {
@@ -495,6 +467,73 @@ namespace TeachingBACKEND.Application.Services
                 .FirstOrDefaultAsync(u => u.Id == supervisorId && u.Role == UserRole.Supervisor);
 
             return supervisor?.ApprovalStatus == ApprovalStatus.Approved;
+        }
+
+        public async Task<User> CreateSupervisorFromApprovedApplicationAsync(Guid supervisorApplicationId)
+        {
+            try
+            {
+                var supervisorApplication = await _context.SupervisorApplications
+                    .FirstOrDefaultAsync(sa => sa.Id == supervisorApplicationId && sa.ApprovalStatus == ApprovalStatus.Approved);
+
+                if (supervisorApplication == null)
+                {
+                    throw new ArgumentException("Approved supervisor application not found");
+                }
+
+                // Check if user already exists
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == supervisorApplication.ContactPersonEmail);
+                
+                if (existingUser != null)
+                {
+                    throw new InvalidOperationException("User with this email already exists");
+                }
+
+                // Create the supervisor user
+                var tempPassword = supervisorApplication.TemporaryPassword ?? GenerateSecurePassword();
+                var tempPasswordHash = _passwordService.HashPassword(tempPassword);
+
+                var supervisor = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Email = supervisorApplication.ContactPersonEmail,
+                    FirstName = supervisorApplication.ContactPersonFirstName,
+                    LastName = supervisorApplication.ContactPersonLastName,
+                    School = supervisorApplication.SchoolName,
+                    City = supervisorApplication.City,
+                    PhoneNumber = supervisorApplication.ContactPersonPhone,
+                    Role = UserRole.Supervisor,
+                    ApprovalStatus = ApprovalStatus.Approved,
+                    IsEmailVerified = true,
+                    PasswordHash = tempPasswordHash,
+                    CreateAt = DateTime.UtcNow
+                };
+
+                _context.Users.Add(supervisor);
+                await _context.SaveChangesAsync();
+
+                // Update the application with the created user ID
+                supervisorApplication.ApprovedUserId = supervisor.Id;
+                supervisorApplication.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                // Send credentials email
+                await _notificationService.SendSupervisorCredentialsEmail(
+                    supervisor.Email,
+                    $"{supervisor.FirstName} {supervisor.LastName}",
+                    tempPassword);
+
+                _logger.LogInformation("Created supervisor user {UserId} from approved application {ApplicationId}", 
+                    supervisor.Id, supervisorApplicationId);
+
+                return supervisor;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating supervisor from approved application {ApplicationId}", supervisorApplicationId);
+                throw;
+            }
         }
 
         public async Task<int> GetStudentCount(Guid supervisorId)

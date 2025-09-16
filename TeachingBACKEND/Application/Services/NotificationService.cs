@@ -221,7 +221,7 @@ public class NotificationService : INotificationService
         await SendEmail("fabiano.meoo98@gmail.com", "Aplikim i ri i Supervizorit", body);
     }
 
-    public async Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string temporaryPassword)
+    public async Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string? temporaryPassword = null)
     {
         _logger.LogInformation("Starting supervisor approval email for {SupervisorEmail}", supervisorEmail);
         var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
@@ -230,17 +230,47 @@ public class NotificationService : INotificationService
         var content = $@"
         <p>Përshëndetje {supervisorName},</p>
         <p>Urime! Aplikimi juaj për të u bërë supervizor është pranuar nga administrata.</p>
+        <p>Tani mund të zgjidhni paketën e subscriptionit tuaj dhe të filloni të menaxhoni nxënësit tuaj.</p>";
+        
+        // Only include credentials if provided (for post-payment email)
+        if (!string.IsNullOrEmpty(temporaryPassword))
+        {
+            content += $@"
+            <p><strong>Kredencialet tuaja të hyrjes:</strong></p>
+            <ul>
+                <li><strong>Email:</strong> {supervisorEmail}</li>
+                <li><strong>Fjalëkalimi i përkohshëm:</strong> {temporaryPassword}</li>
+            </ul>
+            <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimin pas hyrjes së parë për siguri.</em></p>";
+        }
+        
+        var ctaText = "Zgjidh Paketën e Subscriptionit";
+
+        var body = GenerateHtml(title, content, ctaText, packageSelectionLink, footerText);
+        await SendEmail(supervisorEmail, "Aplikimi juaj është pranuar", body);
+    }
+
+    public async Task SendSupervisorCredentialsEmail(string supervisorEmail, string supervisorName, string temporaryPassword)
+    {
+        _logger.LogInformation("Starting supervisor credentials email for {SupervisorEmail}", supervisorEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Kredencialet tuaja të hyrjes";
+        var content = $@"
+        <p>Përshëndetje {supervisorName},</p>
+        <p>Pagesa juaj u konfirmua me sukses! Tani mund të kyçeni në platformë duke përdorur kredencialet e mëposhtme:</p>
         <p><strong>Kredencialet tuaja të hyrjes:</strong></p>
         <ul>
             <li><strong>Email:</strong> {supervisorEmail}</li>
             <li><strong>Fjalëkalimi i përkohshëm:</strong> {temporaryPassword}</li>
         </ul>
         <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimin pas hyrjes së parë për siguri.</em></p>
-        <p>Tani mund të zgjidhni paketën e subscriptionit tuaj dhe të filloni të menaxhoni nxënësit tuaj.</p>";
-        var ctaText = "Zgjidh Paketën e Subscriptionit";
+        <p>Tani mund të filloni të menaxhoni nxënësit tuaj.</p>";
+        var ctaText = "Kyçu në Platformë";
+        var loginUrl = "https://braingainalbania.al/login";
 
-        var body = GenerateHtml(title, content, ctaText, packageSelectionLink, footerText);
-        await SendEmail(supervisorEmail, "Aplikimi juaj është pranuar", body);
+        var body = GenerateHtml(title, content, ctaText, loginUrl, footerText);
+        await SendEmail(supervisorEmail, "Kredencialet tuaja të hyrjes", body);
     }
 
     public async Task SendSupervisorRejectionEmail(string supervisorEmail, string supervisorName, string reason)

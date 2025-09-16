@@ -147,6 +147,137 @@ namespace TeachingBACKEND.Application.Services
             }
         }
 
+        public async Task<string> CreateSupervisorSubscriptionAsync(SupervisorSubscriptionRequestDTO dto)
+        {
+            using var activity = _logger.BeginScope("CreateSupervisorSubscriptionAsync");
+            
+            try
+            {
+                _logger.LogInformation("Starting supervisor subscription creation for application: {ApplicationId}, PackageId: {PackageId}", 
+                    dto.SupervisorApplicationId, dto.SubscriptionPackageId);
+
+                // Get the approved supervisor application
+                var supervisorApplication = await _context.SupervisorApplications
+                    .FirstOrDefaultAsync(sa => sa.Id == dto.SupervisorApplicationId && sa.ApprovalStatus == ApprovalStatus.Approved);
+
+                if (supervisorApplication == null)
+                {
+                    _logger.LogError("Approved supervisor application not found with ID: {ApplicationId}", dto.SupervisorApplicationId);
+                    throw new ArgumentException("Approved supervisor application not found");
+                }
+
+                // Get the subscription package
+                _logger.LogInformation("Looking up subscription package with ID: {PackageId}", dto.SubscriptionPackageId);
+                var package = await _context.SubscriptionPackages
+                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId);
+
+                if (package == null)
+                {
+                    _logger.LogError("Subscription package not found with ID: {PackageId}", dto.SubscriptionPackageId);
+                    throw new ArgumentException("Subscription package not found");
+                }
+
+                _logger.LogInformation("Found subscription package: {PackageName}, UserType: {UserType}, TrialDays: {TrialDays}", 
+                    package.Name, package.UserType, package.TrialDays);
+
+                // Determine the Stripe Price ID based on billing interval
+                string stripePriceId = dto.BillingInterval switch
+                {
+                    BillingInterval.Month => package.StripeMonthlyPriceId,
+                    BillingInterval.Year => package.StripeYearlyPriceId,
+                    _ => package.StripeMonthlyPriceId
+                };
+
+                _logger.LogInformation("Using Stripe Price ID: {StripePriceId} for billing interval: {BillingInterval}", 
+                    stripePriceId, dto.BillingInterval);
+
+                // Create registration data for supervisor
+                var registrationData = JsonSerializer.Serialize(new SupervisorRegistrationDTO
+                {
+                    SupervisorApplicationId = dto.SupervisorApplicationId
+                });
+
+                // Create Stripe checkout session for subscription
+                _logger.LogInformation("Configuring Stripe API key");
+                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
+                var subscriptionData = new SessionSubscriptionDataOptions
+                {
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "registration_type", "supervisor" },
+                        { "registration_data", registrationData },
+                        { "subscription_package_id", dto.SubscriptionPackageId.ToString() },
+                        { "billing_interval", dto.BillingInterval.ToString() }
+                    }
+                };
+
+                // Only set trial period if TrialDays > 0
+                if (package.TrialDays > 0)
+                {
+                    subscriptionData.TrialPeriodDays = package.TrialDays;
+                    _logger.LogInformation("Setting trial period to {TrialDays} days", package.TrialDays);
+                }
+
+                _logger.LogInformation("Creating Stripe checkout session with SuccessUrl: {SuccessUrl}, CancelUrl: {CancelUrl}", 
+                    _configuration["STRIPE_SUCCESS_URL"], _configuration["STRIPE_CANCEL_URL"]);
+
+                var options = new SessionCreateOptions
+                {
+                    PaymentMethodTypes = new List<string> { "card" },
+                    Mode = "subscription",
+                    SuccessUrl = _configuration["STRIPE_SUCCESS_URL"],
+                    CancelUrl = _configuration["STRIPE_CANCEL_URL"],
+                    CustomerEmail = supervisorApplication.ContactPersonEmail,
+                    LineItems = new List<SessionLineItemOptions>
+                    {
+                        new()
+                        {
+                            Price = stripePriceId,
+                            Quantity = 1
+                        }
+                    },
+                    SubscriptionData = subscriptionData
+                };
+
+                _logger.LogInformation("Calling Stripe SessionService.CreateAsync");
+                var service = new SessionService();
+                var session = await service.CreateAsync(options);
+
+                _logger.LogInformation("Stripe session created successfully with ID: {SessionId}", session.Id);
+
+                // Create Payment record for tracking
+                _logger.LogInformation("Creating Payment record for tracking");
+                var payment = new Payment
+                {
+                    Email = supervisorApplication.ContactPersonEmail,
+                    RegistrationType = "supervisor",
+                    RegistrationData = registrationData,
+                    StripeSessionId = session.Id,
+                    Amount = 0, // Will be set by subscription
+                    Currency = "eur",
+                    Status = "pending",
+                    SubscriptionPackageId = dto.SubscriptionPackageId
+                };
+
+                _logger.LogInformation("Adding Payment record to context and saving changes");
+                _context.Payments.Add(payment);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Successfully created Stripe supervisor subscription session: {SessionId} and Payment record", session.Id);
+
+                return session.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating supervisor subscription session for application: {ApplicationId}, PackageId: {PackageId}. " +
+                    "Exception: {ExceptionMessage}. Inner Exception: {InnerExceptionMessage}. Stack Trace: {StackTrace}", 
+                    dto.SupervisorApplicationId, dto.SubscriptionPackageId, ex.Message, 
+                    ex.InnerException?.Message ?? "None", ex.StackTrace);
+                throw;
+            }
+        }
+
         public async Task<SubscriptionResponseDTO> GetSubscriptionAsync(Guid subscriptionId)
         {
             var subscription = await _context.Subscriptions
@@ -676,6 +807,7 @@ namespace TeachingBACKEND.Application.Services
                     "student" => await CreateStudentFromSubscriptionAsync(registrationData, planId),
                     "school" => await CreateSchoolFromSubscriptionAsync(registrationData, planId),
                     "family" => await CreateFamilyFromSubscriptionAsync(registrationData, planId),
+                    "supervisor" => await CreateSupervisorFromSubscriptionAsync(registrationData, planId),
                     _ => throw new ArgumentException($"Unknown registration type: {registrationType}")
                 };
                 
@@ -898,6 +1030,68 @@ namespace TeachingBACKEND.Application.Services
             }
 
             return user;
+        }
+
+        private async Task<User> CreateSupervisorFromSubscriptionAsync(string registrationData, Guid planId)
+        {
+            var dto = JsonSerializer.Deserialize<SupervisorRegistrationDTO>(registrationData);
+            
+            // Get the approved supervisor application
+            var supervisorApplication = await _context.SupervisorApplications
+                .FirstOrDefaultAsync(sa => sa.Id == dto.SupervisorApplicationId && sa.ApprovalStatus == ApprovalStatus.Approved);
+
+            if (supervisorApplication == null)
+            {
+                throw new ArgumentException("Approved supervisor application not found");
+            }
+
+            // Check if user already exists
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == supervisorApplication.ContactPersonEmail);
+            
+            if (existingUser != null)
+            {
+                throw new InvalidOperationException("User with this email already exists");
+            }
+
+            // Create the supervisor user
+            var tempPassword = supervisorApplication.TemporaryPassword ?? Guid.NewGuid().ToString("N")[..12];
+            var tempPasswordHash = _passwordService.HashPassword(tempPassword);
+
+            var supervisor = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = supervisorApplication.ContactPersonEmail,
+                FirstName = supervisorApplication.ContactPersonFirstName,
+                LastName = supervisorApplication.ContactPersonLastName,
+                School = supervisorApplication.SchoolName,
+                City = supervisorApplication.City,
+                PhoneNumber = supervisorApplication.ContactPersonPhone,
+                Role = UserRole.Supervisor,
+                ApprovalStatus = ApprovalStatus.Approved,
+                IsEmailVerified = true,
+                PasswordHash = tempPasswordHash,
+                CreateAt = DateTime.UtcNow
+            };
+
+            _context.Users.Add(supervisor);
+            await _context.SaveChangesAsync();
+
+            // Update the application with the created user ID
+            supervisorApplication.ApprovedUserId = supervisor.Id;
+            supervisorApplication.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Send credentials email
+            await _notificationService.SendSupervisorCredentialsEmail(
+                supervisor.Email,
+                $"{supervisor.FirstName} {supervisor.LastName}",
+                tempPassword);
+
+            _logger.LogInformation("Created supervisor user {UserId} from approved application {ApplicationId}", 
+                supervisor.Id, supervisorApplication.Id);
+
+            return supervisor;
         }
 
         private async Task<string> GenerateUniqueFamilyMemberEmail(string firstName, string lastName)

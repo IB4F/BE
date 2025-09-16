@@ -27,6 +27,7 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<bool> IsSupervisorApproved(Guid supervisorId);
         Task<int> GetStudentCount(Guid supervisorId);
         Task<bool> CanCreateMoreStudents(Guid supervisorId);
+        Task<Domain.Entities.User> CreateSupervisorFromApprovedApplicationAsync(Guid supervisorApplicationId);
     }
 }
 

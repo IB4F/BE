@@ -5,6 +5,7 @@ namespace TeachingBACKEND.Application.Interfaces
     public interface ISubscriptionService
     {
         Task<string> CreateSubscriptionAsync(SubscriptionRequestDTO dto);
+        Task<string> CreateSupervisorSubscriptionAsync(SupervisorSubscriptionRequestDTO dto);
         Task<SubscriptionResponseDTO> GetSubscriptionAsync(Guid subscriptionId);
         Task<SubscriptionResponseDTO> GetUserActiveSubscriptionAsync(Guid userId);
         Task<bool> CancelSubscriptionAsync(Guid subscriptionId, CancelSubscriptionDTO dto);

@@ -49,6 +49,34 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
+        /// Create a subscription for an approved supervisor application
+        /// </summary>
+        [HttpPost("create-supervisor")]
+        public async Task<IActionResult> CreateSupervisorSubscription([FromBody] SupervisorSubscriptionRequestDTO dto)
+        {
+            try
+            {
+                var sessionId = await _subscriptionService.CreateSupervisorSubscriptionAsync(dto);
+                
+                return Ok(new
+                {
+                    message = "Subscription initiated. Please complete payment to start your subscription.",
+                    sessionId = sessionId,
+                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}"
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating supervisor subscription");
+                return StatusCode(500, new { message = "An error occurred while creating the subscription." });
+            }
+        }
+
+        /// <summary>
         /// Get subscription by ID
         /// </summary>
         [HttpGet("{id}")]

@@ -11,8 +11,9 @@
         
         // Supervisor FlowF Methods
         Task SendSupervisorApplicationNotification(string supervisorEmail, string supervisorName, string schoolName);
-        Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string temporaryPassword);
+        Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string? temporaryPassword = null);
         Task SendSupervisorRejectionEmail(string supervisorEmail, string supervisorName, string reason);
+        Task SendSupervisorCredentialsEmail(string supervisorEmail, string supervisorName, string temporaryPassword);
         Task SendNewPasswordSetEmail(string studentEmail, string studentName, string newPassword);
         Task SendStudentPasswordResetRequestToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, Guid resetToken);
         Task SendNewPasswordToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, string newPassword);

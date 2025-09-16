@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -48,6 +50,8 @@
     <Content Remove="wwwroot\images\ce6a4b73-72cf-441e-84be-a0e0a674a515.png" />
     <Content Remove="wwwroot\images\83e499dd-0a7c-433c-b10b-24ba9794175b.png" />
     <Content Remove="wwwroot\audio\9b38df0a-072f-4f11-b932-a57504ad4123.mp3" />
+    <None Remove="STRIPE_SETUP_GUIDE.md" />
+    <None Remove="FAMILY_REGISTRATION_GUIDE.md" />
   </ItemGroup>
 
 </Project>
