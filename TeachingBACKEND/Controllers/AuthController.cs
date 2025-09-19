@@ -356,6 +356,9 @@ namespace TeachingBACKEND.Controllers
                 user.LastName = updatedUser.LastName;
                 user.School = updatedUser.School;
                 user.City = updatedUser.City;
+                user.PhoneNumber = updatedUser.PhoneNumber;
+                user.Profession = updatedUser.Profession;
+                user.CurrentClass = updatedUser.CurrentClass;
 
                 await _userService.UpdateUser(user);
                 return Ok(new { message = "User updated successfully" });
