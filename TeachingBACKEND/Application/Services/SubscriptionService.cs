@@ -569,6 +569,34 @@ namespace TeachingBACKEND.Application.Services
             return subscriptions.Select(MapToResponseDTO).ToList();
         }
 
+        public async Task<List<SubscriptionPaymentResponseDTO>> GetUserPaymentHistoryAsync(Guid userId)
+        {
+            var payments = await _context.SubscriptionPayments
+                .Include(sp => sp.Subscription)
+                .ThenInclude(s => s.SubscriptionPackage)
+                .Where(sp => sp.Subscription.UserId == userId)
+                .OrderByDescending(sp => sp.PaidAt)
+                .ToListAsync();
+
+            return payments.Select(payment => new SubscriptionPaymentResponseDTO
+            {
+                Id = payment.Id,
+                SubscriptionId = payment.SubscriptionId,
+                StripePaymentIntentId = payment.StripePaymentIntentId,
+                StripeInvoiceId = payment.StripeInvoiceId,
+                Amount = payment.Amount,
+                Currency = payment.Currency,
+                Status = payment.Status,
+                PaidAt = payment.PaidAt,
+                CreatedAt = payment.CreatedAt,
+                PeriodStart = payment.PeriodStart,
+                PeriodEnd = payment.PeriodEnd,
+                PlanName = payment.Subscription?.SubscriptionPackage?.Name ?? "Unknown Plan",
+                SubscriptionStatus = payment.Subscription?.Status.ToString() ?? "Unknown",
+                Interval = payment.Subscription?.Interval ?? BillingInterval.Month
+            }).ToList();
+        }
+
         private async Task HandleSubscriptionCreatedAsync(Event stripeEvent)
         {
             var subscription = stripeEvent.Data.Object as Stripe.Subscription;

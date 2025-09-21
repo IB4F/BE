@@ -16,5 +16,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<bool> IsUserSubscriptionActiveAsync(Guid userId);
         Task<DateTime?> GetUserSubscriptionExpiryAsync(Guid userId);
         Task<List<SubscriptionResponseDTO>> GetUserSubscriptionsAsync(Guid userId);
+        Task<List<SubscriptionPaymentResponseDTO>> GetUserPaymentHistoryAsync(Guid userId);
     }
 }

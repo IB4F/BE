@@ -142,6 +142,25 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
+        /// Get user's payment/billing history
+        /// </summary>
+        [HttpGet("user/{userId}/payment-history")]
+        [Authorize]
+        public async Task<IActionResult> GetUserPaymentHistory(Guid userId)
+        {
+            try
+            {
+                var payments = await _subscriptionService.GetUserPaymentHistoryAsync(userId);
+                return Ok(payments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user payment history: {UserId}", userId);
+                return StatusCode(500, new { message = "An error occurred while retrieving the payment history." });
+            }
+        }
+
+        /// <summary>
         /// Cancel subscription
         /// </summary>
         [HttpPost("{id}/cancel")]
@@ -234,27 +253,57 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
-        /// Check if user has active subscription
+        /// Get user's active subscription with detailed information
         /// </summary>
         [HttpGet("user/{userId}/active")]
         [Authorize]
-        public async Task<IActionResult> IsUserSubscriptionActive(Guid userId)
+        public async Task<IActionResult> GetUserActiveSubscriptionDetails(Guid userId)
         {
             try
             {
+                var subscription = await _subscriptionService.GetUserActiveSubscriptionAsync(userId);
+                
+                if (subscription == null)
+                {
+                    return Ok(new
+                    {
+                        isActive = false,
+                        expiresAt = (DateTime?)null,
+                        subscription = (object)null
+                    });
+                }
+
                 var isActive = await _subscriptionService.IsUserSubscriptionActiveAsync(userId);
-                var expiry = await _subscriptionService.GetUserSubscriptionExpiryAsync(userId);
                 
                 return Ok(new
                 {
                     isActive = isActive,
-                    expiresAt = expiry
+                    expiresAt = subscription.CurrentPeriodEnd,
+                    subscription = new
+                    {
+                        id = subscription.Id,
+                        planId = subscription.PlanId,
+                        planName = subscription.PlanName,
+                        status = subscription.Status.ToString(),
+                        startDate = subscription.StartDate,
+                        endDate = subscription.EndDate,
+                        currentPeriodStart = subscription.CurrentPeriodStart,
+                        currentPeriodEnd = subscription.CurrentPeriodEnd,
+                        trialEnd = subscription.TrialEnd,
+                        amount = subscription.Amount,
+                        currency = subscription.Currency,
+                        interval = subscription.Interval.ToString(),
+                        intervalCount = subscription.IntervalCount,
+                        registrationType = subscription.RegistrationType,
+                        createdAt = subscription.CreatedAt,
+                        updatedAt = subscription.UpdatedAt
+                    }
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking user subscription status: {UserId}", userId);
-                return StatusCode(500, new { message = "An error occurred while checking subscription status." });
+                _logger.LogError(ex, "Error getting user active subscription details: {UserId}", userId);
+                return StatusCode(500, new { message = "An error occurred while retrieving subscription details." });
             }
         }
 
