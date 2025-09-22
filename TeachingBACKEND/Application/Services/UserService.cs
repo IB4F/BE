@@ -286,17 +286,34 @@ namespace TeachingBACKEND.Application.Services
             if (entity == null)
                 throw new Exception("User not found");
 
-            return new UserDetails
+            var userDetails = new UserDetails
             {
-                Id =  entity.Id,
+                Id = entity.Id,
                 Email = entity.Email,
                 FirstName = entity.FirstName,
                 LastName = entity.LastName,
                 CurrentClass = entity.CurrentClass,
                 School = entity.School,
                 PhoneNumber = entity.PhoneNumber,
-                Profession = entity.Profession                
+                Profession = entity.Profession,
+                Role = entity.Role
             };
+
+            // Calculate counts based on user role
+            if (entity.Role == UserRole.Family)
+            {
+                // For family members, count children (students with ParentUserId = this user's ID)
+                userDetails.ChildrenCount = await _context.Users
+                    .CountAsync(u => u.ParentUserId == entity.Id && u.Role == UserRole.Student);
+            }
+            else if (entity.Role == UserRole.Supervisor)
+            {
+                // For supervisors, count supervised students
+                userDetails.StudentsCount = await _context.Users
+                    .CountAsync(u => u.SupervisorId == entity.Id && u.Role == UserRole.Student);
+            }
+
+            return userDetails;
         }
 
         public async Task<List<UserResponseDTO>> GetStudentsBySchool(Guid schoolId)
