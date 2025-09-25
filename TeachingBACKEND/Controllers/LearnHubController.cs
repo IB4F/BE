@@ -14,11 +14,13 @@ namespace TeachingBACKEND.Api.Controllers
     public class LearnHubsController : ControllerBase
     {
         private readonly ILearnHubService _learnHubService;
+        private readonly ISubscriptionAccessService _subscriptionAccessService;
         private readonly IConfiguration _configuration;
 
-        public LearnHubsController(ILearnHubService learnHubService, IConfiguration configuration)
+        public LearnHubsController(ILearnHubService learnHubService, ISubscriptionAccessService subscriptionAccessService, IConfiguration configuration)
         {
             _learnHubService = learnHubService;
+            _subscriptionAccessService = subscriptionAccessService;
             _configuration = configuration;
         }
 
@@ -112,6 +114,17 @@ namespace TeachingBACKEND.Api.Controllers
             }
             
             var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject, isAuthenticated, userId);
+            
+            // If user is authenticated, filter based on subscription access
+            if (isAuthenticated && userId.HasValue)
+            {
+                var accessibleLearnHubs = await _subscriptionAccessService.GetAccessibleLearnHubsAsync(userId.Value);
+                var accessibleIds = accessibleLearnHubs.Select(lh => lh.Id).ToHashSet();
+                
+                // Filter the results to only include accessible LearnHubs
+                learnHubs = learnHubs.Where(lh => accessibleIds.Contains(lh.Id)).ToList();
+            }
+            
             return Ok(learnHubs);
         }
         
@@ -126,6 +139,92 @@ namespace TeachingBACKEND.Api.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("check-access/{learnHubId}")]
+        public async Task<IActionResult> CheckLearnHubAccess(Guid learnHubId)
+        {
+            try
+            {
+                // Check if user is authenticated
+                var isAuthenticated = false;
+                Guid? userId = null;
+                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+                {
+                    var token = authHeader.Substring("Bearer ".Length).Trim();
+                    try
+                    {
+                        var tokenHandler = new JwtSecurityTokenHandler();
+                        var key = Encoding.ASCII.GetBytes(Environment.GetEnvironmentVariable("JWT_SECRET_KEY"));
+                        tokenHandler.ValidateToken(token, new TokenValidationParameters
+                        {
+                            ValidateIssuerSigningKey = true,
+                            IssuerSigningKey = new SymmetricSecurityKey(key),
+                            ValidateIssuer = false,
+                            ValidateAudience = false,
+                            ClockSkew = TimeSpan.Zero
+                        }, out SecurityToken validatedToken);
+
+                        var jwtToken = (JwtSecurityToken)validatedToken;
+                        var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "nameid");
+                        if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid extractedUserId))
+                        {
+                            userId = extractedUserId;
+                        }
+
+                        isAuthenticated = true;
+                    }
+                    catch
+                    {
+                        isAuthenticated = false;
+                    }
+                }
+
+                if (!isAuthenticated || !userId.HasValue)
+                {
+                    // For unauthenticated users, only allow access to free LearnHubs
+                    var learnHub = await _learnHubService.GetSingleLearnHub(learnHubId);
+                    if (learnHub == null)
+                        return NotFound(new { message = "LearnHub not found" });
+
+                    var canAccess = learnHub.IsFree;
+                    return Ok(new
+                    {
+                        CanAccess = canAccess,
+                        NeedsUpgrade = !canAccess,
+                        UserTier = (string)null,
+                        RequiredTier = learnHub.RequiredTier?.ToString(),
+                        Message = canAccess ? "Access granted (free content)" : "Please log in to access this content"
+                    });
+                }
+
+                // For authenticated users, check subscription access
+                var userCanAccess = await _subscriptionAccessService.CanUserAccessLearnHubAsync(userId.Value, learnHubId);
+                var needsUpgrade = await _subscriptionAccessService.NeedsUpgradeForLearnHubAsync(userId.Value, learnHubId);
+                var requiredTier = await _subscriptionAccessService.GetLearnHubRequiredTierAsync(learnHubId);
+                var userTier = await _subscriptionAccessService.GetUserAccessTierAsync(userId.Value);
+
+                var response = new
+                {
+                    CanAccess = userCanAccess,
+                    NeedsUpgrade = needsUpgrade,
+                    UserTier = userTier?.ToString(),
+                    RequiredTier = requiredTier?.ToString(),
+                    Message = userCanAccess 
+                        ? "Access granted" 
+                        : needsUpgrade 
+                            ? $"You need to upgrade to {requiredTier} subscription to access this LearnHub"
+                            : "Access denied"
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while checking access", error = ex.Message });
             }
         }
 

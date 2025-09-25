@@ -103,6 +103,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 builder.Services.AddScoped<ISupervisorService, SupervisorService>();
 builder.Services.AddScoped<IStudentProgressService, StudentProgressService>();
+builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
 builder.Services.AddScoped<FamilyPricingService>();
 builder.Services.AddScoped<StripePricingService>();
 builder.Services.AddControllers()
