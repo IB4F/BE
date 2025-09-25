@@ -704,7 +704,7 @@ public class ApplicationDbContext : DbContext
         );
 
         var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var adminEmail = "admin@teachapp.com";
+        var adminEmail = "admin@braingainalbania.al";
         var adminPassword = BCrypt.Net.BCrypt.HashPassword("Admin!2025", 12);
 
         modelBuilder.Entity<User>().HasData(new User
