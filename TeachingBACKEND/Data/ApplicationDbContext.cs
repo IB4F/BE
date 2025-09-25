@@ -159,6 +159,11 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(quizz => quizz.LinkId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // LearnHub tier configuration
+        modelBuilder.Entity<LearnHub>()
+            .Property(lh => lh.RequiredTier)
+            .HasConversion<string>();
+
         // Subscription entity configurations
         modelBuilder.Entity<Subscription>(entity =>
         {

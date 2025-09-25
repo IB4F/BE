@@ -25,10 +25,19 @@ namespace TeachingBACKEND.Controllers
 
         [AllowAnonymous]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<SubscriptionPackage>>> GetAllPackages()
+        public async Task<ActionResult<IEnumerable<object>>> GetAllPackages()
         {
             var packages = await _packageService.GetAllPackagesAsync();
-            return Ok(packages);
+            var simplifiedPackages = packages
+                .Where(p => p.IsActive)
+                .Select(p => new
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                })
+                .ToList();
+
+            return Ok(simplifiedPackages);
         }
 
         [AllowAnonymous]
@@ -141,6 +150,23 @@ namespace TeachingBACKEND.Controllers
             {
                 return BadRequest($"Error calculating family pricing: {ex.Message}");
             }
+        }
+
+        
+
+        // NEW: Get available tiers for LearnHub creation
+        [AllowAnonymous]
+        [HttpGet("Get-Tiers")]
+        public IActionResult GetTiers()
+        {
+            var tiers = new[]
+            {
+                new { Value = 1, Name = "Basic" },
+                new { Value = 2, Name = "Standard" },
+                new { Value = 3, Name = "Premium" }
+            };
+
+            return Ok(tiers);
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace TeachingBACKEND.Domain.DTOs
+﻿using TeachingBACKEND.Domain.Enums;
+
+namespace TeachingBACKEND.Domain.DTOs
 {
     public class LearnHubCreateDTO
     {
@@ -7,6 +9,7 @@
         public string ClassType { get; set; }
         public string Subject { get; set; }
         public bool IsFree { get; set; }
+        public PackageTier? RequiredTier { get; set; } // NEW: Required tier when IsFree = false
         public int Difficulty { get; set; }
         public List<CreateLinkDTO> Links { get; set; }
     }

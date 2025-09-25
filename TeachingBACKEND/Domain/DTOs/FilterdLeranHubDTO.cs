@@ -9,6 +9,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public string ClassType { get; set; }
         public string Subject { get; set; }
         public bool IsFree { get; set; }
+        public string? RequiredTier { get; set; } // NEW: Required tier name (Basic, Standard, Premium)
         public List<LinkDTO> Links { get; set; }
         public int Difficulty { get; set; }
         public DateTime CreatedAt { get; set; }

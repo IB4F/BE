@@ -56,6 +56,12 @@ public class LearnHubService : ILearnHubService
         if (!subjectExists)
             throw new Exception("Subject not found");
 
+        // NEW: Validate tier assignment
+        if (!dto.IsFree && !dto.RequiredTier.HasValue)
+        {
+            throw new Exception("Required tier is needed for paid LearnHubs");
+        }
+
         var postLearnHub = new LearnHub
         {
             Title = dto.Title,
@@ -64,6 +70,7 @@ public class LearnHubService : ILearnHubService
             Subject = dto.Subject, // Store the subject ID directly
             Difficulty = dto.Difficulty,
             IsFree = dto.IsFree,
+            RequiredTier = dto.IsFree ? null : dto.RequiredTier, // NEW: Set required tier
             CreatedAt = DateTime.UtcNow,
             Links = dto.Links?.Select(l => new Link
             {
@@ -96,6 +103,7 @@ public class LearnHubService : ILearnHubService
             ClassType = learnHub.ClassType,
             Subject = learnHub.Subject,
             IsFree = learnHub.IsFree,
+            RequiredTier = (int?)learnHub.RequiredTier, // NEW: Required tier value
             CreatedAt = learnHub.CreatedAt,
             Difficulty = learnHub.Difficulty,
             Links = learnHub.Links?.Select(link => new LinkDTO
@@ -129,12 +137,19 @@ public class LearnHubService : ILearnHubService
         if (!subjectExists)
             throw new Exception("Subject not found");
 
+        // NEW: Validate tier assignment
+        if (!dto.IsFree && !dto.RequiredTier.HasValue)
+        {
+            throw new Exception("Required tier is needed for paid LearnHubs");
+        }
+
         // Update main fields
         learnHub.Title = dto.Title;
         learnHub.Description = dto.Description;
         learnHub.Subject = dto.Subject; // Store subject ID
         learnHub.ClassType = dto.ClassType; // Store class ID
         learnHub.IsFree = dto.IsFree;
+        learnHub.RequiredTier = dto.IsFree ? null : dto.RequiredTier; // NEW: Update required tier
 
         // Smart link update - preserve existing links and their quizzes
         var existingLinks = learnHub.Links.ToList();
@@ -381,6 +396,7 @@ public class LearnHubService : ILearnHubService
                 ClassType = classEntity.Name,
                 Subject = subjectEntity.Name,
                 IsFree = lh.IsFree,
+                RequiredTier = lh.RequiredTier?.ToString(), // NEW: Required tier name
                 Difficulty = lh.Difficulty,
                 CreatedAt = lh.CreatedAt,
                 Links = new List<LinkDTO>()
