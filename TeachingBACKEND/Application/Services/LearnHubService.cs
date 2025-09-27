@@ -209,34 +209,26 @@ public class LearnHubService : ILearnHubService
     
     public async Task MigrateLearnHubClassTypes()
     {
-        var learnHubs = await _context.LearnHubs.ToListAsync();
+        var learnHubs = await _context.LearnHubs
+            .AsNoTracking() // Performance optimization for migration bulk updates
+            .ToListAsync();
+        
+        // Bulk load class and subject entities for better performance
+        var allClasses = await _context.Classes.ToDictionaryAsync(c => c.Name, c => c.Id.ToString());
+        var allSubjects = await _context.Subjects.ToDictionaryAsync(s => s.Name, s => s.Id.ToString());
         
         foreach (var learnHub in learnHubs)
         {
             // Check if ClassType is a class name (not a GUID)
-            if (!Guid.TryParse(learnHub.ClassType, out _))
+            if (!Guid.TryParse(learnHub.ClassType, out _) && allClasses.TryGetValue(learnHub.ClassType, out var classId))
             {
-                // Find the class by name
-                var classEntity = await _context.Classes
-                    .FirstOrDefaultAsync(c => c.Name == learnHub.ClassType);
-                
-                if (classEntity != null)
-                {
-                    learnHub.ClassType = classEntity.Id.ToString();
-                }
+                learnHub.ClassType = classId;
             }
 
             // Check if Subject is a subject name (not a GUID)
-            if (!Guid.TryParse(learnHub.Subject, out _))
+            if (!Guid.TryParse(learnHub.Subject, out _) && allSubjects.TryGetValue(learnHub.Subject, out var subjectId))
             {
-                // Find the subject by name
-                var subjectEntity = await _context.Subjects
-                    .FirstOrDefaultAsync(s => s.Name == learnHub.Subject);
-                
-                if (subjectEntity != null)
-                {
-                    learnHub.Subject = subjectEntity.Id.ToString();
-                }
+                learnHub.Subject = subjectId;
             }
         }
 
@@ -637,6 +629,7 @@ public class LearnHubService : ILearnHubService
                 .ThenInclude(cq => cq.ExplanationAudio)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.QuizzType)
+            .AsNoTracking() // Performance optimization for read-only complex data
             .FirstOrDefaultAsync(q => q.Id == id);
 
         if (quiz == null)

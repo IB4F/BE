@@ -25,6 +25,7 @@ namespace TeachingBACKEND.Domain.Entities
         public DateTime? CurrentPeriodStart { get; set; }
         public DateTime? CurrentPeriodEnd { get; set; }
         public DateTime? TrialEnd { get; set; }
+        public bool CancelAtPeriodEnd { get; set; } = false; // Track cancellation scheduling
         
         // Billing
         public string Currency { get; set; } = "eur";

@@ -17,45 +17,46 @@ namespace TeachingBACKEND.Application.Services
         }
         public async Task<IEnumerable<City>> GetCities()
         {
-            var cities = await _context.Cities.ToListAsync();
-            return cities.Any() == true ? cities : new List<City>();
+            var cities = await _context.Cities
+                .AsNoTracking() // Performance optimization for read-only data
+                .ToListAsync();
+            return cities;
         }
         public async Task<IEnumerable<Class>> GetClasses()
         {
             var classes = await _context.Classes
+                .AsNoTracking() // Performance optimization for read-only data
                 .OrderBy(c => c.Name.Length)   
                 .ThenBy(c => c.Name)   
                 .ToListAsync();
 
-            return classes.Any()
-                 ? classes
-                 : new List<Class>();
+            return classes;
         }  
         public async Task<IEnumerable<Subjects>> GetSubjects()
         {
             var subjects = await _context.Subjects
+                .AsNoTracking() // Performance optimization for read-only data
                 .OrderBy(c => c.Name.Length)   
                 .ThenBy(c => c.Name)   
                 .ToListAsync();
 
-            return subjects.Any()
-                ? subjects
-                : new List<Subjects>();
+            return subjects;
         }
         public async Task<IEnumerable<QuizType>> GetQuizTypes()
         {
             var quizTypes = await _context.QuizTypes
+                .AsNoTracking() // Performance optimization for read-only data
                 .OrderBy(c => c.Name.Length)   
                 .ThenBy(c => c.Name)   
                 .ToListAsync();
 
-            return quizTypes.Any()
-                ? quizTypes
-                : new List<QuizType>();
+            return quizTypes;
         }
         public async Task<List<SubscriptionPackage>> GetAllPlansAsync()
         {
-            return await _context.SubscriptionPackages.ToListAsync();
+            return await _context.SubscriptionPackages
+                .AsNoTracking() // Performance optimization for read-only data
+                .ToListAsync();
         }
 
         public async Task<SubscriptionPackage?> GetPlanByIdAsync(Guid id)

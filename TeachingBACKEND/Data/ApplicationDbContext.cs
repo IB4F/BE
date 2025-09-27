@@ -78,6 +78,11 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(u => u.SupervisorId);
             
             entity.HasIndex(u => new { u.SupervisorId, u.Role });
+            
+            // Performance indexes for subscription access
+            entity.HasIndex(u => u.ActiveSubscriptionId);
+            
+            entity.HasIndex(u => u.ParentUserId);
         });
 
         modelBuilder.Entity<SupervisorApplication>(entity =>
@@ -190,6 +195,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(s => s.StripePriceId)
                 .IsRequired()
                 .HasMaxLength(255);
+
+            // Performance indexes for subscription queries
+            entity.HasIndex(s => new { s.UserId, s.Status });
+            entity.HasIndex(s => s.Status);
+            entity.HasIndex(s => s.StripeSubscriptionId);
+            entity.HasIndex(s => new { s.Status, s.CurrentPeriodEnd });
         });
 
         modelBuilder.Entity<SubscriptionPayment>(entity =>
@@ -207,6 +218,11 @@ public class ApplicationDbContext : DbContext
                 
             entity.Property(sp => sp.StripeInvoiceId)
                 .HasMaxLength(255);
+
+            // Performance indexes for payment history queries
+            entity.HasIndex(sp => sp.SubscriptionId);
+            entity.HasIndex(sp => sp.PaidAt);
+            entity.HasIndex(sp => sp.Status);
         });
 
         modelBuilder.Entity<Option>()

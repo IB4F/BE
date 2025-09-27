@@ -297,7 +297,7 @@ namespace TeachingBACKEND.Application.Services
         {
             var subscription = await _context.Subscriptions
                 .Include(s => s.SubscriptionPackage)
-                .Include(s => s.User)
+                .AsNoTracking() // Performance optimization
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Status == SubscriptionStatus.Active);
 
             if (subscription == null)
@@ -320,23 +320,27 @@ namespace TeachingBACKEND.Application.Services
                     return false;
                 }
 
-                // Cancel in Stripe
+                // Cancel in Stripe - always end of period
                 StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var cancelOptions = new SubscriptionCancelOptions
                 {
-                    Prorate = !dto.Immediately,
-                    InvoiceNow = dto.Immediately
+                    // Always preserve user access until end of subscription period
+                    // This ensures users get full value from their subscription payment
+                    Prorate = false, // No immediate refund
+                    InvoiceNow = false // Keep subscription active until period ends
                 };
 
                 await stripeService.CancelAsync(subscription.StripeSubscriptionId, cancelOptions);
 
-                // Update local subscription
-                subscription.Status = SubscriptionStatus.Canceled;
-                subscription.CanceledAt = DateTime.UtcNow;
+                // Always end-of-period cancellation - user keeps access until subscription period ends
+                // This ensures users get the full value of their subscription payment
+                subscription.Status = SubscriptionStatus.Active; // Keep Active until period ends
+                subscription.CancelAtPeriodEnd = true; // Mark that it will be cancelled when period ends
+                subscription.CanceledAt = null; // Will be set when period actually ends via webhook
+                
                 subscription.UpdatedAt = DateTime.UtcNow;
-
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation("Canceled subscription: {SubscriptionId}", subscriptionId);
@@ -434,21 +438,51 @@ namespace TeachingBACKEND.Application.Services
         {
             try
             {
+                _logger.LogInformation("Starting subscription plan update for subscription: {SubscriptionId}, newPlanId: {NewPlanId}", 
+                    subscriptionId, dto.NewPlanId);
+
+                // Get the subscription with validation
                 var subscription = await _context.Subscriptions
                     .Include(s => s.SubscriptionPackage)
+                    .Include(s => s.User)
                     .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
                 if (subscription == null)
                 {
+                    _logger.LogWarning("Subscription not found: {SubscriptionId}", subscriptionId);
                     return false;
                 }
 
+                // Validate subscription can be updated
+                if (subscription.Status != SubscriptionStatus.Active && subscription.Status != SubscriptionStatus.Trialing)
+                {
+                    _logger.LogWarning("Cannot update subscription with status: {Status}", subscription.Status);
+                    return false;
+                }
+
+                // Validate new package exists and is active
                 var newPackage = await _context.SubscriptionPackages
-                    .FirstOrDefaultAsync(p => p.Id == dto.NewPlanId);
+                    .FirstOrDefaultAsync(p => p.Id == dto.NewPlanId && p.IsActive);
 
                 if (newPackage == null)
                 {
+                    _logger.LogWarning("New subscription package not found or inactive: {PackageId}", dto.NewPlanId);
                     return false;
+                }
+
+                // Require confirmation for plan changes
+                if (!dto.ConfirmChange)
+                {
+                    _logger.LogWarning("Plan change not confirmed: {SubscriptionId}", subscriptionId);
+                    return false;
+                }
+
+                // Check if user is changing to same plan (prevent unnecessary updates)
+                if (subscription.SubscriptionPackageId == dto.NewPlanId && 
+                    subscription.Interval == dto.BillingInterval)
+                {
+                    _logger.LogInformation("No plan change needed - same plan and interval");
+                    return true;
                 }
 
                 // Determine the new Stripe Price ID
@@ -459,26 +493,52 @@ namespace TeachingBACKEND.Application.Services
                     _ => newPackage.StripeMonthlyPriceId
                 };
 
-                // Update in Stripe
+                if (string.IsNullOrEmpty(newStripePriceId))
+                {
+                    _logger.LogError("Invalid Stripe Price ID for package: {PackageId}, billing interval: {BillingInterval}", 
+                        dto.NewPlanId, dto.BillingInterval);
+                    return false;
+                }
+
+                // Get current Stripe subscription to find correct subscription item ID
                 StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
                 var stripeService = new Stripe.SubscriptionService();
                 
+                var currentSubscription = await stripeService.GetAsync(subscription.StripeSubscriptionId);
+                if (currentSubscription == null)
+                {
+                    _logger.LogError("Stripe subscription not found: {StripeSubscriptionId}", subscription.StripeSubscriptionId);
+                    return false;
+                }
+
+                var subscriptionItemId = currentSubscription.Items.Data.FirstOrDefault()?.Id;
+                if (string.IsNullOrEmpty(subscriptionItemId))
+                {
+                    _logger.LogError("No subscription items found in Stripe subscription: {StripeSubscriptionId}", 
+                        subscription.StripeSubscriptionId);
+                    return false;
+                }
+
+                // Update in Stripe with correct subscription item ID
                 var updateOptions = new SubscriptionUpdateOptions
                 {
                     Items = new List<SubscriptionItemOptions>
                     {
                         new()
                         {
-                            Id = subscription.StripeSubscriptionId,
+                            Id = subscriptionItemId,
                             Price = newStripePriceId
                         }
                     },
                     ProrationBehavior = dto.Prorate ? "create_prorations" : "none"
                 };
 
+                _logger.LogInformation("Updating Stripe subscription {StripeSubscriptionId} to new plan {NewPlanId}", 
+                    subscription.StripeSubscriptionId, dto.NewPlanId);
+
                 await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
 
-                // Update local subscription
+                // Update local subscription only after successful Stripe update
                 subscription.SubscriptionPackageId = dto.NewPlanId;
                 subscription.StripePriceId = newStripePriceId;
                 subscription.Interval = dto.BillingInterval;
@@ -486,8 +546,15 @@ namespace TeachingBACKEND.Application.Services
 
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Updated subscription plan: {SubscriptionId}", subscriptionId);
+                _logger.LogInformation("Successfully updated subscription plan: {SubscriptionId} from {OldPackage} to {NewPackage}", 
+                    subscriptionId, subscription.SubscriptionPackage?.Name ?? "Unknown", newPackage.Name);
                 return true;
+            }
+            catch (StripeException stripeEx)
+            {
+                _logger.LogError(stripeEx, "Stripe error updating subscription plan: {SubscriptionId}. Stripe error: {StripeError}", 
+                    subscriptionId, stripeEx.Message);
+                return false;
             }
             catch (Exception ex)
             {
@@ -544,6 +611,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<bool> IsUserSubscriptionActiveAsync(Guid userId)
         {
             var subscription = await _context.Subscriptions
+                .AsNoTracking() // Performance optimization for read-only checks
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Status == SubscriptionStatus.Active);
 
             return subscription != null && subscription.CurrentPeriodEnd > DateTime.UtcNow;
@@ -552,6 +620,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<DateTime?> GetUserSubscriptionExpiryAsync(Guid userId)
         {
             var subscription = await _context.Subscriptions
+                .AsNoTracking() // Performance optimization for read-only checks
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Status == SubscriptionStatus.Active);
 
             return subscription?.CurrentPeriodEnd;
@@ -561,7 +630,7 @@ namespace TeachingBACKEND.Application.Services
         {
             var subscriptions = await _context.Subscriptions
                 .Include(s => s.SubscriptionPackage)
-                .Include(s => s.User)
+                .AsNoTracking() // Performance optimization
                 .Where(s => s.UserId == userId)
                 .OrderByDescending(s => s.CreatedAt)
                 .ToListAsync();
@@ -573,7 +642,8 @@ namespace TeachingBACKEND.Application.Services
         {
             var payments = await _context.SubscriptionPayments
                 .Include(sp => sp.Subscription)
-                .ThenInclude(s => s.SubscriptionPackage)
+                    .ThenInclude(s => s.SubscriptionPackage)
+                .AsNoTracking() // Performance optimization for read-only data
                 .Where(sp => sp.Subscription.UserId == userId)
                 .OrderByDescending(sp => sp.PaidAt)
                 .ToListAsync();
@@ -678,6 +748,7 @@ namespace TeachingBACKEND.Application.Services
 
                 if (subscriptionEntity != null)
                 {
+                    var oldStatus = subscriptionEntity.Status;
                     subscriptionEntity.Status = MapStripeStatus(subscription.Status);
                     subscriptionEntity.EndDate = subscription.EndedAt;
                     subscriptionEntity.CurrentPeriodStart = subscription.Items.Data[0].CurrentPeriodStart;
@@ -685,11 +756,22 @@ namespace TeachingBACKEND.Application.Services
                     subscriptionEntity.TrialEnd = subscription.TrialEnd;
                     subscriptionEntity.UpdatedAt = DateTime.UtcNow;
 
+                    // Handle period-end cancellation
+                    if (subscription.CancelAtPeriodEnd && 
+                        oldStatus == SubscriptionStatus.Active && 
+                        subscriptionEntity.Status == SubscriptionStatus.Canceled)
+                    {
+                        subscriptionEntity.CanceledAt = DateTime.UtcNow;
+                        subscriptionEntity.CancelAtPeriodEnd = false; // Mark as fulfilled
+                        
+                        _logger.LogInformation("Subscription completed period-end cancellation: {SubscriptionId}", subscriptionEntity.Id);
+                    }
+
                     // Update user's subscription expiry
                     var user = await _context.Users.FindAsync(subscriptionEntity.UserId);
                     if (user != null)
                     {
-                        user.SubscriptionExpiresAt = subscription.StartDate;
+                        user.SubscriptionExpiresAt = subscriptionEntity.CurrentPeriodEnd;
                     }
 
                     await _context.SaveChangesAsync();

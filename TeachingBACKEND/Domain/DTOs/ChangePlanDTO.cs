@@ -13,6 +13,11 @@ namespace TeachingBACKEND.Domain.DTOs
         
         public bool Prorate { get; set; } = true;
         
+        [MaxLength(500)]
         public string? Reason { get; set; }
+        
+        // Add validation attributes for better input validation
+        [Range(typeof(bool), "false", "true")]
+        public bool ConfirmChange { get; set; } = true; // Safety flag to prevent accidental changes
     }
 }

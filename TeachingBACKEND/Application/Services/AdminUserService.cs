@@ -58,7 +58,10 @@ namespace TeachingBACKEND.Application.Services
 
         public async Task<AdminUserDetailsDTO> GetUserDetailsById(Guid id)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _context.Users
+                .AsNoTracking() // Performance optimization for read-only data
+                .FirstOrDefaultAsync(u => u.Id == id);
+            
             if (user == null)
             {
                 throw new Exception("User not found");

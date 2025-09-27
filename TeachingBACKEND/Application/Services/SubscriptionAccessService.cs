@@ -17,8 +17,9 @@ namespace TeachingBACKEND.Application.Services
 
         public async Task<bool> CanUserAccessLearnHubAsync(Guid userId, Guid learnHubId)
         {
-            // Get the LearnHub and its required tier
+            // Get the LearnHub and its required tier (optimized single query)
             var learnHub = await _context.LearnHubs
+                .AsNoTracking() // Performance optimization for read-only check
                 .FirstOrDefaultAsync(lh => lh.Id == learnHubId);
 
             if (learnHub == null)
@@ -47,6 +48,7 @@ namespace TeachingBACKEND.Application.Services
                 .Include(u => u.Supervisor)
                     .ThenInclude(s => s.ActiveSubscription)
                         .ThenInclude(s => s.SubscriptionPackage)
+                .AsNoTracking() // Performance optimization for read-only check
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
@@ -70,6 +72,7 @@ namespace TeachingBACKEND.Application.Services
                 var parent = await _context.Users
                     .Include(p => p.ActiveSubscription)
                         .ThenInclude(s => s.SubscriptionPackage)
+                    .AsNoTracking() // Performance optimization for read-only check
                     .FirstOrDefaultAsync(p => p.Id == user.ParentUserId);
 
                 if (parent?.HasActiveSubscription == true)
@@ -85,7 +88,7 @@ namespace TeachingBACKEND.Application.Services
         {
             var userAccessTier = await GetUserAccessTierAsync(userId);
 
-            var query = _context.LearnHubs.AsQueryable();
+            var query = _context.LearnHubs.AsNoTracking(); // Performance optimization
 
             // If user has no subscription, only show free LearnHubs
             if (userAccessTier == null)
@@ -104,6 +107,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<bool> NeedsUpgradeForLearnHubAsync(Guid userId, Guid learnHubId)
         {
             var learnHub = await _context.LearnHubs
+                .AsNoTracking() // Performance optimization for read-only check
                 .FirstOrDefaultAsync(lh => lh.Id == learnHubId);
 
             if (learnHub == null || learnHub.IsFree || learnHub.RequiredTier == null)
@@ -120,6 +124,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<PackageTier?> GetLearnHubRequiredTierAsync(Guid learnHubId)
         {
             var learnHub = await _context.LearnHubs
+                .AsNoTracking() // Performance optimization for read-only check
                 .FirstOrDefaultAsync(lh => lh.Id == learnHubId);
 
             return learnHub?.RequiredTier;
