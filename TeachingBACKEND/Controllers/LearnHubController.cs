@@ -78,6 +78,7 @@ namespace TeachingBACKEND.Api.Controllers
 
             // Check if user is authenticated by validating JWT token
             var isAuthenticated = false;
+            var isAdmin = false;
             Guid? userId = null;
             var authHeader = Request.Headers["Authorization"].FirstOrDefault();
             if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
@@ -96,12 +97,19 @@ namespace TeachingBACKEND.Api.Controllers
                         ClockSkew = TimeSpan.Zero
                     }, out SecurityToken validatedToken);
 
-                    // Extract user ID from the token using "nameid" claim
+                    // Extract user ID and role from the token
                     var jwtToken = (JwtSecurityToken)validatedToken;
                     var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "nameid");
                     if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid extractedUserId))
                     {
                         userId = extractedUserId;
+                    }
+
+                    // Check if user is admin
+                    var roleClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "role" || x.Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/role");
+                    if (roleClaim != null && roleClaim.Value == "Admin")
+                    {
+                        isAdmin = true;
                     }
 
                     isAuthenticated = true;
@@ -115,8 +123,8 @@ namespace TeachingBACKEND.Api.Controllers
             
             var learnHubs = await _learnHubService.GetFilteredLearnHubs(classType, subject, isAuthenticated, userId);
             
-            // If user is authenticated, filter based on subscription access
-            if (isAuthenticated && userId.HasValue)
+            // If user is authenticated and NOT admin, filter based on subscription access
+            if (isAuthenticated && userId.HasValue && !isAdmin)
             {
                 var accessibleLearnHubs = await _subscriptionAccessService.GetAccessibleLearnHubsAsync(userId.Value);
                 var accessibleIds = accessibleLearnHubs.Select(lh => lh.Id).ToHashSet();

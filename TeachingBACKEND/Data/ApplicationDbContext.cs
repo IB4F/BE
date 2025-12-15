@@ -707,11 +707,11 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Subjects>().HasData(
             new Subjects { Id = Guid.Parse("dbe6757d-2138-463a-bee7-5d07a6d7b320"), Name = "Letërsi" },
-            new Subjects { Id = Guid.Parse("616273bd-2a2a-4894-b689-57fe86702ae0"), Name = "Matematik" },
+            new Subjects { Id = Guid.Parse("616273bd-2a2a-4894-b689-57fe86702ae0"), Name = "Matematikë" },
             new Subjects { Id = Guid.Parse("a072e5ed-714d-40d3-9af8-3b5b940acd2f"), Name = "Anglisht" },
             new Subjects { Id = Guid.Parse("a5cf5e27-ef08-4fef-b907-109496b284eb"), Name = "Histori" },
             new Subjects { Id = Guid.Parse("5eac82ae-0b4b-47a8-9871-ba6ab1c99df7"), Name = "Gjeografi" },
-            new Subjects { Id = Guid.Parse("faf6b93a-91d1-4ead-85f5-0120ac85f7d2"), Name = "Shkenca" }
+            new Subjects { Id = Guid.Parse("faf6b93a-91d1-4ead-85f5-0120ac85f7d2"), Name = "Shkencë" }
         );
 
         modelBuilder.Entity<QuizType>().HasData(
