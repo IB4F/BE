@@ -724,7 +724,7 @@ namespace TeachingBACKEND.Application.Services
 
                 // Update user's active subscription
                 user.ActiveSubscriptionId = subscriptionEntity.Id;
-                user.SubscriptionExpiresAt = subscription.EndedAt;
+                user.SubscriptionExpiresAt = subscriptionEntity.CurrentPeriodEnd;
 
                 await _context.SaveChangesAsync();
 

@@ -383,6 +383,7 @@ public class LearnHubService : ILearnHubService
         {
             var learnHubDto = new FilteredLearnHubDTO
             {
+                Id = lh.Id,
                 Title = lh.Title,
                 Description = lh.Description,
                 ClassType = classEntity.Name,
