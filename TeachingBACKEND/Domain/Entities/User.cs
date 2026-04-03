@@ -37,7 +37,6 @@ namespace TeachingBACKEND.Domain.Entities
         // One Time Login Status (for students created by supervisor)
         public bool IsOneTimeLoginUsed { get; set; } = false;
         public bool MustChangePasswordOnNextLogin { get; set; } = false;
-        public string? OriginalGeneratedPassword { get; set; } // Store original password until first login (only for students under supervisor)
         
         // Supervisor-Student Relationship
         public Guid? SupervisorId { get; set; }        // For students: link to supervisor

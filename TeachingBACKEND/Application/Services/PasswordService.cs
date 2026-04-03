@@ -175,19 +175,21 @@ namespace TeachingBACKEND.Application.Services
         public string GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_jwtSecret);
+            var key = Encoding.UTF8.GetBytes(_jwtSecret);
 
             var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
-        };
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
+            };
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
+                Expires = DateTime.UtcNow.AddMinutes(15),
+                Issuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+                Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
@@ -196,11 +198,13 @@ namespace TeachingBACKEND.Application.Services
         }
         public string GenerateAccessToken(IEnumerable<Claim> claims)
         {
-            var key = Encoding.ASCII.GetBytes(_jwtSecret);
+            var key = Encoding.UTF8.GetBytes(_jwtSecret);
             var descriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
+                Expires = DateTime.UtcNow.AddMinutes(15),
+                Issuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+                Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256Signature
@@ -216,7 +220,7 @@ namespace TeachingBACKEND.Application.Services
                 ValidateAudience = false,
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtSecret)),
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret)),
                 ValidateLifetime = false
             };
 
@@ -268,7 +272,7 @@ namespace TeachingBACKEND.Application.Services
 
             //persist
             user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
 
@@ -284,21 +288,23 @@ namespace TeachingBACKEND.Application.Services
             return Guid.NewGuid();
         }
 
-        public string GenerateRandomPassword()
+        private static readonly char[] PasswordChars =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%*?&".ToCharArray();
+
+        public string GenerateRandomPassword(int length = 12)
         {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$!%*?&";
-            var random = new Random();
-            var password = new string(Enumerable.Repeat(chars, 12)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
-            
-            // Ensure password meets complexity requirements
-            if (!password.Any(char.IsUpper) || !password.Any(char.IsLower) || 
-                !password.Any(char.IsDigit) || !password.Any(c => "@$!%*?&".Contains(c)))
+            using var rng = RandomNumberGenerator.Create();
+            var randomBytes = new byte[length];
+
+            string password;
+            do
             {
-                // If it doesn't meet requirements, generate a new one
-                return GenerateRandomPassword();
+                rng.GetBytes(randomBytes);
+                password = new string(randomBytes.Select(b => PasswordChars[b % PasswordChars.Length]).ToArray());
             }
-            
+            while (!password.Any(char.IsUpper) || !password.Any(char.IsLower) ||
+                   !password.Any(char.IsDigit) || !password.Any(c => "!@#$%*?&".Contains(c)));
+
             return password;
         }
 

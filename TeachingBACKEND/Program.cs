@@ -12,6 +12,9 @@ using static TeachingBACKEND.Application.Services.PasswordValidationService;
 using TeachingBACKEND.Infrastructure;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using TeachingBACKEND.Middleware;
 
 Env.Load();
 
@@ -55,8 +58,11 @@ builder.Services.AddSwaggerGen(c =>
 
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .EnableSensitiveDataLogging());
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    if (builder.Environment.IsDevelopment())
+        options.EnableSensitiveDataLogging();
+});
 
 builder.Services
   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -64,12 +70,14 @@ builder.Services
   {
       options.TokenValidationParameters = new TokenValidationParameters
       {
-          ValidateIssuer = false,
-          ValidateAudience = false,
+          ValidateIssuer = true,
+          ValidIssuer = builder.Configuration["JWT_ISSUER"],
+          ValidateAudience = true,
+          ValidAudience = builder.Configuration["JWT_AUDIENCE"],
           ValidateLifetime = true,
           ValidateIssuerSigningKey = true,
           IssuerSigningKey = new SymmetricSecurityKey(
-              Encoding.ASCII.GetBytes(builder.Configuration["JWT_SECRET_KEY"])
+              Encoding.UTF8.GetBytes(builder.Configuration["JWT_SECRET_KEY"])
           ),
           ClockSkew = TimeSpan.Zero
       };
@@ -78,13 +86,59 @@ builder.Services
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+            .WithOrigins(
+                "https://app.braingainalbania.al",
+                "https://braingainalbania.al",
+                "http://localhost:4200"
+            )
+            .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .AllowAnyHeader()
+            .AllowCredentials();
     });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    // POST /api/auth/login — max 5 per minute per IP
+    options.AddPolicy("login_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // POST /api/auth/request-reset — max 3 per 15 min per IP
+    options.AddPolicy("reset_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(15),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // POST /api/auth/resend-verification — max 3 per 15 min per IP
+    options.AddPolicy("verify_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(15),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 builder.Services.AddHttpContextAccessor(); // Add this for URL generation
@@ -133,9 +187,25 @@ builder.Host.UseSerilog();
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 app.UseHttpsRedirection();
+
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (!app.Environment.IsDevelopment())
+        context.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    await next();
+});
+
 app.UseStaticFiles();
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

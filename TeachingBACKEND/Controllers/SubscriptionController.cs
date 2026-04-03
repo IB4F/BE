@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
+using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
 
@@ -21,16 +22,24 @@ namespace TeachingBACKEND.Controllers
             _logger = logger;
         }
 
+        private (Guid LoggedUserId, bool IsAdmin) GetCallerInfo()
+        {
+            var loggedUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var isAdmin = User.IsInRole("Admin");
+            return (loggedUserId, isAdmin);
+        }
+
         /// <summary>
         /// Create a new subscription
         /// </summary>
+        [Authorize]
         [HttpPost("create")]
         public async Task<IActionResult> CreateSubscription([FromBody] SubscriptionRequestDTO dto)
         {
             try
             {
                 var sessionId = await _subscriptionService.CreateSubscriptionAsync(dto);
-                
+
                 return Ok(new
                 {
                     message = "Subscription initiated. Please complete payment to start your subscription.",
@@ -52,13 +61,14 @@ namespace TeachingBACKEND.Controllers
         /// <summary>
         /// Create a subscription for an approved supervisor application
         /// </summary>
+        [Authorize]
         [HttpPost("create-supervisor")]
         public async Task<IActionResult> CreateSupervisorSubscription([FromBody] SupervisorSubscriptionRequestDTO dto)
         {
             try
             {
                 var sessionId = await _subscriptionService.CreateSupervisorSubscriptionAsync(dto);
-                
+
                 return Ok(new
                 {
                     message = "Subscription initiated. Please complete payment to start your subscription.",
@@ -87,6 +97,11 @@ namespace TeachingBACKEND.Controllers
             try
             {
                 var subscription = await _subscriptionService.GetSubscriptionAsync(id);
+
+                var (loggedUserId, isAdmin) = GetCallerInfo();
+                if (subscription.UserId != loggedUserId && !isAdmin)
+                    return Forbid();
+
                 return Ok(subscription);
             }
             catch (ArgumentException ex)
@@ -107,6 +122,10 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         public async Task<IActionResult> GetUserSubscription(Guid userId)
         {
+            var (loggedUserId, isAdmin) = GetCallerInfo();
+            if (userId != loggedUserId && !isAdmin)
+                return Forbid();
+
             try
             {
                 var subscription = await _subscriptionService.GetUserActiveSubscriptionAsync(userId);
@@ -130,6 +149,10 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         public async Task<IActionResult> GetUserSubscriptions(Guid userId)
         {
+            var (loggedUserId, isAdmin) = GetCallerInfo();
+            if (userId != loggedUserId && !isAdmin)
+                return Forbid();
+
             try
             {
                 var subscriptions = await _subscriptionService.GetUserSubscriptionsAsync(userId);
@@ -149,6 +172,10 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         public async Task<IActionResult> GetUserPaymentHistory(Guid userId)
         {
+            var (loggedUserId, isAdmin) = GetCallerInfo();
+            if (userId != loggedUserId && !isAdmin)
+                return Forbid();
+
             try
             {
                 var payments = await _subscriptionService.GetUserPaymentHistoryAsync(userId);
@@ -170,12 +197,21 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
+                var subscription = await _subscriptionService.GetSubscriptionAsync(id);
+                var (loggedUserId, isAdmin) = GetCallerInfo();
+                if (subscription.UserId != loggedUserId && !isAdmin)
+                    return Forbid();
+
                 var success = await _subscriptionService.CancelSubscriptionAsync(id, dto);
                 if (success)
                 {
                     return Ok(new { message = "Subscription canceled successfully." });
                 }
                 return BadRequest(new { message = "Failed to cancel subscription." });
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -193,12 +229,21 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
+                var subscription = await _subscriptionService.GetSubscriptionAsync(id);
+                var (loggedUserId, isAdmin) = GetCallerInfo();
+                if (subscription.UserId != loggedUserId && !isAdmin)
+                    return Forbid();
+
                 var success = await _subscriptionService.PauseSubscriptionAsync(id);
                 if (success)
                 {
                     return Ok(new { message = "Subscription paused successfully." });
                 }
                 return BadRequest(new { message = "Failed to pause subscription." });
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -216,12 +261,21 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
+                var subscription = await _subscriptionService.GetSubscriptionAsync(id);
+                var (loggedUserId, isAdmin) = GetCallerInfo();
+                if (subscription.UserId != loggedUserId && !isAdmin)
+                    return Forbid();
+
                 var success = await _subscriptionService.ResumeSubscriptionAsync(id);
                 if (success)
                 {
                     return Ok(new { message = "Subscription resumed successfully." });
                 }
                 return BadRequest(new { message = "Failed to resume subscription." });
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -239,12 +293,21 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
+                var subscription = await _subscriptionService.GetSubscriptionAsync(id);
+                var (loggedUserId, isAdmin) = GetCallerInfo();
+                if (subscription.UserId != loggedUserId && !isAdmin)
+                    return Forbid();
+
                 var success = await _subscriptionService.UpdateSubscriptionPlanAsync(id, dto);
                 if (success)
                 {
                     return Ok(new { message = "Subscription plan updated successfully." });
                 }
                 return BadRequest(new { message = "Failed to update subscription plan." });
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -260,10 +323,14 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         public async Task<IActionResult> GetUserActiveSubscriptionDetails(Guid userId)
         {
+            var (loggedUserId, isAdmin) = GetCallerInfo();
+            if (userId != loggedUserId && !isAdmin)
+                return Forbid();
+
             try
             {
                 var subscription = await _subscriptionService.GetUserActiveSubscriptionAsync(userId);
-                
+
                 if (subscription == null)
                 {
                     return Ok(new
@@ -275,7 +342,7 @@ namespace TeachingBACKEND.Controllers
                 }
 
                 var isActive = await _subscriptionService.IsUserSubscriptionActiveAsync(userId);
-                
+
                 return Ok(new
                 {
                     isActive = isActive,

@@ -18,7 +18,7 @@ namespace TeachingBACKEND.Application.Interfaces
         bool VerifyPassword(string password, string hashed);
         Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model);
         Guid GenerateVerificationToken();
-        string GenerateRandomPassword();
+        string GenerateRandomPassword(int length = 12);
         Task<string> ChangePassword(Guid userId, string currentPassword, string newPassword);
     }
 }

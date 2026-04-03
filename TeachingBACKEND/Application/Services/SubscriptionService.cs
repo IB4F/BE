@@ -68,7 +68,7 @@ namespace TeachingBACKEND.Application.Services
 
                 // Create Stripe checkout session for subscription
                 _logger.LogInformation("Configuring Stripe API key");
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
 
                 var subscriptionData = new SessionSubscriptionDataOptions
                 {
@@ -199,7 +199,7 @@ namespace TeachingBACKEND.Application.Services
 
                 // Create Stripe checkout session for subscription
                 _logger.LogInformation("Configuring Stripe API key");
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
 
                 var subscriptionData = new SessionSubscriptionDataOptions
                 {
@@ -361,7 +361,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Pause in Stripe
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var updateOptions = new SubscriptionUpdateOptions
@@ -403,7 +403,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Resume in Stripe
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var updateOptions = new SubscriptionUpdateOptions
@@ -496,7 +496,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Get current Stripe subscription to find correct subscription item ID
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var currentSubscription = await stripeService.GetAsync(subscription.StripeSubscriptionId);

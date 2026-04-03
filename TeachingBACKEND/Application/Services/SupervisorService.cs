@@ -213,7 +213,6 @@ namespace TeachingBACKEND.Application.Services
                     IsEmailVerified = true,
                     MustChangePasswordOnNextLogin = true,
                     IsOneTimeLoginUsed = false,
-                    OriginalGeneratedPassword = generatedPassword, // Store original password
                     CreateAt = DateTime.UtcNow
                 };
 
@@ -337,9 +336,6 @@ namespace TeachingBACKEND.Application.Services
                     student.PasswordHash = _passwordService.HashPassword(newPassword);
                     student.MustChangePasswordOnNextLogin = true;
                     student.IsOneTimeLoginUsed = false;
-                    
-                    // Store the original generated password (like when creating a student)
-                    student.OriginalGeneratedPassword = newPassword;
                     
                     // Clear the password reset token since it's been handled
                     student.PasswordResetToken = null;
@@ -599,16 +595,8 @@ namespace TeachingBACKEND.Application.Services
                 var student = await _context.Users
                     .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == UserRole.Student);
                 
-                if (student != null && student.SupervisorId.HasValue && !student.IsOneTimeLoginUsed && !string.IsNullOrEmpty(student.OriginalGeneratedPassword))
-                {
-                    // If the student is under a supervisor, hasn't logged in yet, and we have the original password, include it
-                    progressDetail.GeneratedPassword = student.OriginalGeneratedPassword;
-                }
-                else
-                {
-                    // Student has already logged in, is not under a supervisor, or no original password available, don't include password
-                    progressDetail.GeneratedPassword = null;
-                }
+                // Password is no longer stored in DB — sent via email only at creation/reset
+                progressDetail.GeneratedPassword = null;
                 
                 return progressDetail;
             }

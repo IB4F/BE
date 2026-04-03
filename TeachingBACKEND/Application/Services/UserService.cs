@@ -226,14 +226,13 @@ namespace TeachingBACKEND.Application.Services
             if (isFirstTimeLogin)
             {
                 user.IsOneTimeLoginUsed = true;
-                user.OriginalGeneratedPassword = null; // Clear the original password for security
             }
 
             var accessToken = _passwordService.GenerateJwtToken(user);
             var refreshToken = _passwordService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
 
             await _context.SaveChangesAsync();
 
