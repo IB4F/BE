@@ -556,6 +556,7 @@ public class LearnHubService : ILearnHubService
             CreatedAt = DateTime.UtcNow,
             QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null,
             ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null,
+            ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null,
             ParentQuizId = parentQuizId,
             Options = dto.Options.Select(o => new Option
             {
@@ -620,6 +621,7 @@ public class LearnHubService : ILearnHubService
                 .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuestionAudio)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.ExplanationImage)
             .Include(q => q.QuizzType)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.Options)
@@ -628,6 +630,8 @@ public class LearnHubService : ILearnHubService
                 .ThenInclude(cq => cq.QuestionAudio)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.ExplanationAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.ExplanationImage)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.QuizzType)
             .AsNoTracking() // Performance optimization for read-only complex data
@@ -649,8 +653,10 @@ public class LearnHubService : ILearnHubService
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
             ParentQuizId = quiz.ParentQuizId,
             Options = quiz.Options.Select(o => new OptionDTO
@@ -675,8 +681,10 @@ public class LearnHubService : ILearnHubService
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
             ParentQuizId = quiz.ParentQuizId,
             Options = quiz.Options.Select(o => new OptionDTO

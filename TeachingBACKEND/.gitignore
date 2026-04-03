@@ -6,12 +6,27 @@
 bin/
 obj/
 
+# Publish artifacts
+publish/
+
 # Visual Studio Code settings
 .vscode/
 
 # User secrets (optional if using dotnet user-secrets)
 secrets.json
 
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Others
-.env
 appsettings.json
+.env
+**/.env
+
+# Uploaded files (runtime data, not source code)
+wwwroot/images/

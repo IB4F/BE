@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Stripe;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
 
@@ -318,8 +319,15 @@ namespace TeachingBACKEND.Controllers
                 await _subscriptionService.HandleStripeSubscriptionWebhookAsync(Request);
                 return Ok();
             }
+            catch (StripeException ex)
+            {
+                // Invalid signature or malformed event — return 400 so Stripe does NOT retry
+                _logger.LogWarning(ex, "Invalid Stripe webhook signature or event");
+                return BadRequest(new { message = "Invalid webhook." });
+            }
             catch (Exception ex)
             {
+                // Server-side error — return 500 so Stripe retries
                 _logger.LogError(ex, "Error handling Stripe webhook");
                 return StatusCode(500, new { message = "Webhook processing failed." });
             }

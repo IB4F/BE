@@ -6,6 +6,7 @@
         public string? QuestionAudioId { get; set; }
         public string Explanation { get; set; }
         public string? ExplanationAudioId { get; set; }
+        public string? ExplanationImageId { get; set; }
         public int Points { get; set; }
         public List<OptionDTO> Options { get; set; }
         public string QuizType { get; set; }
