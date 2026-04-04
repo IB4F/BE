@@ -79,9 +79,8 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
-                return BadRequest(new { error = ex.Message });
+                _logger.LogError(ex, "Error in register-student");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 
@@ -131,7 +130,8 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                _logger.LogError(ex, "Error in register-school");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 
@@ -328,8 +328,8 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-
-                return NotFound(new { error = ex.Message });
+                _logger.LogWarning(ex, "GetUserById failed for id {Id}", id);
+                return NotFound(new { message = "Utente non trovato." });
             }
         }
 

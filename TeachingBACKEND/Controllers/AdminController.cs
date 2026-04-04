@@ -41,7 +41,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFound(new { message = "Risorsa non trovata." });
             }
         }
 
@@ -56,7 +56,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
 
@@ -70,7 +70,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
     }

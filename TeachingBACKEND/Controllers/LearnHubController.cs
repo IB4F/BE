@@ -146,7 +146,7 @@ namespace TeachingBACKEND.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
 
@@ -232,7 +232,7 @@ namespace TeachingBACKEND.Api.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while checking access", error = ex.Message });
+                return StatusCode(500, new { message = "An error occurred while checking access." });
             }
         }
 

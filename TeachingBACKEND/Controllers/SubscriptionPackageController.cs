@@ -148,7 +148,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest($"Error calculating family pricing: {ex.Message}");
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
 

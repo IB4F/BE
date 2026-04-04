@@ -231,7 +231,8 @@ namespace TeachingBACKEND.Application.Services
             var accessToken = _passwordService.GenerateJwtToken(user);
             var refreshToken = _passwordService.GenerateRefreshToken();
 
-            user.RefreshToken = refreshToken;
+            // Store the hash — never the raw token
+            user.RefreshToken = _passwordService.HashRefreshToken(refreshToken);
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
 
             await _context.SaveChangesAsync();
@@ -265,8 +266,8 @@ namespace TeachingBACKEND.Application.Services
             if (user == null)
                 throw new Exception("User not found");
 
-            user.RefreshToken = Guid.Empty;
-            user.RefreshTokenExpiry = DateTime.MinValue;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
 
             await _context.SaveChangesAsync();
 

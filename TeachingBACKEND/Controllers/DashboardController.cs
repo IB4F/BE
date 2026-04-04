@@ -39,7 +39,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
 
@@ -58,7 +58,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, new { message = "Errore interno del server." });
             }
         }
     }

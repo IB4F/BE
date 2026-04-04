@@ -14,6 +14,7 @@ namespace TeachingBACKEND.Application.Interfaces
         string GenerateAccessToken(IEnumerable<Claim> claims);
         ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
         Guid GenerateRefreshToken();
+        Guid HashRefreshToken(Guid rawToken);
         string HashPassword(string password);
         bool VerifyPassword(string password, string hashed);
         Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model);

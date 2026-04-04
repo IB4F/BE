@@ -242,6 +242,14 @@ namespace TeachingBACKEND.Application.Services
             rng.GetBytes(randomBytes);
             return new Guid(randomBytes);
         }
+
+        // Store the hash in the DB — never the raw token.
+        // SHA256 is sufficient for high-entropy random tokens (no brute-force risk).
+        public Guid HashRefreshToken(Guid rawToken)
+        {
+            var hash = SHA256.HashData(rawToken.ToByteArray());
+            return new Guid(hash[..16]);
+        }
         public string HashPassword(string password)
         {
             return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
@@ -259,19 +267,21 @@ namespace TeachingBACKEND.Application.Services
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
 
+            var incomingHash = HashRefreshToken(model.RefreshToken);
+
             if (user == null
-           || user.RefreshToken != model.RefreshToken
+           || user.RefreshToken != incomingHash
            || user.RefreshTokenExpiry <= DateTime.UtcNow)
             {
                 throw new SecurityTokenException("Invalid or expired refresh token");
             }
 
-            //generate new tokens 
+            //generate new tokens
             var newAccessToken = GenerateAccessToken(principal.Claims);
             var newRefreshToken = GenerateRefreshToken();
 
-            //persist
-            user.RefreshToken = newRefreshToken;
+            //persist — store hash, never the raw token
+            user.RefreshToken = HashRefreshToken(newRefreshToken);
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 

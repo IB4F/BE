@@ -53,7 +53,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while checking access", error = ex.Message });
+                return StatusCode(500, new { message = "An error occurred while checking access"});
             }
         }
 
@@ -80,7 +80,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while fetching accessible LearnHubs", error = ex.Message });
+                return StatusCode(500, new { message = "An error occurred while fetching accessible LearnHubs"});
             }
         }
 
@@ -107,7 +107,7 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while fetching user tier", error = ex.Message });
+                return StatusCode(500, new { message = "An error occurred while fetching user tier"});
             }
         }
 

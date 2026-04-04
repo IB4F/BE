@@ -42,7 +42,7 @@ public class StudentController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return StatusCode(500, new { message = "Errore interno del server." });
         }
     }
 
@@ -71,7 +71,7 @@ public class StudentController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return StatusCode(500, new { message = "Errore interno del server." });
         }
     }
 
@@ -101,7 +101,7 @@ public class StudentController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return StatusCode(500, new { message = "Errore interno del server." });
         }
     }
 
@@ -140,7 +140,7 @@ public class StudentController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return StatusCode(500, new { message = "Errore interno del server." });
         }
     }
 
@@ -166,7 +166,7 @@ public class StudentController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return StatusCode(500, new { message = "Errore interno del server." });
         }
     }
 }
