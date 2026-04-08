@@ -471,17 +471,23 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         [HttpGet("me")]
         [SwaggerOperation(Summary = "Get Current User Details")]
-        public async Task <IActionResult> GetCurrentUser()
+        public async Task<IActionResult> GetCurrentUser()
         {
             try
             {
                 var dto = await _userService.GetUserDetails(User);
                 return Ok(dto);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "GetCurrentUser: user ID claim missing or invalid. Claims: {Claims}",
+                    string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}")));
+                return Unauthorized(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return Unauthorized(new {message = ex.Message});
-                
+                _logger.LogError(ex, "GetCurrentUser: unexpected error");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 

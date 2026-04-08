@@ -68,18 +68,55 @@ builder.Services
   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
   .AddJwtBearer(options =>
   {
+      // Force the old JwtSecurityTokenHandler path.
+      // JwtBearer 8.x defaults to JsonWebTokenHandler, but its interaction with
+      // System.IdentityModel 8.6.1 causes signature validation failures.
+      // JwtSecurityTokenHandler is consistent with how tokens are generated and
+      // with GetPrincipalFromExpiredToken in PasswordService.
+#pragma warning disable CS0618
+      options.UseSecurityTokenValidators = true;
+#pragma warning restore CS0618
+
+      var jwtSecret = builder.Configuration["JWT_SECRET_KEY"]
+          ?? throw new InvalidOperationException("JWT_SECRET_KEY is not configured.");
+
+      var validIssuer = builder.Configuration["JWT_ISSUER"];
+      var validAudience = builder.Configuration["JWT_AUDIENCE"];
+
       options.TokenValidationParameters = new TokenValidationParameters
       {
-          ValidateIssuer = true,
-          ValidIssuer = builder.Configuration["JWT_ISSUER"],
-          ValidateAudience = true,
-          ValidAudience = builder.Configuration["JWT_AUDIENCE"],
+          ValidateIssuer = !string.IsNullOrWhiteSpace(validIssuer),
+          ValidIssuer = validIssuer,
+          ValidateAudience = !string.IsNullOrWhiteSpace(validAudience),
+          ValidAudience = validAudience,
           ValidateLifetime = true,
           ValidateIssuerSigningKey = true,
-          IssuerSigningKey = new SymmetricSecurityKey(
-              Encoding.UTF8.GetBytes(builder.Configuration["JWT_SECRET_KEY"])
-          ),
+          IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
           ClockSkew = TimeSpan.Zero
+      };
+
+      options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+      {
+          OnAuthenticationFailed = ctx =>
+          {
+              var logger = ctx.HttpContext.RequestServices
+                  .GetRequiredService<ILogger<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler>>();
+              logger.LogWarning(ctx.Exception,
+                  "JWT authentication failed on {Method} {Path}: {Error}",
+                  ctx.Request.Method, ctx.Request.Path, ctx.Exception.GetType().Name);
+              return System.Threading.Tasks.Task.CompletedTask;
+          },
+          OnTokenValidated = ctx =>
+          {
+              var logger = ctx.HttpContext.RequestServices
+                  .GetRequiredService<ILogger<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler>>();
+              var nameId = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? ctx.Principal?.FindFirst("nameid")?.Value
+                        ?? ctx.Principal?.FindFirst("sub")?.Value
+                        ?? "NOT FOUND";
+              logger.LogDebug("JWT validated. NameIdentifier claim: {NameId}", nameId);
+              return System.Threading.Tasks.Task.CompletedTask;
+          }
       };
   });
 

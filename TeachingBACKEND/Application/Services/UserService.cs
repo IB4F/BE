@@ -14,7 +14,6 @@ namespace TeachingBACKEND.Application.Services
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
-        private readonly string _jwtSecret;
         private readonly INotificationService _notificationService;
         private readonly IPasswordService _passwordService;
         private readonly ILogger<UserService> _logger;
@@ -275,11 +274,15 @@ namespace TeachingBACKEND.Application.Services
         }     
         public async Task<UserDetails> GetUserDetails(ClaimsPrincipal user)
         {
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            // Support both the mapped CLR name and the raw JWT short names (nameid / sub),
+            // which can differ depending on the JwtBearer version and MapInboundClaims setting.
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? user.FindFirst("nameid")?.Value
+                           ?? user.FindFirst("sub")?.Value;
 
             if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
-                throw new Exception("Invalid or missing user ID in token.");
+                throw new UnauthorizedAccessException("Invalid or missing user ID in token.");
             }
 
             var entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);

@@ -24,7 +24,8 @@ namespace TeachingBACKEND.Application.Services
         {
             _context = context;
             _notificationService = notificationService;
-            _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+            _jwtSecret = configuration["JWT_SECRET_KEY"]
+                ?? throw new InvalidOperationException("JWT_SECRET_KEY is not configured.");
             _passwordValidation = passwordValidation;
         }
 
