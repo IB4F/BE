@@ -894,7 +894,7 @@ namespace TeachingBACKEND.Application.Services
                     {
                         Id = Guid.NewGuid(),
                         SubscriptionId = subscriptionEntity.Id,
-                        StripePaymentIntentId = invoice.Payments.Data.FirstOrDefault(p => p.Payment.PaymentIntentId != null)?.Payment.PaymentIntentId,
+                        StripePaymentIntentId = invoice.Payments?.Data?.FirstOrDefault(p => p.Payment.PaymentIntentId != null)?.Payment.PaymentIntentId,
                         StripeInvoiceId = invoice.Id,
                         Amount = invoice.AmountDue,
                         Currency = invoice.Currency,
