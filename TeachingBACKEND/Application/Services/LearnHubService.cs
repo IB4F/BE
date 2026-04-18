@@ -556,6 +556,7 @@ public class LearnHubService : ILearnHubService
             CreatedAt = DateTime.UtcNow,
             QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null,
             ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null,
+            ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null,
             ParentQuizId = parentQuizId,
             Options = dto.Options.Select(o => new Option
             {
@@ -620,6 +621,7 @@ public class LearnHubService : ILearnHubService
                 .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuestionAudio)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.ExplanationImage)
             .Include(q => q.QuizzType)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.Options)
@@ -628,6 +630,8 @@ public class LearnHubService : ILearnHubService
                 .ThenInclude(cq => cq.QuestionAudio)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.ExplanationAudio)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.ExplanationImage)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.QuizzType)
             .AsNoTracking() // Performance optimization for read-only complex data
@@ -649,8 +653,10 @@ public class LearnHubService : ILearnHubService
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
             ParentQuizId = quiz.ParentQuizId,
             Options = quiz.Options.Select(o => new OptionDTO
@@ -675,8 +681,10 @@ public class LearnHubService : ILearnHubService
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
             ParentQuizId = quiz.ParentQuizId,
             Options = quiz.Options.Select(o => new OptionDTO
@@ -739,6 +747,7 @@ public class LearnHubService : ILearnHubService
         // Store old file IDs for cleanup
         var oldQuestionAudioId = quizz.QuestionAudioId;
         var oldExplanationAudioId = quizz.ExplanationAudioId;
+        var oldExplanationImageId = quizz.ExplanationImageId;
         var oldOptionImageIds = quizz.Options
             .Where(o => o.OptionImageId.HasValue)
             .Select(o => o.OptionImageId.Value)
@@ -750,6 +759,7 @@ public class LearnHubService : ILearnHubService
         quizz.QuizzTypeId = quizTypeId;
         quizz.QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null;
         quizz.ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null;
+        quizz.ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null;
         quizz.ParentQuizId = parentQuizId;
 
         // Remove old options
@@ -766,12 +776,12 @@ public class LearnHubService : ILearnHubService
         await _context.SaveChangesAsync();
 
         // Clean up old files that are no longer referenced
-        await CleanupUnusedFiles(oldQuestionAudioId, oldExplanationAudioId, oldOptionImageIds, dto);
+        await CleanupUnusedFiles(oldQuestionAudioId, oldExplanationAudioId, oldExplanationImageId, oldOptionImageIds, dto);
 
         return quizz;
     }
 
-    private async Task CleanupUnusedFiles(Guid? oldQuestionAudioId, Guid? oldExplanationAudioId, List<Guid> oldOptionImageIds, CreateQuizzDTO newDto)
+    private async Task CleanupUnusedFiles(Guid? oldQuestionAudioId, Guid? oldExplanationAudioId, Guid? oldExplanationImageId, List<Guid> oldOptionImageIds, CreateQuizzDTO newDto)
     {
         var filesToDelete = new List<Guid>();
 
@@ -783,10 +793,17 @@ public class LearnHubService : ILearnHubService
         }
 
         // Check if explanation audio was replaced
-        if (oldExplanationAudioId.HasValue && 
+        if (oldExplanationAudioId.HasValue &&
             (string.IsNullOrEmpty(newDto.ExplanationAudioId) || Guid.Parse(newDto.ExplanationAudioId) != oldExplanationAudioId.Value))
         {
             filesToDelete.Add(oldExplanationAudioId.Value);
+        }
+
+        // Check if explanation image was replaced
+        if (oldExplanationImageId.HasValue &&
+            (string.IsNullOrEmpty(newDto.ExplanationImageId) || Guid.Parse(newDto.ExplanationImageId) != oldExplanationImageId.Value))
+        {
+            filesToDelete.Add(oldExplanationImageId.Value);
         }
 
         // Check option images that were replaced
@@ -835,10 +852,13 @@ public class LearnHubService : ILearnHubService
         // Collect files from parent quiz
         if (quizz.QuestionAudioId.HasValue)
             filesToDelete.Add(quizz.QuestionAudioId.Value);
-            
+
         if (quizz.ExplanationAudioId.HasValue)
             filesToDelete.Add(quizz.ExplanationAudioId.Value);
-            
+
+        if (quizz.ExplanationImageId.HasValue)
+            filesToDelete.Add(quizz.ExplanationImageId.Value);
+
         foreach (var option in quizz.Options)
         {
             if (option.OptionImageId.HasValue)
@@ -850,10 +870,13 @@ public class LearnHubService : ILearnHubService
         {
             if (childQuiz.QuestionAudioId.HasValue)
                 filesToDelete.Add(childQuiz.QuestionAudioId.Value);
-                
+
             if (childQuiz.ExplanationAudioId.HasValue)
                 filesToDelete.Add(childQuiz.ExplanationAudioId.Value);
-                
+
+            if (childQuiz.ExplanationImageId.HasValue)
+                filesToDelete.Add(childQuiz.ExplanationImageId.Value);
+
             foreach (var option in childQuiz.Options)
             {
                 if (option.OptionImageId.HasValue)

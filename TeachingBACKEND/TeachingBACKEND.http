@@ -1,6 +1,69 @@
-@TeachingBACKEND_HostAddress = http://localhost:5002
+# Dashboard API Tests
 
-GET {{TeachingBACKEND_HostAddress}}/weatherforecast/
-Accept: application/json
+### Get Student Dashboard (requires authentication)
+GET https://localhost:7000/api/Dashboard/student
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
-###
+### Get Student Dashboard by ID (admin/teacher access)
+GET https://localhost:7000/api/Dashboard/student/{{studentId}}
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+### Example with actual student ID (replace with real ID)
+GET https://localhost:7000/api/Dashboard/student/12345678-1234-1234-1234-123456789012
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+### Test with a real token (replace YOUR_JWT_TOKEN_HERE with actual token)
+GET https://localhost:7000/api/Dashboard/student
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODkwMTIiLCJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJyb2xlIjoiU3R1ZGVudCIsIm5hbWUiOiJUZXN0IFVzZXIiLCJleHAiOjE3MDQwNzM2MDAsImlhdCI6MTcwNDA3MDAwMH0.example_signature
+
+# Password Reset API Tests
+
+### Request password reset for regular email (should send email to user)
+POST https://localhost:7000/api/Auth/request-reset
+Content-Type: application/json
+
+{
+  "email": "student@example.com"
+}
+
+### Request password reset for @bga.al email (should notify supervisor)
+POST https://localhost:7000/api/Auth/request-reset
+Content-Type: application/json
+
+{
+  "email": "john.doe@bga.al"
+}
+
+### Reset password with token (works for both regular and @bga.al emails)
+POST https://localhost:7000/api/Auth/reset
+Content-Type: application/json
+
+{
+  "token": "YOUR_RESET_TOKEN_HERE",
+  "newPassword": "NewSecurePassword123!"
+}
+
+# Supervisor Dashboard Tests
+
+### Get supervisor dashboard (should show pending password reset requests)
+GET https://localhost:7000/api/Supervisor/dashboard
+Authorization: Bearer YOUR_SUPERVISOR_JWT_TOKEN_HERE
+
+### Get pending password reset requests for supervisor
+GET https://localhost:7000/api/Supervisor/password-reset-requests
+Authorization: Bearer YOUR_SUPERVISOR_JWT_TOKEN_HERE
+
+
+### Handle password reset request (supervisor action - auto-generate one-time password)
+POST https://localhost:7000/api/Supervisor/students/4ef3c745-c3ad-4941-8b9e-1c235e1c0b2c/password-reset
+Authorization: Bearer YOUR_SUPERVISOR_JWT_TOKEN_HERE
+Content-Type: application/json
+
+true
+
+### Reject password reset request (supervisor action)
+POST https://localhost:7000/api/Supervisor/students/4ef3c745-c3ad-4941-8b9e-1c235e1c0b2c/password-reset
+Authorization: Bearer YOUR_SUPERVISOR_JWT_TOKEN_HERE
+Content-Type: application/json
+
+false

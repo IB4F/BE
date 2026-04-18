@@ -10,8 +10,10 @@ namespace TeachingBACKEND.Domain.DTOs.Quizzes
         public bool IsAnswered { get; set; }
         public string? QuestionAudioId { get; set; }
         public string? ExplanationAudioId { get; set; }
+        public string? ExplanationImageId { get; set; }
         public string? QuestionAudioUrl { get; set; }
         public string? ExplanationAudioUrl { get; set; }
+        public string? ExplanationImageUrl { get; set; }
         public string QuizType { get; set; }
         public Guid? ParentQuizId { get; set; }
         // No ChildQuizzes property - child quizzes don't have children

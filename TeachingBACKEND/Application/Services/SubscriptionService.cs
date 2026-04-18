@@ -68,7 +68,7 @@ namespace TeachingBACKEND.Application.Services
 
                 // Create Stripe checkout session for subscription
                 _logger.LogInformation("Configuring Stripe API key");
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
 
                 var subscriptionData = new SessionSubscriptionDataOptions
                 {
@@ -199,7 +199,7 @@ namespace TeachingBACKEND.Application.Services
 
                 // Create Stripe checkout session for subscription
                 _logger.LogInformation("Configuring Stripe API key");
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
 
                 var subscriptionData = new SessionSubscriptionDataOptions
                 {
@@ -320,24 +320,19 @@ namespace TeachingBACKEND.Application.Services
                     return false;
                 }
 
-                // Cancel in Stripe - always end of period
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+                // Cancel at period end in Stripe — user keeps access until the billing period ends
                 var stripeService = new Stripe.SubscriptionService();
-                
-                var cancelOptions = new SubscriptionCancelOptions
+
+                var updateOptions = new SubscriptionUpdateOptions
                 {
-                    // Always preserve user access until end of subscription period
-                    // This ensures users get full value from their subscription payment
-                    Prorate = false, // No immediate refund
-                    InvoiceNow = false // Keep subscription active until period ends
+                    CancelAtPeriodEnd = true
                 };
 
-                await stripeService.CancelAsync(subscription.StripeSubscriptionId, cancelOptions);
+                await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
 
-                // Always end-of-period cancellation - user keeps access until subscription period ends
-                // This ensures users get the full value of their subscription payment
-                subscription.Status = SubscriptionStatus.Active; // Keep Active until period ends
-                subscription.CancelAtPeriodEnd = true; // Mark that it will be cancelled when period ends
+                // Keep Active locally — access remains until period ends, webhook will set Canceled
+                subscription.Status = SubscriptionStatus.Active;
+                subscription.CancelAtPeriodEnd = true;
                 subscription.CanceledAt = null; // Will be set when period actually ends via webhook
                 
                 subscription.UpdatedAt = DateTime.UtcNow;
@@ -366,7 +361,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Pause in Stripe
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var updateOptions = new SubscriptionUpdateOptions
@@ -408,7 +403,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Resume in Stripe
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var updateOptions = new SubscriptionUpdateOptions
@@ -501,7 +496,7 @@ namespace TeachingBACKEND.Application.Services
                 }
 
                 // Get current Stripe subscription to find correct subscription item ID
-                StripeConfiguration.ApiKey = _configuration["STRIPE_SECRET_KEY"];
+
                 var stripeService = new Stripe.SubscriptionService();
                 
                 var currentSubscription = await stripeService.GetAsync(subscription.StripeSubscriptionId);
@@ -675,7 +670,16 @@ namespace TeachingBACKEND.Application.Services
             try
             {
                 _logger.LogInformation("Processing subscription created webhook for subscription: {SubscriptionId}", subscription.Id);
-                
+
+                // Idempotency check — Stripe can retry webhooks, avoid duplicate user/subscription creation
+                var alreadyExists = await _context.Subscriptions
+                    .AnyAsync(s => s.StripeSubscriptionId == subscription.Id);
+                if (alreadyExists)
+                {
+                    _logger.LogInformation("Subscription already processed, skipping: {SubscriptionId}", subscription.Id);
+                    return;
+                }
+
                 // Get metadata
                 var registrationType = subscription.Metadata.GetValueOrDefault("registration_type");
                 var registrationData = subscription.Metadata.GetValueOrDefault("registration_data");
@@ -828,8 +832,12 @@ namespace TeachingBACKEND.Application.Services
 
             try
             {
+                var stripeSubscriptionId = invoice.Parent?.SubscriptionDetails?.SubscriptionId;
+
+                if (string.IsNullOrEmpty(stripeSubscriptionId)) return;
+
                 var subscriptionEntity = await _context.Subscriptions
-                    .FirstOrDefaultAsync(s => s.StripeSubscriptionId == invoice.Parent.SubscriptionDetails.SubscriptionId);
+                    .FirstOrDefaultAsync(s => s.StripeSubscriptionId == stripeSubscriptionId);
 
                 if (subscriptionEntity != null)
                 {
@@ -838,7 +846,7 @@ namespace TeachingBACKEND.Application.Services
                     {
                         Id = Guid.NewGuid(),
                         SubscriptionId = subscriptionEntity.Id,
-                        StripePaymentIntentId = invoice.Payments.Data.FirstOrDefault(p => p.Payment.PaymentIntentId != null).Payment.PaymentIntentId,
+                        StripePaymentIntentId = invoice.Payments?.Data?.FirstOrDefault(p => p.Payment.PaymentIntentId != null)?.Payment.PaymentIntentId,
                         StripeInvoiceId = invoice.Id,
                         Amount = invoice.AmountPaid,
                         Currency = invoice.Currency,
@@ -868,17 +876,25 @@ namespace TeachingBACKEND.Application.Services
 
             try
             {
+                var stripeSubscriptionId = invoice.Parent?.SubscriptionDetails?.SubscriptionId;
+
+                if (string.IsNullOrEmpty(stripeSubscriptionId)) return;
+
                 var subscriptionEntity = await _context.Subscriptions
-                    .FirstOrDefaultAsync(s => s.StripeSubscriptionId == invoice.Parent.SubscriptionDetails.SubscriptionId);
+                    .FirstOrDefaultAsync(s => s.StripeSubscriptionId == stripeSubscriptionId);
 
                 if (subscriptionEntity != null)
                 {
+                    // Mark subscription as past due — Stripe will retry payment automatically
+                    subscriptionEntity.Status = SubscriptionStatus.PastDue;
+                    subscriptionEntity.UpdatedAt = DateTime.UtcNow;
+
                     // Create subscription payment record
                     var payment = new SubscriptionPayment
                     {
                         Id = Guid.NewGuid(),
                         SubscriptionId = subscriptionEntity.Id,
-                        StripePaymentIntentId = invoice.Payments.Data.FirstOrDefault(p => p.Payment.PaymentIntentId != null).Payment.PaymentIntentId,
+                        StripePaymentIntentId = invoice.Payments?.Data?.FirstOrDefault(p => p.Payment.PaymentIntentId != null)?.Payment.PaymentIntentId,
                         StripeInvoiceId = invoice.Id,
                         Amount = invoice.AmountDue,
                         Currency = invoice.Currency,
@@ -892,7 +908,7 @@ namespace TeachingBACKEND.Application.Services
                     _context.SubscriptionPayments.Add(payment);
                     await _context.SaveChangesAsync();
 
-                    _logger.LogInformation("Recorded failed payment for subscription: {SubscriptionId}", subscriptionEntity.Id);
+                    _logger.LogInformation("Recorded failed payment and set PastDue for subscription: {SubscriptionId}", subscriptionEntity.Id);
                 }
             }
             catch (Exception ex)
@@ -1281,7 +1297,10 @@ namespace TeachingBACKEND.Application.Services
             if (payment != null)
             {
                 payment.Status = "succeeded";
-                payment.StripePaymentIntentId = session.PaymentIntentId;
+                // For subscription checkout sessions, PaymentIntentId is null on the session —
+                // the actual payment intent is on the invoice (recorded via invoice.payment_succeeded).
+                if (!string.IsNullOrEmpty(session.PaymentIntentId))
+                    payment.StripePaymentIntentId = session.PaymentIntentId;
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Updated payment status to succeeded for session: {SessionId}", session.Id);
             }

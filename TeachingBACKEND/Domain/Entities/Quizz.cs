@@ -16,6 +16,8 @@
         public UploadedFile QuestionAudio { get; set; }
         public Guid? ExplanationAudioId { get; set; }
         public UploadedFile ExplanationAudio { get; set; }
+        public Guid? ExplanationImageId { get; set; }
+        public UploadedFile ExplanationImage { get; set; }
         
         // Parent-Child relationship properties
         public Guid? ParentQuizId { get; set; }

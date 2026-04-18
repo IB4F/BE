@@ -12,6 +12,9 @@ using static TeachingBACKEND.Application.Services.PasswordValidationService;
 using TeachingBACKEND.Infrastructure;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using TeachingBACKEND.Middleware;
 
 Env.Load();
 
@@ -55,36 +58,124 @@ builder.Services.AddSwaggerGen(c =>
 
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .EnableSensitiveDataLogging());
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    if (builder.Environment.IsDevelopment())
+        options.EnableSensitiveDataLogging();
+});
 
 builder.Services
   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
   .AddJwtBearer(options =>
   {
+      // Force the old JwtSecurityTokenHandler path.
+      // JwtBearer 8.x defaults to JsonWebTokenHandler, but its interaction with
+      // System.IdentityModel 8.6.1 causes signature validation failures.
+      // JwtSecurityTokenHandler is consistent with how tokens are generated and
+      // with GetPrincipalFromExpiredToken in PasswordService.
+#pragma warning disable CS0618
+      options.UseSecurityTokenValidators = true;
+#pragma warning restore CS0618
+
+      var jwtSecret = builder.Configuration["JWT_SECRET_KEY"]
+          ?? throw new InvalidOperationException("JWT_SECRET_KEY is not configured.");
+
+      var validIssuer = builder.Configuration["JWT_ISSUER"];
+      var validAudience = builder.Configuration["JWT_AUDIENCE"];
+
       options.TokenValidationParameters = new TokenValidationParameters
       {
-          ValidateIssuer = false,
-          ValidateAudience = false,
+          ValidateIssuer = !string.IsNullOrWhiteSpace(validIssuer),
+          ValidIssuer = validIssuer,
+          ValidateAudience = !string.IsNullOrWhiteSpace(validAudience),
+          ValidAudience = validAudience,
           ValidateLifetime = true,
           ValidateIssuerSigningKey = true,
-          IssuerSigningKey = new SymmetricSecurityKey(
-              Encoding.ASCII.GetBytes(builder.Configuration["JWT_SECRET_KEY"])
-          ),
+          IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
           ClockSkew = TimeSpan.Zero
+      };
+
+      options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+      {
+          OnAuthenticationFailed = ctx =>
+          {
+              var logger = ctx.HttpContext.RequestServices
+                  .GetRequiredService<ILogger<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler>>();
+              logger.LogWarning(ctx.Exception,
+                  "JWT authentication failed on {Method} {Path}: {Error}",
+                  ctx.Request.Method, ctx.Request.Path, ctx.Exception.GetType().Name);
+              return System.Threading.Tasks.Task.CompletedTask;
+          },
+          OnTokenValidated = ctx =>
+          {
+              var logger = ctx.HttpContext.RequestServices
+                  .GetRequiredService<ILogger<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler>>();
+              var nameId = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? ctx.Principal?.FindFirst("nameid")?.Value
+                        ?? ctx.Principal?.FindFirst("sub")?.Value
+                        ?? "NOT FOUND";
+              logger.LogDebug("JWT validated. NameIdentifier claim: {NameId}", nameId);
+              return System.Threading.Tasks.Task.CompletedTask;
+          }
       };
   });
 
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+            .WithOrigins(
+                "https://app.braingainalbania.al",
+                "https://braingainalbania.al",
+                "http://localhost:4200"
+            )
+            .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .AllowAnyHeader()
+            .AllowCredentials();
     });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    // POST /api/auth/login — max 5 per minute per IP
+    options.AddPolicy("login_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // POST /api/auth/request-reset — max 3 per 15 min per IP
+    options.AddPolicy("reset_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(15),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // POST /api/auth/resend-verification — max 3 per 15 min per IP
+    options.AddPolicy("verify_limit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(15),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 builder.Services.AddHttpContextAccessor(); // Add this for URL generation
@@ -133,9 +224,25 @@ builder.Host.UseSerilog();
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 app.UseHttpsRedirection();
+
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (!app.Environment.IsDevelopment())
+        context.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    await next();
+});
+
 app.UseStaticFiles();
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

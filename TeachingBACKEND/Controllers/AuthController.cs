@@ -21,14 +21,16 @@ namespace TeachingBACKEND.Controllers
         private readonly ISubscriptionService _subscriptionService;
         private readonly ApplicationDbContext _context;
         private readonly IPasswordService _passwordService;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IUserService userService, ISubscriptionService subscriptionService, ApplicationDbContext context, IPasswordService passwordService, ILogger<AuthController> logger)
+        public AuthController(IUserService userService, ISubscriptionService subscriptionService, ApplicationDbContext context, IPasswordService passwordService, INotificationService notificationService, ILogger<AuthController> logger)
         {
             _userService = userService;
             _subscriptionService = subscriptionService;
             _context = context;
             _passwordService = passwordService;
+            _notificationService = notificationService;
             _logger = logger;
         }
 
@@ -77,9 +79,8 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
-                return BadRequest(new { error = ex.Message });
+                _logger.LogError(ex, "Error in register-student");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 
@@ -129,7 +130,8 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                _logger.LogError(ex, "Error in register-school");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 
@@ -260,18 +262,7 @@ namespace TeachingBACKEND.Controllers
                     ex.InnerException?.Message ?? "None",
                     ex.StackTrace);
                 
-                // Return more detailed error information
-                var errorMessage = ex.Message;
-                if (ex.InnerException != null)
-                {
-                    errorMessage += $" Inner Exception: {ex.InnerException.Message}";
-                }
-                
-                return BadRequest(new { 
-                    message = "An error occurred while saving the entity changes. See the inner exception for details.",
-                    details = errorMessage,
-                    stackTrace = ex.StackTrace
-                }); 
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
         
@@ -305,6 +296,7 @@ namespace TeachingBACKEND.Controllers
 
         [AllowAnonymous]
         [HttpPost("login")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login_limit")]
         public async Task<IActionResult> Login([FromBody] LoginDTO model)
         {
             try
@@ -324,6 +316,7 @@ namespace TeachingBACKEND.Controllers
         }
 
 
+        [Authorize]
         [HttpGet("{id}")]
         [SwaggerOperation(Summary = "Get user by ID")]
         public async Task<IActionResult> GetUserById(Guid id)
@@ -335,43 +328,50 @@ namespace TeachingBACKEND.Controllers
             }
             catch (Exception ex)
             {
-
-                return NotFound(new { error = ex.Message });
+                _logger.LogWarning(ex, "GetUserById failed for id {Id}", id);
+                return NotFound(new { message = "Utente non trovato." });
             }
         }
 
+        [Authorize]
         [HttpPut("{id}")]
         [SwaggerOperation(Summary = "Update user by ID")]
-        public async Task<IActionResult> UpdateUser(Guid id, [FromBody] User updatedUser)
+        public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDTO dto)
         {
+            var loggedUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var isAdmin = User.IsInRole("Admin");
+
+            if (id != loggedUserId && !isAdmin)
+                return Forbid();
+
             try
             {
                 var user = await _userService.GetUserById(id);
-                if (user == null)
-                {
-                    return NotFound(new { error = "User not found" });
-                }
 
-                user.FirstName = updatedUser.FirstName;
-                user.LastName = updatedUser.LastName;
-                user.School = updatedUser.School;
-                user.City = updatedUser.City;
-                user.PhoneNumber = updatedUser.PhoneNumber;
-                user.Profession = updatedUser.Profession;
-                user.CurrentClass = updatedUser.CurrentClass;
+                if (!string.IsNullOrWhiteSpace(dto.FirstName)) user.FirstName = dto.FirstName;
+                if (!string.IsNullOrWhiteSpace(dto.LastName)) user.LastName = dto.LastName;
+                if (dto.PhoneNumber != null) user.PhoneNumber = dto.PhoneNumber;
+                if (dto.School != null) user.School = dto.School;
+                if (dto.City != null) user.City = dto.City;
+                if (dto.PostalCode != null) user.PostalCode = dto.PostalCode;
+                if (dto.Profession != null) user.Profession = dto.Profession;
+                if (dto.CurrentClass != null) user.CurrentClass = dto.CurrentClass;
+                if (dto.DateOfBirth.HasValue) user.DateOfBirth = dto.DateOfBirth;
 
                 await _userService.UpdateUser(user);
                 return Ok(new { message = "User updated successfully" });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                _logger.LogError(ex, "Error updating user {UserId}", id);
+                return BadRequest(new { message = "Si è verificato un errore durante l'aggiornamento." });
             }
         }
 
 
         //Request password reset(step 1)
         [HttpPost("request-reset")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("reset_limit")]
         [SwaggerOperation(Summary = "Request Password Reset Step 1")]
         public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordDTO model)
         {
@@ -399,6 +399,7 @@ namespace TeachingBACKEND.Controllers
 
 
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("schools/set-password")]
         public async Task<IActionResult> SetSchoolPassword([FromBody] SetPasswordDTO model)
         {
@@ -470,17 +471,23 @@ namespace TeachingBACKEND.Controllers
         [Authorize]
         [HttpGet("me")]
         [SwaggerOperation(Summary = "Get Current User Details")]
-        public async Task <IActionResult> GetCurrentUser()
+        public async Task<IActionResult> GetCurrentUser()
         {
             try
             {
                 var dto = await _userService.GetUserDetails(User);
                 return Ok(dto);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "GetCurrentUser: user ID claim missing or invalid. Claims: {Claims}",
+                    string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}")));
+                return Unauthorized(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return Unauthorized(new {message = ex.Message});
-                
+                _logger.LogError(ex, "GetCurrentUser: unexpected error");
+                return StatusCode(500, new { message = "Si è verificato un errore interno. Riprova più tardi." });
             }
         }
 
@@ -498,20 +505,28 @@ namespace TeachingBACKEND.Controllers
 
         [AllowAnonymous]
         [HttpPost("resend-verification")]
-        public async Task<IActionResult> ResendVerification([FromBody] string email)
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("verify_limit")]
+        public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationDTO dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
-            if (user == null)
-                return NotFound(new { message = "User not found." });
+            // Generic response to prevent user enumeration
+            const string genericResponse = "Se l'email è registrata e non ancora verificata, riceverai un nuovo link di verifica.";
 
-            if (user.IsEmailVerified)
-                return BadRequest(new { message = "Email is already verified." });
+            if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
+                return Ok(new { message = genericResponse });
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+
+            if (user == null || user.IsEmailVerified)
+                return Ok(new { message = genericResponse });
 
             var newToken = _passwordService.GenerateVerificationToken();
             user.EmailVerificationToken = newToken;
+            user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Verification resent" });
+            await _notificationService.SendEmailVerification(user.Email, newToken, "email-verification");
+
+            return Ok(new { message = genericResponse });
         }
     }
 }
