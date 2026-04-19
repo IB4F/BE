@@ -4,6 +4,7 @@ using Stripe;
 using System.Security.Claims;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Domain.DTOs;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Controllers
 {
@@ -30,7 +31,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
-        /// Create a new subscription
+        /// Create a new subscription. Set "provider" to: Stripe, Novalnet, Paddle, BKT, or Raiffeisen.
         /// </summary>
         [Authorize]
         [HttpPost("create")]
@@ -38,14 +39,8 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                var sessionId = await _subscriptionService.CreateSubscriptionAsync(dto);
-
-                return Ok(new
-                {
-                    message = "Subscription initiated. Please complete payment to start your subscription.",
-                    sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}"
-                });
+                var result = await _subscriptionService.CreateSubscriptionAsync(dto);
+                return Ok(BuildCheckoutResponse(result));
             }
             catch (ArgumentException ex)
             {
@@ -59,7 +54,7 @@ namespace TeachingBACKEND.Controllers
         }
 
         /// <summary>
-        /// Create a subscription for an approved supervisor application
+        /// Create a subscription for an approved supervisor application.
         /// </summary>
         [Authorize]
         [HttpPost("create-supervisor")]
@@ -67,14 +62,8 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                var sessionId = await _subscriptionService.CreateSupervisorSubscriptionAsync(dto);
-
-                return Ok(new
-                {
-                    message = "Subscription initiated. Please complete payment to start your subscription.",
-                    sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}"
-                });
+                var result = await _subscriptionService.CreateSupervisorSubscriptionAsync(dto);
+                return Ok(BuildCheckoutResponse(result));
             }
             catch (ArgumentException ex)
             {
@@ -85,6 +74,30 @@ namespace TeachingBACKEND.Controllers
                 _logger.LogError(ex, "Error creating supervisor subscription");
                 return StatusCode(500, new { message = "An error occurred while creating the subscription." });
             }
+        }
+
+        private static object BuildCheckoutResponse(PaymentSessionResult result)
+        {
+            if (result.IsManual)
+            {
+                return new
+                {
+                    message = "Subscription initiated. Please complete the bank transfer to activate your account.",
+                    provider = result.Provider.ToString(),
+                    isManual = true,
+                    sessionId = result.SessionId,
+                    manualDetails = result.ManualDetails
+                };
+            }
+
+            return new
+            {
+                message = "Subscription initiated. Please complete payment to start your subscription.",
+                provider = result.Provider.ToString(),
+                isManual = false,
+                sessionId = result.SessionId,
+                checkoutUrl = result.CheckoutUrl
+            };
         }
 
         /// <summary>
@@ -388,15 +401,124 @@ namespace TeachingBACKEND.Controllers
             }
             catch (StripeException ex)
             {
-                // Invalid signature or malformed event — return 400 so Stripe does NOT retry
                 _logger.LogWarning(ex, "Invalid Stripe webhook signature or event");
                 return BadRequest(new { message = "Invalid webhook." });
             }
             catch (Exception ex)
             {
-                // Server-side error — return 500 so Stripe retries
                 _logger.LogError(ex, "Error handling Stripe webhook");
                 return StatusCode(500, new { message = "Webhook processing failed." });
+            }
+        }
+
+        /// <summary>
+        /// Handle Novalnet webhook events
+        /// </summary>
+        [HttpPost("webhook/novalnet")]
+        public async Task<IActionResult> HandleNovalnetWebhook()
+        {
+            try
+            {
+                await _subscriptionService.HandleNovalnetWebhookAsync(Request);
+                return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Invalid Novalnet webhook signature");
+                return BadRequest(new { message = "Invalid webhook." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling Novalnet webhook");
+                return StatusCode(500, new { message = "Webhook processing failed." });
+            }
+        }
+
+        /// <summary>
+        /// Handle Paddle webhook events
+        /// </summary>
+        [HttpPost("webhook/paddle")]
+        public async Task<IActionResult> HandlePaddleWebhook()
+        {
+            try
+            {
+                await _subscriptionService.HandlePaddleWebhookAsync(Request);
+                return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Invalid Paddle webhook signature");
+                return BadRequest(new { message = "Invalid webhook." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling Paddle webhook");
+                return StatusCode(500, new { message = "Webhook processing failed." });
+            }
+        }
+
+        /// <summary>
+        /// Admin: confirm a manual bank transfer payment (BKT / Raiffeisen).
+        /// </summary>
+        [HttpPost("manual/confirm/{paymentReference}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ConfirmManualPayment(string paymentReference)
+        {
+            var (adminId, _) = GetCallerInfo();
+            try
+            {
+                var success = await _subscriptionService.ConfirmManualPaymentAsync(paymentReference, adminId);
+                if (success)
+                    return Ok(new { message = "Manual payment confirmed. Subscription activated." });
+
+                return BadRequest(new { message = "Payment reference not found or already confirmed." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error confirming manual payment: {Reference}", paymentReference);
+                return StatusCode(500, new { message = "An error occurred while confirming the payment." });
+            }
+        }
+
+        /// <summary>
+        /// Admin: send payment reminder for a pending manual bank transfer.
+        /// </summary>
+        [HttpPost("manual/remind/{paymentReference}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> SendManualPaymentReminder(string paymentReference)
+        {
+            try
+            {
+                await _subscriptionService.SendManualPaymentReminderAsync(paymentReference);
+                return Ok(new { message = "Reminder email sent." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending manual payment reminder: {Reference}", paymentReference);
+                return StatusCode(500, new { message = "An error occurred while sending the reminder." });
+            }
+        }
+
+        /// <summary>
+        /// Check if user's subscription is active
+        /// </summary>
+        [HttpGet("is-active/{userId}")]
+        [Authorize]
+        public async Task<IActionResult> IsSubscriptionActive(Guid userId)
+        {
+            var (loggedUserId, isAdmin) = GetCallerInfo();
+            if (userId != loggedUserId && !isAdmin)
+                return Forbid();
+
+            try
+            {
+                var isActive = await _subscriptionService.IsUserSubscriptionActiveAsync(userId);
+                return Ok(new { isActive });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking subscription status: {UserId}", userId);
+                return StatusCode(500, new { message = "An error occurred." });
             }
         }
     }

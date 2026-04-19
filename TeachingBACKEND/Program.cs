@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TeachingBACKEND.Application.Interfaces;
 using TeachingBACKEND.Application.Services;
+using TeachingBACKEND.Application.Services.Providers;
+using TeachingBACKEND.Domain.Enums;
 using TeachingBACKEND.Data;
 using Serilog;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -183,6 +185,30 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<StripePaymentProvider>();
+builder.Services.AddScoped<NovalnetPaymentProvider>();
+builder.Services.AddScoped<PaddlePaymentProvider>();
+builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
+builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<NovalnetPaymentProvider>());
+builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PaddlePaymentProvider>());
+builder.Services.AddScoped<IPaymentProvider>(_ =>
+{
+    var cfg = _.GetRequiredService<IConfiguration>();
+    var email = _.GetRequiredService<IEmailService>();
+    var logger = _.GetRequiredService<ILogger<ManualPaymentProvider>>();
+    return new ManualPaymentProvider(cfg, email, logger, PaymentProvider.BKT);
+});
+builder.Services.AddScoped<IPaymentProvider>(_ =>
+{
+    var cfg = _.GetRequiredService<IConfiguration>();
+    var email = _.GetRequiredService<IEmailService>();
+    var logger = _.GetRequiredService<ILogger<ManualPaymentProvider>>();
+    return new ManualPaymentProvider(cfg, email, logger, PaymentProvider.Raiffeisen);
+});
+builder.Services.AddScoped<PaymentProviderFactory>();
+builder.Services.AddHttpClient("Novalnet");
+builder.Services.AddHttpClient("Paddle");
 builder.Services.AddScoped<IDetailsService, DetailsService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ILearnHubService, LearnHubService>();

@@ -26,8 +26,12 @@ namespace TeachingBACKEND.Domain.Entities
         public int? MaxFamilyMembers { get; set; }          // Package limit
         
         // Stripe Integration
-        public string StripeMonthlyPriceId { get; set; }
-        public string StripeYearlyPriceId { get; set; }
+        public string? StripeMonthlyPriceId { get; set; }
+        public string? StripeYearlyPriceId { get; set; }
+
+        // Paddle Integration
+        public string? PaddleMonthlyPriceId { get; set; }
+        public string? PaddleYearlyPriceId { get; set; }
         
         // Package Settings
         public int MaxUsers { get; set; }                   // User limit
