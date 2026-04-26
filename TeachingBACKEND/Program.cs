@@ -276,8 +276,8 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStaticFiles();
 app.UseCors("AllowFrontend");
+app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
