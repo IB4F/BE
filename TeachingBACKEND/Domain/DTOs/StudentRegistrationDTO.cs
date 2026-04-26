@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Domain.DTOs
 {
@@ -37,5 +38,7 @@ namespace TeachingBACKEND.Domain.DTOs
 
 
         public Guid SubscriptionPackageId { get; set; }
+
+        public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
     }
 }

@@ -66,14 +66,15 @@ namespace TeachingBACKEND.Controllers
                     RegistrationType = "student",
                     SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
-                    BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
+                    BillingInterval = BillingInterval.Month,
+                    Provider = model.Provider
                 };
 
                 var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
-                return Ok(new { 
-                    message = "Student subscription initiated. Please complete payment to start your subscription.", 
+                return Ok(new {
+                    message = "Student subscription initiated. Please complete payment to start your subscription.",
                     sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    paymentUrl = sessionId.CheckoutUrl,
                     packageName = package.Name
                 });
             }
@@ -116,14 +117,15 @@ namespace TeachingBACKEND.Controllers
                     RegistrationType = "school",
                     SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
-                    BillingInterval = BillingInterval.Month // Default to monthly, can be made configurable
+                    BillingInterval = BillingInterval.Month,
+                    Provider = model.Provider
                 };
 
                 var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
                 return Ok(new {
                     message = "School subscription initiated. Please complete payment to start your subscription.",
                     sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    paymentUrl = sessionId.CheckoutUrl,
                     note = "After payment, school and students will be created. Each student will receive a randomly generated password via email.",
                     packageName = package.Name
                 });
@@ -229,20 +231,21 @@ namespace TeachingBACKEND.Controllers
                     RegistrationType = "family",
                     SubscriptionPackageId = model.SubscriptionPackageId,
                     RegistrationData = JsonSerializer.Serialize(model),
-                    BillingInterval = BillingInterval.Month, // Default to monthly, can be made configurable
-                    FamilyMemberCount = totalFamilyMembers
+                    BillingInterval = BillingInterval.Month,
+                    FamilyMemberCount = totalFamilyMembers,
+                    Provider = model.Provider
                 };
 
                 _logger.LogInformation("Calling CreateSubscriptionAsync for family registration");
 
                 var sessionId = await _subscriptionService.CreateSubscriptionAsync(subscriptionRequest);
-                
+
                 _logger.LogInformation("Family registration initiated successfully. Session ID: {SessionId}", sessionId);
-                
+
                 return Ok(new {
                     message = "Family subscription initiated. Please complete payment to start your subscription.",
                     sessionId = sessionId,
-                    paymentUrl = $"https://checkout.stripe.com/pay/{sessionId}", // Frontend should redirect to this
+                    paymentUrl = sessionId.CheckoutUrl,
                     note = "After payment, family members will be created and verification email will be sent.",
                     familyMemberCount = totalFamilyMembers,
                     packageName = package.Name

@@ -7,5 +7,6 @@ namespace TeachingBACKEND.Domain.DTOs
         public Guid SupervisorApplicationId { get; set; }
         public Guid SubscriptionPackageId { get; set; }
         public BillingInterval BillingInterval { get; set; }
+        public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
     }
 }

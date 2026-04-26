@@ -3,6 +3,7 @@ using Stripe;
 using Stripe.Checkout;
 using System.Text.Json;
 using TeachingBACKEND.Application.Interfaces;
+using TeachingBACKEND.Application.Services.Providers;
 using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
@@ -16,6 +17,10 @@ namespace TeachingBACKEND.Application.Services
         private readonly IConfiguration _configuration;
         private readonly IPasswordService _passwordService;
         private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly PaymentProviderFactory _providerFactory;
+        private readonly NovalnetPaymentProvider _novalnetProvider;
+        private readonly PaddlePaymentProvider _paddleProvider;
         private readonly ILogger<SubscriptionService> _logger;
 
         public SubscriptionService(
@@ -23,257 +28,138 @@ namespace TeachingBACKEND.Application.Services
             IConfiguration configuration,
             IPasswordService passwordService,
             INotificationService notificationService,
+            IEmailService emailService,
+            PaymentProviderFactory providerFactory,
+            NovalnetPaymentProvider novalnetProvider,
+            PaddlePaymentProvider paddleProvider,
             ILogger<SubscriptionService> logger)
         {
             _context = context;
             _configuration = configuration;
             _passwordService = passwordService;
             _notificationService = notificationService;
+            _emailService = emailService;
+            _providerFactory = providerFactory;
+            _novalnetProvider = novalnetProvider;
+            _paddleProvider = paddleProvider;
             _logger = logger;
         }
 
-        public async Task<string> CreateSubscriptionAsync(SubscriptionRequestDTO dto)
+        public async Task<PaymentSessionResult> CreateSubscriptionAsync(SubscriptionRequestDTO dto)
         {
             using var activity = _logger.BeginScope("CreateSubscriptionAsync");
-            
+
             try
             {
-                _logger.LogInformation("Starting subscription creation for email: {Email}, RegistrationType: {RegistrationType}, PackageId: {PackageId}", 
-                    dto.Email, dto.RegistrationType, dto.SubscriptionPackageId);
+                _logger.LogInformation("Creating subscription: Email={Email}, Provider={Provider}, Package={PackageId}",
+                    dto.Email, dto.Provider, dto.SubscriptionPackageId);
 
-                // Get the subscription package
-                _logger.LogInformation("Looking up subscription package with ID: {PackageId}", dto.SubscriptionPackageId);
                 var package = await _context.SubscriptionPackages
-                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId);
+                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId)
+                    ?? throw new ArgumentException("Subscription package not found");
 
-                if (package == null)
+                var sessionRequest = new PaymentSessionRequest
                 {
-                    _logger.LogError("Subscription package not found with ID: {PackageId}", dto.SubscriptionPackageId);
-                    throw new ArgumentException("Subscription package not found");
-                }
-
-                _logger.LogInformation("Found subscription package: {PackageName}, UserType: {UserType}, TrialDays: {TrialDays}", 
-                    package.Name, package.UserType, package.TrialDays);
-
-                // Determine the Stripe Price ID based on billing interval
-                string stripePriceId = dto.BillingInterval switch
-                {
-                    BillingInterval.Month => package.StripeMonthlyPriceId,
-                    BillingInterval.Year => package.StripeYearlyPriceId,
-                    _ => package.StripeMonthlyPriceId
+                    Email = dto.Email,
+                    Package = package,
+                    BillingInterval = dto.BillingInterval,
+                    FamilyMemberCount = dto.FamilyMemberCount ?? 1,
+                    RegistrationType = dto.RegistrationType,
+                    RegistrationData = dto.RegistrationData,
+                    SuccessUrl = _configuration["STRIPE_SUCCESS_URL"] ?? "",
+                    CancelUrl = _configuration["STRIPE_CANCEL_URL"] ?? ""
                 };
 
-                _logger.LogInformation("Using Stripe Price ID: {StripePriceId} for billing interval: {BillingInterval}", 
-                    stripePriceId, dto.BillingInterval);
+                var provider = _providerFactory.GetProvider(dto.Provider);
+                var result = await provider.CreateCheckoutSessionAsync(sessionRequest);
 
-                // Create Stripe checkout session for subscription
-                _logger.LogInformation("Configuring Stripe API key");
-
-
-                var subscriptionData = new SessionSubscriptionDataOptions
-                {
-                    Metadata = new Dictionary<string, string>
-                    {
-                        { "registration_type", dto.RegistrationType },
-                        { "registration_data", dto.RegistrationData },
-                        { "subscription_package_id", dto.SubscriptionPackageId.ToString() },
-                        { "billing_interval", dto.BillingInterval.ToString() }
-                    }
-                };
-
-                // Only set trial period if TrialDays > 0
-                if (package.TrialDays > 0)
-                {
-                    subscriptionData.TrialPeriodDays = package.TrialDays;
-                    _logger.LogInformation("Setting trial period to {TrialDays} days", package.TrialDays);
-                }
-
-                _logger.LogInformation("Creating Stripe checkout session with SuccessUrl: {SuccessUrl}, CancelUrl: {CancelUrl}", 
-                    _configuration["STRIPE_SUCCESS_URL"], _configuration["STRIPE_CANCEL_URL"]);
-
-                var options = new SessionCreateOptions
-                {
-                    PaymentMethodTypes = new List<string> { "card" },
-                    Mode = "subscription",
-                    SuccessUrl = _configuration["STRIPE_SUCCESS_URL"],
-                    CancelUrl = _configuration["STRIPE_CANCEL_URL"],
-                    CustomerEmail = dto.Email,
-                    LineItems = new List<SessionLineItemOptions>
-                    {
-                        new()
-                        {
-                            Price = stripePriceId,
-                            Quantity = 1
-                        }
-                    },
-                    SubscriptionData = subscriptionData
-                };
-
-                _logger.LogInformation("Calling Stripe SessionService.CreateAsync");
-                var service = new SessionService();
-                var session = await service.CreateAsync(options);
-
-                _logger.LogInformation("Stripe session created successfully with ID: {SessionId}", session.Id);
-
-                // Create Payment record for tracking
-                _logger.LogInformation("Creating Payment record for tracking");
                 var payment = new Payment
                 {
                     Email = dto.Email,
                     RegistrationType = dto.RegistrationType,
                     RegistrationData = dto.RegistrationData,
-                    StripeSessionId = session.Id,
-                    Amount = 0, // Will be set by subscription
+                    Provider = dto.Provider,
+                    StripeSessionId = dto.Provider == PaymentProvider.Stripe ? result.SessionId : null,
+                    ExternalSessionId = dto.Provider != PaymentProvider.Stripe ? result.SessionId : null,
+                    Amount = 0,
                     Currency = "eur",
-                    Status = "pending",
+                    Status = result.IsManual ? "awaiting_transfer" : "pending",
                     SubscriptionPackageId = dto.SubscriptionPackageId
                 };
 
-                _logger.LogInformation("Adding Payment record to context and saving changes");
                 _context.Payments.Add(payment);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Successfully created Stripe subscription session: {SessionId} and Payment record", session.Id);
+                _logger.LogInformation("Payment record created: {PaymentId}, Provider={Provider}, SessionId={SessionId}",
+                    payment.Id, dto.Provider, result.SessionId);
 
-                return session.Id;
+                return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating subscription session for email: {Email}, RegistrationType: {RegistrationType}, PackageId: {PackageId}. " +
-                    "Exception: {ExceptionMessage}. Inner Exception: {InnerExceptionMessage}. Stack Trace: {StackTrace}", 
-                    dto.Email, dto.RegistrationType, dto.SubscriptionPackageId, ex.Message, 
-                    ex.InnerException?.Message ?? "None", ex.StackTrace);
+                _logger.LogError(ex, "Error creating subscription for {Email} with provider {Provider}", dto.Email, dto.Provider);
                 throw;
             }
         }
 
-        public async Task<string> CreateSupervisorSubscriptionAsync(SupervisorSubscriptionRequestDTO dto)
+        public async Task<PaymentSessionResult> CreateSupervisorSubscriptionAsync(SupervisorSubscriptionRequestDTO dto)
         {
             using var activity = _logger.BeginScope("CreateSupervisorSubscriptionAsync");
-            
+
             try
             {
-                _logger.LogInformation("Starting supervisor subscription creation for application: {ApplicationId}, PackageId: {PackageId}", 
-                    dto.SupervisorApplicationId, dto.SubscriptionPackageId);
-
-                // Get the approved supervisor application
                 var supervisorApplication = await _context.SupervisorApplications
-                    .FirstOrDefaultAsync(sa => sa.Id == dto.SupervisorApplicationId && sa.ApprovalStatus == ApprovalStatus.Approved);
+                    .FirstOrDefaultAsync(sa => sa.Id == dto.SupervisorApplicationId && sa.ApprovalStatus == ApprovalStatus.Approved)
+                    ?? throw new ArgumentException("Approved supervisor application not found");
 
-                if (supervisorApplication == null)
-                {
-                    _logger.LogError("Approved supervisor application not found with ID: {ApplicationId}", dto.SupervisorApplicationId);
-                    throw new ArgumentException("Approved supervisor application not found");
-                }
-
-                // Get the subscription package
-                _logger.LogInformation("Looking up subscription package with ID: {PackageId}", dto.SubscriptionPackageId);
                 var package = await _context.SubscriptionPackages
-                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId);
+                    .FirstOrDefaultAsync(p => p.Id == dto.SubscriptionPackageId)
+                    ?? throw new ArgumentException("Subscription package not found");
 
-                if (package == null)
-                {
-                    _logger.LogError("Subscription package not found with ID: {PackageId}", dto.SubscriptionPackageId);
-                    throw new ArgumentException("Subscription package not found");
-                }
-
-                _logger.LogInformation("Found subscription package: {PackageName}, UserType: {UserType}, TrialDays: {TrialDays}", 
-                    package.Name, package.UserType, package.TrialDays);
-
-                // Determine the Stripe Price ID based on billing interval
-                string stripePriceId = dto.BillingInterval switch
-                {
-                    BillingInterval.Month => package.StripeMonthlyPriceId,
-                    BillingInterval.Year => package.StripeYearlyPriceId,
-                    _ => package.StripeMonthlyPriceId
-                };
-
-                _logger.LogInformation("Using Stripe Price ID: {StripePriceId} for billing interval: {BillingInterval}", 
-                    stripePriceId, dto.BillingInterval);
-
-                // Create registration data for supervisor
                 var registrationData = JsonSerializer.Serialize(new SupervisorRegistrationDTO
                 {
                     SupervisorApplicationId = dto.SupervisorApplicationId
                 });
 
-                // Create Stripe checkout session for subscription
-                _logger.LogInformation("Configuring Stripe API key");
-
-
-                var subscriptionData = new SessionSubscriptionDataOptions
+                var sessionRequest = new PaymentSessionRequest
                 {
-                    Metadata = new Dictionary<string, string>
-                    {
-                        { "registration_type", "supervisor" },
-                        { "registration_data", registrationData },
-                        { "subscription_package_id", dto.SubscriptionPackageId.ToString() },
-                        { "billing_interval", dto.BillingInterval.ToString() }
-                    }
+                    Email = supervisorApplication.ContactPersonEmail,
+                    Package = package,
+                    BillingInterval = dto.BillingInterval,
+                    RegistrationType = "supervisor",
+                    RegistrationData = registrationData,
+                    SuccessUrl = _configuration["STRIPE_SUCCESS_URL"] ?? "",
+                    CancelUrl = _configuration["STRIPE_CANCEL_URL"] ?? ""
                 };
 
-                // Only set trial period if TrialDays > 0
-                if (package.TrialDays > 0)
-                {
-                    subscriptionData.TrialPeriodDays = package.TrialDays;
-                    _logger.LogInformation("Setting trial period to {TrialDays} days", package.TrialDays);
-                }
+                var provider = _providerFactory.GetProvider(dto.Provider);
+                var result = await provider.CreateCheckoutSessionAsync(sessionRequest);
 
-                _logger.LogInformation("Creating Stripe checkout session with SuccessUrl: {SuccessUrl}, CancelUrl: {CancelUrl}", 
-                    _configuration["STRIPE_SUCCESS_URL"], _configuration["STRIPE_CANCEL_URL"]);
-
-                var options = new SessionCreateOptions
-                {
-                    PaymentMethodTypes = new List<string> { "card" },
-                    Mode = "subscription",
-                    SuccessUrl = _configuration["STRIPE_SUCCESS_URL"],
-                    CancelUrl = _configuration["STRIPE_CANCEL_URL"],
-                    CustomerEmail = supervisorApplication.ContactPersonEmail,
-                    LineItems = new List<SessionLineItemOptions>
-                    {
-                        new()
-                        {
-                            Price = stripePriceId,
-                            Quantity = 1
-                        }
-                    },
-                    SubscriptionData = subscriptionData
-                };
-
-                _logger.LogInformation("Calling Stripe SessionService.CreateAsync");
-                var service = new SessionService();
-                var session = await service.CreateAsync(options);
-
-                _logger.LogInformation("Stripe session created successfully with ID: {SessionId}", session.Id);
-
-                // Create Payment record for tracking
-                _logger.LogInformation("Creating Payment record for tracking");
                 var payment = new Payment
                 {
                     Email = supervisorApplication.ContactPersonEmail,
                     RegistrationType = "supervisor",
                     RegistrationData = registrationData,
-                    StripeSessionId = session.Id,
-                    Amount = 0, // Will be set by subscription
+                    Provider = dto.Provider,
+                    StripeSessionId = dto.Provider == PaymentProvider.Stripe ? result.SessionId : null,
+                    ExternalSessionId = dto.Provider != PaymentProvider.Stripe ? result.SessionId : null,
+                    Amount = 0,
                     Currency = "eur",
-                    Status = "pending",
+                    Status = result.IsManual ? "awaiting_transfer" : "pending",
                     SubscriptionPackageId = dto.SubscriptionPackageId
                 };
 
-                _logger.LogInformation("Adding Payment record to context and saving changes");
                 _context.Payments.Add(payment);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Successfully created Stripe supervisor subscription session: {SessionId} and Payment record", session.Id);
+                _logger.LogInformation("Supervisor payment record created: Provider={Provider}, SessionId={SessionId}",
+                    dto.Provider, result.SessionId);
 
-                return session.Id;
+                return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating supervisor subscription session for application: {ApplicationId}, PackageId: {PackageId}. " +
-                    "Exception: {ExceptionMessage}. Inner Exception: {InnerExceptionMessage}. Stack Trace: {StackTrace}", 
-                    dto.SupervisorApplicationId, dto.SubscriptionPackageId, ex.Message, 
-                    ex.InnerException?.Message ?? "None", ex.StackTrace);
+                _logger.LogError(ex, "Error creating supervisor subscription for application {ApplicationId}", dto.SupervisorApplicationId);
                 throw;
             }
         }
@@ -315,30 +201,22 @@ namespace TeachingBACKEND.Application.Services
                 var subscription = await _context.Subscriptions
                     .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
-                if (subscription == null)
+                if (subscription == null) return false;
+
+                var externalId = GetExternalSubscriptionId(subscription);
+                if (!string.IsNullOrEmpty(externalId))
                 {
-                    return false;
+                    var provider = _providerFactory.GetProvider(subscription.Provider);
+                    await provider.CancelSubscriptionAsync(externalId);
                 }
 
-                // Cancel at period end in Stripe — user keeps access until the billing period ends
-                var stripeService = new Stripe.SubscriptionService();
-
-                var updateOptions = new SubscriptionUpdateOptions
-                {
-                    CancelAtPeriodEnd = true
-                };
-
-                await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
-
-                // Keep Active locally — access remains until period ends, webhook will set Canceled
                 subscription.Status = SubscriptionStatus.Active;
                 subscription.CancelAtPeriodEnd = true;
-                subscription.CanceledAt = null; // Will be set when period actually ends via webhook
-                
+                subscription.CanceledAt = null;
                 subscription.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Canceled subscription: {SubscriptionId}", subscriptionId);
+                _logger.LogInformation("Canceled subscription: {SubscriptionId}, Provider: {Provider}", subscriptionId, subscription.Provider);
                 return true;
             }
             catch (Exception ex)
@@ -355,32 +233,20 @@ namespace TeachingBACKEND.Application.Services
                 var subscription = await _context.Subscriptions
                     .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
-                if (subscription == null)
+                if (subscription == null) return false;
+
+                var externalId = GetExternalSubscriptionId(subscription);
+                if (!string.IsNullOrEmpty(externalId))
                 {
-                    return false;
+                    var provider = _providerFactory.GetProvider(subscription.Provider);
+                    await provider.PauseSubscriptionAsync(externalId);
                 }
 
-                // Pause in Stripe
-
-                var stripeService = new Stripe.SubscriptionService();
-                
-                var updateOptions = new SubscriptionUpdateOptions
-                {
-                    PauseCollection = new SubscriptionPauseCollectionOptions
-                    {
-                        Behavior = "void"
-                    }
-                };
-
-                await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
-
-                // Update local subscription
                 subscription.Status = SubscriptionStatus.Paused;
                 subscription.UpdatedAt = DateTime.UtcNow;
-
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Paused subscription: {SubscriptionId}", subscriptionId);
+                _logger.LogInformation("Paused subscription: {SubscriptionId}, Provider: {Provider}", subscriptionId, subscription.Provider);
                 return true;
             }
             catch (Exception ex)
@@ -397,29 +263,20 @@ namespace TeachingBACKEND.Application.Services
                 var subscription = await _context.Subscriptions
                     .FirstOrDefaultAsync(s => s.Id == subscriptionId);
 
-                if (subscription == null)
+                if (subscription == null) return false;
+
+                var externalId = GetExternalSubscriptionId(subscription);
+                if (!string.IsNullOrEmpty(externalId))
                 {
-                    return false;
+                    var provider = _providerFactory.GetProvider(subscription.Provider);
+                    await provider.ResumeSubscriptionAsync(externalId);
                 }
 
-                // Resume in Stripe
-
-                var stripeService = new Stripe.SubscriptionService();
-                
-                var updateOptions = new SubscriptionUpdateOptions
-                {
-                    PauseCollection = null
-                };
-
-                await stripeService.UpdateAsync(subscription.StripeSubscriptionId, updateOptions);
-
-                // Update local subscription
                 subscription.Status = SubscriptionStatus.Active;
                 subscription.UpdatedAt = DateTime.UtcNow;
-
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Resumed subscription: {SubscriptionId}", subscriptionId);
+                _logger.LogInformation("Resumed subscription: {SubscriptionId}, Provider: {Provider}", subscriptionId, subscription.Provider);
                 return true;
             }
             catch (Exception ex)
@@ -428,6 +285,11 @@ namespace TeachingBACKEND.Application.Services
                 return false;
             }
         }
+
+        private static string? GetExternalSubscriptionId(Domain.Entities.Subscription subscription) =>
+            subscription.Provider == PaymentProvider.Stripe
+                ? subscription.StripeSubscriptionId
+                : subscription.ExternalSubscriptionId;
 
         public async Task<bool> UpdateSubscriptionPlanAsync(Guid subscriptionId, ChangePlanDTO dto)
         {
@@ -951,7 +813,11 @@ namespace TeachingBACKEND.Application.Services
         private async Task<User> CreateStudentFromSubscriptionAsync(string registrationData, Guid planId)
         {
             var dto = JsonSerializer.Deserialize<StudentRegistrationDTO>(registrationData);
-            
+
+            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (existing != null)
+                return existing;
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -973,7 +839,6 @@ namespace TeachingBACKEND.Application.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Send verification email
             if (user.EmailVerificationToken.HasValue)
             {
                 await _notificationService.SendEmailVerification(user.Email, user.EmailVerificationToken.Value, "email");
@@ -985,10 +850,14 @@ namespace TeachingBACKEND.Application.Services
         private async Task<User> CreateSchoolFromSubscriptionAsync(string registrationData, Guid planId)
         {
             var dto = JsonSerializer.Deserialize<SchoolRegistrationDTO>(registrationData);
-            
+
+            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (existing != null)
+                return existing;
+
             // Generate a temporary password for school users
             var tempPassword = Guid.NewGuid().ToString("N")[..8];
-            
+
             var schoolUser = new User
             {
                 Id = Guid.NewGuid(),
@@ -1069,12 +938,9 @@ namespace TeachingBACKEND.Application.Services
         {
             var dto = JsonSerializer.Deserialize<FamilyRegistrationDTO>(registrationData);
             
-            // Check if main user email already exists
             var existingMainUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
             if (existingMainUser != null)
-            {
-                throw new InvalidOperationException($"User with email {dto.Email} already exists");
-            }
+                return existingMainUser;
             
             // Create the main family user (parent/guardian)
             var user = new User
@@ -1171,14 +1037,10 @@ namespace TeachingBACKEND.Application.Services
                 throw new ArgumentException("Approved supervisor application not found");
             }
 
-            // Check if user already exists
             var existingUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == supervisorApplication.ContactPersonEmail);
-            
             if (existingUser != null)
-            {
-                throw new InvalidOperationException("User with this email already exists");
-            }
+                return existingUser;
 
             // Create the supervisor user
             var tempPassword = supervisorApplication.TemporaryPassword ?? Guid.NewGuid().ToString("N")[..12];
@@ -1309,6 +1171,453 @@ namespace TeachingBACKEND.Application.Services
                 _logger.LogWarning("No matching payment found for subscription session: {SessionId}", session.Id);
             }
         }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Webhook handlers for Novalnet and Paddle
+        // ──────────────────────────────────────────────────────────────────────────
+
+        public async Task HandleNovalnetWebhookAsync(HttpRequest request)
+        {
+            var body = await new StreamReader(request.Body).ReadToEndAsync();
+
+            if (!_novalnetProvider.VerifyWebhookSignature(request, body))
+                throw new UnauthorizedAccessException("Invalid Novalnet webhook signature");
+
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            var eventType = root.GetProperty("event").GetProperty("type").GetString();
+            var txnStatus = root.GetProperty("transaction").GetProperty("status").GetString();
+            var txnId = root.GetProperty("transaction").GetProperty("tid").GetString();
+
+            _logger.LogInformation("Novalnet webhook: EventType={EventType}, Status={Status}, TxnId={TxnId}",
+                eventType, txnStatus, txnId);
+
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == txnId);
+
+            if (subscription == null)
+            {
+                _logger.LogWarning("No subscription found for Novalnet TxnId: {TxnId}", txnId);
+                return;
+            }
+
+            switch (eventType)
+            {
+                case "PAYMENT":
+                    if (txnStatus == "CONFIRMED")
+                    {
+                        subscription.Status = SubscriptionStatus.Active;
+                        subscription.UpdatedAt = DateTime.UtcNow;
+
+                        var amountCents = root.GetProperty("transaction").GetProperty("amount").GetInt64();
+                        _context.SubscriptionPayments.Add(new SubscriptionPayment
+                        {
+                            Id = Guid.NewGuid(),
+                            SubscriptionId = subscription.Id,
+                            Amount = amountCents,
+                            Currency = root.GetProperty("transaction").GetProperty("currency").GetString() ?? "EUR",
+                            Status = PaymentStatus.Succeeded,
+                            PaidAt = DateTime.UtcNow,
+                            PeriodStart = DateTime.UtcNow,
+                            PeriodEnd = subscription.Interval == BillingInterval.Year
+                                ? DateTime.UtcNow.AddYears(1)
+                                : DateTime.UtcNow.AddMonths(1),
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    break;
+
+                case "SUBSCRIPTION_SUSPEND":
+                    subscription.Status = SubscriptionStatus.Paused;
+                    subscription.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                case "SUBSCRIPTION_REACTIVATE":
+                    subscription.Status = SubscriptionStatus.Active;
+                    subscription.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                case "SUBSCRIPTION_CANCEL":
+                    subscription.Status = SubscriptionStatus.Canceled;
+                    subscription.CanceledAt = DateTime.UtcNow;
+                    subscription.UpdatedAt = DateTime.UtcNow;
+                    break;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task HandlePaddleWebhookAsync(HttpRequest request)
+        {
+            var body = await new StreamReader(request.Body).ReadToEndAsync();
+            var paddleSignature = request.Headers["Paddle-Signature"].ToString();
+
+            if (!_paddleProvider.VerifyWebhookSignature(body, paddleSignature))
+                throw new UnauthorizedAccessException("Invalid Paddle webhook signature");
+
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            var eventType = root.GetProperty("event_type").GetString();
+            _logger.LogInformation("Paddle webhook: EventType={EventType}", eventType);
+
+            switch (eventType)
+            {
+                case "subscription.activated":
+                case "subscription.updated":
+                    await HandlePaddleSubscriptionActivatedAsync(root);
+                    break;
+
+                case "subscription.canceled":
+                    await HandlePaddleSubscriptionCanceledAsync(root);
+                    break;
+
+                case "subscription.paused":
+                    await HandlePaddleSubscriptionPausedAsync(root);
+                    break;
+
+                case "subscription.resumed":
+                    await HandlePaddleSubscriptionResumedAsync(root);
+                    break;
+
+                case "transaction.completed":
+                    await HandlePaddleTransactionCompletedAsync(root);
+                    break;
+            }
+        }
+
+        private async Task HandlePaddleSubscriptionActivatedAsync(System.Text.Json.JsonElement root)
+        {
+            var data = root.GetProperty("data");
+            var paddleSubId = data.GetProperty("id").GetString();
+
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
+
+            if (subscription == null)
+            {
+                // First activation — create user and subscription record from custom_data
+                if (!data.TryGetProperty("custom_data", out var customData) || customData.ValueKind == System.Text.Json.JsonValueKind.Null)
+                {
+                    _logger.LogWarning("Paddle subscription.activated: no custom_data for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                var registrationType = customData.TryGetProperty("registration_type", out var rt) ? rt.GetString() : null;
+                var registrationData = customData.TryGetProperty("registration_data", out var rd) ? rd.GetString() : null;
+                var planIdString = customData.TryGetProperty("subscription_package_id", out var pi) ? pi.GetString() : null;
+                var billingIntervalStr = customData.TryGetProperty("billing_interval", out var bi) ? bi.GetString() : null;
+
+                if (string.IsNullOrEmpty(registrationType) || string.IsNullOrEmpty(registrationData) || string.IsNullOrEmpty(planIdString))
+                {
+                    _logger.LogError("Paddle subscription.activated: missing custom_data fields for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                if (!Guid.TryParse(planIdString, out var planId))
+                {
+                    _logger.LogError("Paddle subscription.activated: invalid plan ID {PlanId}", planIdString);
+                    return;
+                }
+
+                User user;
+                try
+                {
+                    user = registrationType switch
+                    {
+                        "student" => await CreateStudentFromSubscriptionAsync(registrationData, planId),
+                        "school" => await CreateSchoolFromSubscriptionAsync(registrationData, planId),
+                        "family" => await CreateFamilyFromSubscriptionAsync(registrationData, planId),
+                        _ => throw new ArgumentException($"Unknown registration type: {registrationType}")
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to create user for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                var billingInterval = string.Equals(billingIntervalStr, "Year", StringComparison.OrdinalIgnoreCase)
+                    ? BillingInterval.Year
+                    : BillingInterval.Month;
+
+                long subscriptionAmount = 0;
+                var subscriptionCurrency = data.TryGetProperty("currency_code", out var subCur) ? subCur.GetString() ?? "eur" : "eur";
+                if (data.TryGetProperty("items", out var subItems) && subItems.GetArrayLength() > 0)
+                {
+                    var firstItem = subItems[0];
+                    if (firstItem.TryGetProperty("price", out var subPrice) &&
+                        subPrice.TryGetProperty("unit_price", out var subUnitPrice) &&
+                        subUnitPrice.TryGetProperty("amount", out var subAmountEl))
+                    {
+                        long.TryParse(subAmountEl.GetString(), out subscriptionAmount);
+                    }
+                }
+
+                var newSubscription = new Domain.Entities.Subscription
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    ExternalSubscriptionId = paddleSubId,
+                    Provider = PaymentProvider.Paddle,
+                    SubscriptionPackageId = planId,
+                    Status = SubscriptionStatus.Active,
+                    StartDate = DateTime.UtcNow,
+                    Interval = billingInterval,
+                    IntervalCount = 1,
+                    Amount = subscriptionAmount,
+                    Currency = subscriptionCurrency,
+                    RegistrationType = registrationType,
+                    RegistrationData = registrationData,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                if (data.TryGetProperty("current_billing_period", out var bp))
+                {
+                    if (DateTime.TryParse(bp.GetProperty("starts_at").GetString(), out var start))
+                        newSubscription.CurrentPeriodStart = start;
+                    if (DateTime.TryParse(bp.GetProperty("ends_at").GetString(), out var end))
+                        newSubscription.CurrentPeriodEnd = end;
+                }
+
+                try
+                {
+                    _context.Subscriptions.Add(newSubscription);
+                    user.ActiveSubscriptionId = newSubscription.Id;
+                    user.SubscriptionExpiresAt = newSubscription.CurrentPeriodEnd;
+
+                    var pendingPayment = await _context.Payments
+                        .FirstOrDefaultAsync(p => p.Provider == PaymentProvider.Paddle
+                                               && p.Email.ToLower() == user.Email.ToLower()
+                                               && p.Status == "pending");
+                    if (pendingPayment != null)
+                        pendingPayment.Status = "succeeded";
+
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Paddle: created user {UserId} and subscription {SubId}", user.Id, paddleSubId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to save subscription for user {UserId}, sub {SubId}", user.Id, paddleSubId);
+                    return;
+                }
+
+                // Save payment record separately so a parsing failure never blocks subscription creation
+                try
+                {
+                    long amountCents = 0;
+                    var currency = data.TryGetProperty("currency_code", out var cur) ? cur.GetString() ?? "EUR" : "EUR";
+                    if (data.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
+                    {
+                        var firstItem = items[0];
+                        if (firstItem.TryGetProperty("price", out var price) &&
+                            price.TryGetProperty("unit_price", out var unitPrice) &&
+                            unitPrice.TryGetProperty("amount", out var amountEl))
+                        {
+                            long.TryParse(amountEl.GetString(), out amountCents);
+                        }
+                    }
+
+                    _context.SubscriptionPayments.Add(new SubscriptionPayment
+                    {
+                        Id = Guid.NewGuid(),
+                        SubscriptionId = newSubscription.Id,
+                        Amount = amountCents,
+                        Currency = currency,
+                        Status = PaymentStatus.Succeeded,
+                        PaidAt = DateTime.UtcNow,
+                        PeriodStart = newSubscription.CurrentPeriodStart ?? DateTime.UtcNow,
+                        PeriodEnd = newSubscription.CurrentPeriodEnd ?? DateTime.UtcNow.AddMonths(1),
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to save payment record for subscription {SubId} — subscription itself was saved", newSubscription.Id);
+                }
+                return;
+            }
+
+            subscription.Status = SubscriptionStatus.Active;
+            subscription.UpdatedAt = DateTime.UtcNow;
+
+            if (data.TryGetProperty("current_billing_period", out var period))
+            {
+                if (DateTime.TryParse(period.GetProperty("starts_at").GetString(), out var start))
+                    subscription.CurrentPeriodStart = start;
+                if (DateTime.TryParse(period.GetProperty("ends_at").GetString(), out var end))
+                    subscription.CurrentPeriodEnd = end;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task HandlePaddleSubscriptionCanceledAsync(System.Text.Json.JsonElement root)
+        {
+            var paddleSubId = root.GetProperty("data").GetProperty("id").GetString();
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
+
+            if (subscription == null) return;
+
+            subscription.Status = SubscriptionStatus.Canceled;
+            subscription.CanceledAt = DateTime.UtcNow;
+            subscription.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task HandlePaddleSubscriptionPausedAsync(System.Text.Json.JsonElement root)
+        {
+            var paddleSubId = root.GetProperty("data").GetProperty("id").GetString();
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
+
+            if (subscription == null) return;
+
+            subscription.Status = SubscriptionStatus.Paused;
+            subscription.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task HandlePaddleSubscriptionResumedAsync(System.Text.Json.JsonElement root)
+        {
+            var paddleSubId = root.GetProperty("data").GetProperty("id").GetString();
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
+
+            if (subscription == null) return;
+
+            subscription.Status = SubscriptionStatus.Active;
+            subscription.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task HandlePaddleTransactionCompletedAsync(System.Text.Json.JsonElement root)
+        {
+            var data = root.GetProperty("data");
+            var paddleSubId = data.TryGetProperty("subscription_id", out var subIdEl) ? subIdEl.GetString() : null;
+
+            if (string.IsNullOrEmpty(paddleSubId)) return;
+
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
+
+            if (subscription == null)
+            {
+                _logger.LogWarning("Paddle transaction.completed: subscription not found for {PaddleSubId} — likely race condition, payment will be recorded via subscription.activated", paddleSubId);
+                return;
+            }
+
+            var detailsEl = data.GetProperty("details");
+            var totalsEl = detailsEl.GetProperty("totals");
+            var amountCents = long.TryParse(totalsEl.GetProperty("grand_total").GetString(), out var total) ? total : 0;
+            var currency = data.GetProperty("currency_code").GetString() ?? "EUR";
+
+            _context.SubscriptionPayments.Add(new SubscriptionPayment
+            {
+                Id = Guid.NewGuid(),
+                SubscriptionId = subscription.Id,
+                Amount = amountCents,
+                Currency = currency,
+                Status = PaymentStatus.Succeeded,
+                PaidAt = DateTime.UtcNow,
+                PeriodStart = subscription.CurrentPeriodStart ?? DateTime.UtcNow,
+                PeriodEnd = subscription.CurrentPeriodEnd ?? DateTime.UtcNow.AddMonths(1),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Manual payment (BKT / Raiffeisen)
+        // ──────────────────────────────────────────────────────────────────────────
+
+        public async Task<bool> ConfirmManualPaymentAsync(string paymentReference, Guid confirmedByAdminId)
+        {
+            try
+            {
+                var payment = await _context.Payments
+                    .Include(p => p.SubscriptionPackage)
+                    .FirstOrDefaultAsync(p => p.ExternalSessionId == paymentReference &&
+                                             (p.Provider == PaymentProvider.BKT || p.Provider == PaymentProvider.Raiffeisen));
+
+                if (payment == null)
+                {
+                    _logger.LogWarning("Manual payment not found for reference: {Reference}", paymentReference);
+                    return false;
+                }
+
+                if (payment.Status == "succeeded")
+                {
+                    _logger.LogWarning("Manual payment already confirmed: {Reference}", paymentReference);
+                    return false;
+                }
+
+                payment.Status = "succeeded";
+
+                // Find associated subscription (created on checkout initiation) or create one
+                var subscription = await _context.Subscriptions
+                    .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paymentReference);
+
+                if (subscription != null)
+                {
+                    subscription.Status = SubscriptionStatus.Active;
+                    subscription.StartDate = DateTime.UtcNow;
+                    subscription.CurrentPeriodStart = DateTime.UtcNow;
+                    subscription.CurrentPeriodEnd = subscription.Interval == BillingInterval.Year
+                        ? DateTime.UtcNow.AddYears(1)
+                        : DateTime.UtcNow.AddMonths(1);
+                    subscription.UpdatedAt = DateTime.UtcNow;
+
+                    var user = await _context.Users.FindAsync(subscription.UserId);
+                    if (user != null)
+                    {
+                        user.ActiveSubscriptionId = subscription.Id;
+                        user.SubscriptionExpiresAt = subscription.CurrentPeriodEnd;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Send confirmation email
+                var packageName = payment.SubscriptionPackage?.Name ?? "abbonamento";
+                await _emailService.SendManualPaymentConfirmedAsync(payment.Email, packageName);
+
+                _logger.LogInformation("Manual payment confirmed: {Reference} by admin {AdminId}", paymentReference, confirmedByAdminId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error confirming manual payment: {Reference}", paymentReference);
+                return false;
+            }
+        }
+
+        public async Task SendManualPaymentReminderAsync(string paymentReference)
+        {
+            var payment = await _context.Payments
+                .FirstOrDefaultAsync(p => p.ExternalSessionId == paymentReference &&
+                                         (p.Provider == PaymentProvider.BKT || p.Provider == PaymentProvider.Raiffeisen));
+
+            if (payment == null)
+            {
+                _logger.LogWarning("Manual payment not found for reminder: {Reference}", paymentReference);
+                return;
+            }
+
+            var package = await _context.SubscriptionPackages.FindAsync(payment.SubscriptionPackageId);
+            var amountCents = package?.MonthlyPrice ?? 0;
+
+            await _emailService.SendManualPaymentReminderAsync(payment.Email, paymentReference, amountCents, "ALL");
+
+            _logger.LogInformation("Manual payment reminder sent for reference: {Reference}", paymentReference);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
 
         private SubscriptionResponseDTO MapToResponseDTO(Domain.Entities.Subscription subscription)
         {

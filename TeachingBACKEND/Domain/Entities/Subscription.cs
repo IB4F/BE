@@ -1,5 +1,6 @@
 using TeachingBACKEND.Domain.Enums;
 
+
 namespace TeachingBACKEND.Domain.Entities
 {
     public class Subscription
@@ -8,10 +9,17 @@ namespace TeachingBACKEND.Domain.Entities
         public Guid UserId { get; set; }
         public User User { get; set; }
         
-        // Stripe Fields
-        public string StripeSubscriptionId { get; set; }
-        public string StripeCustomerId { get; set; }
-        public string StripePriceId { get; set; }
+        // Provider
+        public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
+
+        // Stripe Fields (kept for backward compatibility)
+        public string? StripeSubscriptionId { get; set; }
+        public string? StripeCustomerId { get; set; }
+        public string? StripePriceId { get; set; }
+
+        // Generic external provider fields
+        public string? ExternalSubscriptionId { get; set; }
+        public string? ExternalCustomerId { get; set; }
         
         // Subscription Details
         public Guid SubscriptionPackageId { get; set; }

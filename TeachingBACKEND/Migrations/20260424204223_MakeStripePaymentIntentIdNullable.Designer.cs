@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeachingBACKEND.Data;
 
@@ -11,9 +12,11 @@ using TeachingBACKEND.Data;
 namespace TeachingBACKEND.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424204223_MakeStripePaymentIntentIdNullable")]
+    partial class MakeStripePaymentIntentIdNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -799,7 +802,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2630),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6110),
                             Description = "Basic student package with monthly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -809,7 +812,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2630),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6110),
                             UserType = 1,
                             YearlyPrice = 20000L
                         },
@@ -817,7 +820,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("11111111-1111-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2640),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6110),
                             Description = "Basic student package with yearly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -827,7 +830,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2640),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6110),
                             UserType = 1,
                             YearlyPrice = 20000L
                         },
@@ -835,7 +838,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("22222222-2222-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2640),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6120),
                             Description = "Standard student package with monthly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -845,7 +848,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2640),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6120),
                             UserType = 1,
                             YearlyPrice = 40000L
                         },
@@ -853,7 +856,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2650),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6120),
                             Description = "Standard student package with yearly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -863,7 +866,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2650),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6120),
                             UserType = 1,
                             YearlyPrice = 40000L
                         },
@@ -871,7 +874,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("33333333-3333-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2660),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6130),
                             Description = "Premium student package with monthly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -881,7 +884,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2660),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6130),
                             UserType = 1,
                             YearlyPrice = 60000L
                         },
@@ -889,7 +892,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("33333333-3333-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2670),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6140),
                             Description = "Premium student package with yearly billing",
                             IsActive = true,
                             MaxUsers = 1,
@@ -899,7 +902,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_student_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2670),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6140),
                             UserType = 1,
                             YearlyPrice = 60000L
                         },
@@ -908,7 +911,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("44444444-4444-1111-1111-111111111111"),
                             BasePrice = 3000L,
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2700),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6180),
                             Description = "Basic family package with monthly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -921,7 +924,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2700),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6180),
                             UserType = 2,
                             YearlyPrice = 30000L
                         },
@@ -930,7 +933,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("44444444-4444-2222-2222-222222222222"),
                             BasePrice = 30000L,
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2710),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6190),
                             Description = "Basic family package with yearly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -943,7 +946,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2710),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6190),
                             UserType = 2,
                             YearlyPrice = 30000L
                         },
@@ -952,7 +955,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("55555555-5555-1111-1111-111111111111"),
                             BasePrice = 5000L,
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2710),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6190),
                             Description = "Standard family package with monthly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -965,7 +968,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2710),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6200),
                             UserType = 2,
                             YearlyPrice = 50000L
                         },
@@ -974,7 +977,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("55555555-5555-2222-2222-222222222222"),
                             BasePrice = 50000L,
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2720),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6200),
                             Description = "Standard family package with yearly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -987,7 +990,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2720),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6200),
                             UserType = 2,
                             YearlyPrice = 50000L
                         },
@@ -996,7 +999,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("66666666-6666-1111-1111-111111111111"),
                             BasePrice = 8000L,
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2720),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6210),
                             Description = "Premium family package with monthly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -1009,7 +1012,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2720),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6210),
                             UserType = 2,
                             YearlyPrice = 80000L
                         },
@@ -1018,7 +1021,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("66666666-6666-2222-2222-222222222222"),
                             BasePrice = 80000L,
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2730),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6210),
                             Description = "Premium family package with yearly billing - dynamic pricing based on family size",
                             IsActive = true,
                             MaxFamilyMembers = 10,
@@ -1031,7 +1034,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_family_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2730),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6210),
                             UserType = 2,
                             YearlyPrice = 80000L
                         },
@@ -1039,7 +1042,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("77777777-7777-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2730),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6220),
                             Description = "Basic supervisor package with monthly billing",
                             IsActive = true,
                             MaxUsers = 50,
@@ -1049,7 +1052,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2740),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6220),
                             UserType = 3,
                             YearlyPrice = 100000L
                         },
@@ -1057,7 +1060,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("77777777-7777-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2740),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6220),
                             Description = "Basic supervisor package with yearly billing",
                             IsActive = true,
                             MaxUsers = 50,
@@ -1067,7 +1070,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_basic_yearly",
                             Tier = 1,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2740),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6220),
                             UserType = 3,
                             YearlyPrice = 100000L
                         },
@@ -1075,7 +1078,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("88888888-8888-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2740),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6230),
                             Description = "Standard supervisor package with monthly billing",
                             IsActive = true,
                             MaxUsers = 100,
@@ -1085,7 +1088,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2740),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6230),
                             UserType = 3,
                             YearlyPrice = 200000L
                         },
@@ -1093,7 +1096,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("88888888-8888-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2750),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6230),
                             Description = "Standard supervisor package with yearly billing",
                             IsActive = true,
                             MaxUsers = 100,
@@ -1103,7 +1106,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_standard_yearly",
                             Tier = 2,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2750),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6240),
                             UserType = 3,
                             YearlyPrice = 200000L
                         },
@@ -1111,7 +1114,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("99999999-9999-1111-1111-111111111111"),
                             BillingInterval = 3,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2750),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6240),
                             Description = "Premium supervisor package with monthly billing",
                             IsActive = true,
                             MaxUsers = 500,
@@ -1121,7 +1124,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2750),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6240),
                             UserType = 3,
                             YearlyPrice = 300000L
                         },
@@ -1129,7 +1132,7 @@ namespace TeachingBACKEND.Migrations
                         {
                             Id = new Guid("99999999-9999-2222-2222-222222222222"),
                             BillingInterval = 4,
-                            CreatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2760),
+                            CreatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6250),
                             Description = "Premium supervisor package with yearly billing",
                             IsActive = true,
                             MaxUsers = 500,
@@ -1139,7 +1142,7 @@ namespace TeachingBACKEND.Migrations
                             StripeYearlyPriceId = "price_supervisor_premium_yearly",
                             Tier = 3,
                             TrialDays = 0,
-                            UpdatedAt = new DateTime(2026, 4, 24, 20, 59, 20, 135, DateTimeKind.Utc).AddTicks(2760),
+                            UpdatedAt = new DateTime(2026, 4, 24, 20, 42, 21, 859, DateTimeKind.Utc).AddTicks(6260),
                             UserType = 3,
                             YearlyPrice = 300000L
                         });
@@ -1174,6 +1177,7 @@ namespace TeachingBACKEND.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("StripeInvoiceId")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -1432,7 +1436,7 @@ namespace TeachingBACKEND.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             ApprovalStatus = 1,
                             City = "Tirana",
-                            CreateAt = new DateTime(2026, 4, 24, 20, 59, 20, 497, DateTimeKind.Utc).AddTicks(4490),
+                            CreateAt = new DateTime(2026, 4, 24, 20, 42, 22, 221, DateTimeKind.Utc).AddTicks(3910),
                             DateOfBirth = new DateTime(1985, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@braingainalbania.al",
                             FirstName = "System",
@@ -1440,7 +1444,7 @@ namespace TeachingBACKEND.Migrations
                             IsOneTimeLoginUsed = false,
                             LastName = "Administrator",
                             MustChangePasswordOnNextLogin = false,
-                            PasswordHash = "$2a$12$OxRL9/6NcNGzk.UIMVct1.468ypYe6Hepuu0c9HShvwtGSEbWUajC",
+                            PasswordHash = "$2a$12$vlAVS8EcxHJISFBc0U7NaO3WjGfInj0.oIzebTh7o66h21Its4C/K",
                             PhoneNumber = "+35500000000",
                             Profession = "Administrator",
                             RefreshToken = new Guid("00000000-0000-0000-0000-000000000000"),

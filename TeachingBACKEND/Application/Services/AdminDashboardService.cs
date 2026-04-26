@@ -375,7 +375,7 @@ namespace TeachingBACKEND.Application.Services
         public async Task<List<MonthlyRevenueDTO>> GetMonthlyRevenueAsync(int months = 12)
         {
             var revenueData = new List<MonthlyRevenueDTO>();
-            var startDate = DateTime.UtcNow.AddMonths(-months);
+            var startDate = DateTime.UtcNow.AddMonths(-(months - 1));
 
             for (int i = 0; i < months; i++)
             {
