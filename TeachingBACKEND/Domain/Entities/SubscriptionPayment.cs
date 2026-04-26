@@ -9,8 +9,8 @@ namespace TeachingBACKEND.Domain.Entities
         public Subscription Subscription { get; set; }
         
         // Stripe Fields
-        public string StripePaymentIntentId { get; set; }
-        public string StripeInvoiceId { get; set; }
+        public string? StripePaymentIntentId { get; set; }
+        public string? StripeInvoiceId { get; set; }
         
         // Payment Details
         public long Amount { get; set; }

@@ -185,15 +185,15 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
                 
             entity.Property(s => s.StripeSubscriptionId)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(255);
-                
+
             entity.Property(s => s.StripeCustomerId)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(255);
-                
+
             entity.Property(s => s.StripePriceId)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(255);
 
             // Performance indexes for subscription queries
@@ -213,10 +213,11 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
                 
             entity.Property(sp => sp.StripePaymentIntentId)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(255);
                 
             entity.Property(sp => sp.StripeInvoiceId)
+                .IsRequired(false)
                 .HasMaxLength(255);
 
             // Performance indexes for payment history queries

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using TeachingBACKEND.Domain.Enums;
 
 namespace TeachingBACKEND.Domain.DTOs
 {
@@ -27,5 +28,7 @@ namespace TeachingBACKEND.Domain.DTOs
 
         [Required]
         public List<CreateStudentBySchoolDTO> Students { get; set; }
+
+        public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using TeachingBACKEND.Domain.Enums;
 
 public class FamilyMemberInput
 {
@@ -29,4 +30,5 @@ public class FamilyRegistrationDTO
     [Required]
     public List<FamilyMemberInput> FamilyMembers { get; set; } // family members to create
     public string? PhoneNumber { get; set; }
+    public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
 }

@@ -17,6 +17,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using TeachingBACKEND.Middleware;
+using Microsoft.AspNetCore.HttpOverrides;
 
 Env.Load();
 
@@ -131,7 +132,8 @@ builder.Services.AddCors(options =>
             .WithOrigins(
                 "https://app.braingainalbania.al",
                 "https://braingainalbania.al",
-                "http://localhost:4200"
+                "http://localhost:4200",
+                "https://localhost:4200"
             )
             .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .AllowAnyHeader()
@@ -249,6 +251,11 @@ builder.Host.UseSerilog();
 
 
 var app = builder.Build();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

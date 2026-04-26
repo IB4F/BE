@@ -34,12 +34,12 @@ namespace TeachingBACKEND.Application.Services.Providers
 
         public async Task<PaymentSessionResult> CreateCheckoutSessionAsync(PaymentSessionRequest request)
         {
-            var apiKey = _configuration["NOVALNET_API_KEY"]
-                ?? throw new InvalidOperationException("NOVALNET_API_KEY not configured");
-            var tarballKey = _configuration["NOVALNET_TARBALL_KEY"]
-                ?? throw new InvalidOperationException("NOVALNET_TARBALL_KEY not configured");
-            var projectId = _configuration["NOVALNET_PROJECT_ID"]
-                ?? throw new InvalidOperationException("NOVALNET_PROJECT_ID not configured");
+            var apiKey = _configuration["NOVALNET_API_KEY"];
+            var tarballKey = _configuration["NOVALNET_TARBALL_KEY"];
+            var projectId = _configuration["NOVALNET_PROJECT_ID"];
+
+            if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(tarballKey) || string.IsNullOrEmpty(projectId))
+                throw new InvalidOperationException("Novalnet non è ancora configurato. Aggiungi NOVALNET_API_KEY, NOVALNET_TARBALL_KEY e NOVALNET_PROJECT_ID nel file .env.");
 
             var package = request.Package;
             var amountCents = CalculateAmount(package, request.BillingInterval, request.FamilyMemberCount);

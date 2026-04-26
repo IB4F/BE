@@ -813,7 +813,11 @@ namespace TeachingBACKEND.Application.Services
         private async Task<User> CreateStudentFromSubscriptionAsync(string registrationData, Guid planId)
         {
             var dto = JsonSerializer.Deserialize<StudentRegistrationDTO>(registrationData);
-            
+
+            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (existing != null)
+                return existing;
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -835,7 +839,6 @@ namespace TeachingBACKEND.Application.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Send verification email
             if (user.EmailVerificationToken.HasValue)
             {
                 await _notificationService.SendEmailVerification(user.Email, user.EmailVerificationToken.Value, "email");
@@ -847,10 +850,14 @@ namespace TeachingBACKEND.Application.Services
         private async Task<User> CreateSchoolFromSubscriptionAsync(string registrationData, Guid planId)
         {
             var dto = JsonSerializer.Deserialize<SchoolRegistrationDTO>(registrationData);
-            
+
+            var existing = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (existing != null)
+                return existing;
+
             // Generate a temporary password for school users
             var tempPassword = Guid.NewGuid().ToString("N")[..8];
-            
+
             var schoolUser = new User
             {
                 Id = Guid.NewGuid(),
@@ -931,12 +938,9 @@ namespace TeachingBACKEND.Application.Services
         {
             var dto = JsonSerializer.Deserialize<FamilyRegistrationDTO>(registrationData);
             
-            // Check if main user email already exists
             var existingMainUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
             if (existingMainUser != null)
-            {
-                throw new InvalidOperationException($"User with email {dto.Email} already exists");
-            }
+                return existingMainUser;
             
             // Create the main family user (parent/guardian)
             var user = new User
@@ -1033,14 +1037,10 @@ namespace TeachingBACKEND.Application.Services
                 throw new ArgumentException("Approved supervisor application not found");
             }
 
-            // Check if user already exists
             var existingUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == supervisorApplication.ContactPersonEmail);
-            
             if (existingUser != null)
-            {
-                throw new InvalidOperationException("User with this email already exists");
-            }
+                return existingUser;
 
             // Create the supervisor user
             var tempPassword = supervisorApplication.TemporaryPassword ?? Guid.NewGuid().ToString("N")[..12];
@@ -1295,7 +1295,151 @@ namespace TeachingBACKEND.Application.Services
             var subscription = await _context.Subscriptions
                 .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
 
-            if (subscription == null) return;
+            if (subscription == null)
+            {
+                // First activation — create user and subscription record from custom_data
+                if (!data.TryGetProperty("custom_data", out var customData) || customData.ValueKind == System.Text.Json.JsonValueKind.Null)
+                {
+                    _logger.LogWarning("Paddle subscription.activated: no custom_data for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                var registrationType = customData.TryGetProperty("registration_type", out var rt) ? rt.GetString() : null;
+                var registrationData = customData.TryGetProperty("registration_data", out var rd) ? rd.GetString() : null;
+                var planIdString = customData.TryGetProperty("subscription_package_id", out var pi) ? pi.GetString() : null;
+                var billingIntervalStr = customData.TryGetProperty("billing_interval", out var bi) ? bi.GetString() : null;
+
+                if (string.IsNullOrEmpty(registrationType) || string.IsNullOrEmpty(registrationData) || string.IsNullOrEmpty(planIdString))
+                {
+                    _logger.LogError("Paddle subscription.activated: missing custom_data fields for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                if (!Guid.TryParse(planIdString, out var planId))
+                {
+                    _logger.LogError("Paddle subscription.activated: invalid plan ID {PlanId}", planIdString);
+                    return;
+                }
+
+                User user;
+                try
+                {
+                    user = registrationType switch
+                    {
+                        "student" => await CreateStudentFromSubscriptionAsync(registrationData, planId),
+                        "school" => await CreateSchoolFromSubscriptionAsync(registrationData, planId),
+                        "family" => await CreateFamilyFromSubscriptionAsync(registrationData, planId),
+                        _ => throw new ArgumentException($"Unknown registration type: {registrationType}")
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to create user for subscription {SubId}", paddleSubId);
+                    return;
+                }
+
+                var billingInterval = string.Equals(billingIntervalStr, "Year", StringComparison.OrdinalIgnoreCase)
+                    ? BillingInterval.Year
+                    : BillingInterval.Month;
+
+                long subscriptionAmount = 0;
+                var subscriptionCurrency = data.TryGetProperty("currency_code", out var subCur) ? subCur.GetString() ?? "eur" : "eur";
+                if (data.TryGetProperty("items", out var subItems) && subItems.GetArrayLength() > 0)
+                {
+                    var firstItem = subItems[0];
+                    if (firstItem.TryGetProperty("price", out var subPrice) &&
+                        subPrice.TryGetProperty("unit_price", out var subUnitPrice) &&
+                        subUnitPrice.TryGetProperty("amount", out var subAmountEl))
+                    {
+                        long.TryParse(subAmountEl.GetString(), out subscriptionAmount);
+                    }
+                }
+
+                var newSubscription = new Domain.Entities.Subscription
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    ExternalSubscriptionId = paddleSubId,
+                    Provider = PaymentProvider.Paddle,
+                    SubscriptionPackageId = planId,
+                    Status = SubscriptionStatus.Active,
+                    StartDate = DateTime.UtcNow,
+                    Interval = billingInterval,
+                    IntervalCount = 1,
+                    Amount = subscriptionAmount,
+                    Currency = subscriptionCurrency,
+                    RegistrationType = registrationType,
+                    RegistrationData = registrationData,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                if (data.TryGetProperty("current_billing_period", out var bp))
+                {
+                    if (DateTime.TryParse(bp.GetProperty("starts_at").GetString(), out var start))
+                        newSubscription.CurrentPeriodStart = start;
+                    if (DateTime.TryParse(bp.GetProperty("ends_at").GetString(), out var end))
+                        newSubscription.CurrentPeriodEnd = end;
+                }
+
+                try
+                {
+                    _context.Subscriptions.Add(newSubscription);
+                    user.ActiveSubscriptionId = newSubscription.Id;
+                    user.SubscriptionExpiresAt = newSubscription.CurrentPeriodEnd;
+
+                    var pendingPayment = await _context.Payments
+                        .FirstOrDefaultAsync(p => p.Provider == PaymentProvider.Paddle
+                                               && p.Email.ToLower() == user.Email.ToLower()
+                                               && p.Status == "pending");
+                    if (pendingPayment != null)
+                        pendingPayment.Status = "succeeded";
+
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Paddle: created user {UserId} and subscription {SubId}", user.Id, paddleSubId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to save subscription for user {UserId}, sub {SubId}", user.Id, paddleSubId);
+                    return;
+                }
+
+                // Save payment record separately so a parsing failure never blocks subscription creation
+                try
+                {
+                    long amountCents = 0;
+                    var currency = data.TryGetProperty("currency_code", out var cur) ? cur.GetString() ?? "EUR" : "EUR";
+                    if (data.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
+                    {
+                        var firstItem = items[0];
+                        if (firstItem.TryGetProperty("price", out var price) &&
+                            price.TryGetProperty("unit_price", out var unitPrice) &&
+                            unitPrice.TryGetProperty("amount", out var amountEl))
+                        {
+                            long.TryParse(amountEl.GetString(), out amountCents);
+                        }
+                    }
+
+                    _context.SubscriptionPayments.Add(new SubscriptionPayment
+                    {
+                        Id = Guid.NewGuid(),
+                        SubscriptionId = newSubscription.Id,
+                        Amount = amountCents,
+                        Currency = currency,
+                        Status = PaymentStatus.Succeeded,
+                        PaidAt = DateTime.UtcNow,
+                        PeriodStart = newSubscription.CurrentPeriodStart ?? DateTime.UtcNow,
+                        PeriodEnd = newSubscription.CurrentPeriodEnd ?? DateTime.UtcNow.AddMonths(1),
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Paddle: failed to save payment record for subscription {SubId} — subscription itself was saved", newSubscription.Id);
+                }
+                return;
+            }
 
             subscription.Status = SubscriptionStatus.Active;
             subscription.UpdatedAt = DateTime.UtcNow;
@@ -1361,7 +1505,11 @@ namespace TeachingBACKEND.Application.Services
             var subscription = await _context.Subscriptions
                 .FirstOrDefaultAsync(s => s.ExternalSubscriptionId == paddleSubId);
 
-            if (subscription == null) return;
+            if (subscription == null)
+            {
+                _logger.LogWarning("Paddle transaction.completed: subscription not found for {PaddleSubId} — likely race condition, payment will be recorded via subscription.activated", paddleSubId);
+                return;
+            }
 
             var detailsEl = data.GetProperty("details");
             var totalsEl = detailsEl.GetProperty("totals");
