@@ -8,41 +8,48 @@ namespace TeachingBACKEND.Application.Services
 {
     public class DashboardService : IDashboardService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public DashboardService(ApplicationDbContext context)
+        public DashboardService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<DashboardDTO> GetStudentDashboardAsync(Guid studentId)
         {
-            // Get all LearnHubs that the student has access to
-            var learnHubs = await _context.LearnHubs
+            await using var ctx1 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx2 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx3 = await _contextFactory.CreateDbContextAsync();
+
+            var learnHubsTask = ctx1.LearnHubs
+                .AsNoTracking()
                 .Include(lh => lh.Links)
                     .ThenInclude(l => l.Quizzes)
                 .ToListAsync();
 
-            // Get student's performance data
-            var studentPerformances = await _context.StudentPerformanceSummaries
+            var studentPerformancesTask = ctx2.StudentPerformanceSummaries
+                .AsNoTracking()
                 .Where(sps => sps.StudentId == studentId)
                 .Include(sps => sps.Link)
                     .ThenInclude(l => l.LearnHub)
                 .ToListAsync();
 
-            // Get student's quiz performances for detailed calculations
-            var quizPerformances = await _context.StudentQuizPerformances
+            var quizPerformancesTask = ctx3.StudentQuizPerformances
+                .AsNoTracking()
                 .Where(sqp => sqp.StudentId == studentId)
                 .Include(sqp => sqp.Quiz)
                     .ThenInclude(q => q.Link)
                         .ThenInclude(l => l.LearnHub)
                 .ToListAsync();
 
-            // Calculate dashboard stats
-            var stats = CalculateDashboardStats(learnHubs, studentPerformances, quizPerformances);
+            await Task.WhenAll(learnHubsTask, studentPerformancesTask, quizPerformancesTask);
 
-            // Get latest LearnHubs with progress
-            var latestLearnHubs = await GetLatestLearnHubsWithProgressAsync(studentId, learnHubs, studentPerformances, quizPerformances);
+            var learnHubs = learnHubsTask.Result;
+            var studentPerformances = studentPerformancesTask.Result;
+            var quizPerformances = quizPerformancesTask.Result;
+
+            var stats = CalculateDashboardStats(learnHubs, studentPerformances, quizPerformances);
+            var latestLearnHubs = GetLatestLearnHubsWithProgress(studentId, learnHubs, studentPerformances, quizPerformances);
 
             return new DashboardDTO
             {
@@ -52,14 +59,13 @@ namespace TeachingBACKEND.Application.Services
         }
 
         private DashboardStatsDTO CalculateDashboardStats(
-            List<LearnHub> learnHubs, 
+            List<LearnHub> learnHubs,
             List<StudentPerformanceSummary> studentPerformances,
             List<StudentQuizPerformance> quizPerformances)
         {
             var totalLearnHubs = learnHubs.Count;
             var totalPointsCollected = quizPerformances.Sum(qp => qp.PointsEarned);
 
-            // Calculate completed LearnHubs
             var completedLearnHubs = 0;
             var totalProgressSum = 0.0;
 
@@ -67,24 +73,17 @@ namespace TeachingBACKEND.Application.Services
             {
                 var learnHubLinks = learnHub.Links;
                 var totalQuizzesInLearnHub = learnHubLinks.Sum(l => l.Quizzes.Count);
-                
+
                 if (totalQuizzesInLearnHub == 0) continue;
 
-                var completedQuizzesInLearnHub = quizPerformances
-                    .Where(qp => learnHubLinks.Any(l => l.Id == qp.LinkId))
-                    .Count();
+                var linkIds = new HashSet<Guid>(learnHubLinks.Select(l => l.Id));
+                var completedQuizzesInLearnHub = quizPerformances.Count(qp => linkIds.Contains(qp.LinkId));
 
-                var learnHubProgress = totalQuizzesInLearnHub > 0 
-                    ? (double)completedQuizzesInLearnHub / totalQuizzesInLearnHub * 100 
-                    : 0;
-
+                var learnHubProgress = (double)completedQuizzesInLearnHub / totalQuizzesInLearnHub * 100;
                 totalProgressSum += learnHubProgress;
 
-                // Consider LearnHub completed if 80% or more quizzes are done
                 if (learnHubProgress >= 80)
-                {
                     completedLearnHubs++;
-                }
             }
 
             var totalProgress = totalLearnHubs > 0 ? totalProgressSum / totalLearnHubs : 0;
@@ -98,15 +97,12 @@ namespace TeachingBACKEND.Application.Services
             };
         }
 
-        private async Task<List<LearnHubProgressDTO>> GetLatestLearnHubsWithProgressAsync(
+        private List<LearnHubProgressDTO> GetLatestLearnHubsWithProgress(
             Guid studentId,
             List<LearnHub> learnHubs,
             List<StudentPerformanceSummary> studentPerformances,
             List<StudentQuizPerformance> quizPerformances)
         {
-            var latestLearnHubs = new List<LearnHubProgressDTO>();
-
-            // Get the 3 most recently accessed LearnHubs
             var recentLearnHubIds = quizPerformances
                 .GroupBy(qp => qp.Quiz.Link.LearnHubId)
                 .OrderByDescending(g => g.Max(qp => qp.LastAttemptAt ?? qp.CompletedAt))
@@ -114,54 +110,43 @@ namespace TeachingBACKEND.Application.Services
                 .Select(g => g.Key)
                 .ToList();
 
+            var learnHubById = learnHubs.ToDictionary(lh => lh.Id);
+            var result = new List<LearnHubProgressDTO>();
+
             foreach (var learnHubId in recentLearnHubIds)
             {
-                var learnHub = learnHubs.FirstOrDefault(lh => lh.Id == learnHubId);
-                if (learnHub == null) continue;
+                if (!learnHubById.TryGetValue(learnHubId, out var learnHub)) continue;
 
-                var learnHubLinks = learnHub.Links;
-                var totalQuizzesInLearnHub = learnHubLinks.Sum(l => l.Quizzes.Count);
-                
+                var linkIds = new HashSet<Guid>(learnHub.Links.Select(l => l.Id));
+                var totalQuizzesInLearnHub = learnHub.Links.Sum(l => l.Quizzes.Count);
+
                 if (totalQuizzesInLearnHub == 0) continue;
 
-                var completedQuizzesInLearnHub = quizPerformances
-                    .Where(qp => learnHubLinks.Any(l => l.Id == qp.LinkId))
-                    .Count();
+                var lhPerformances = quizPerformances.Where(qp => linkIds.Contains(qp.LinkId)).ToList();
+                var progressPercentage = (double)lhPerformances.Count / totalQuizzesInLearnHub * 100;
 
-                var progressPercentage = totalQuizzesInLearnHub > 0 
-                    ? (double)completedQuizzesInLearnHub / totalQuizzesInLearnHub * 100 
-                    : 0;
-
-                // Get last exercise (most recent quiz completed)
-                var lastQuizPerformance = quizPerformances
-                    .Where(qp => learnHubLinks.Any(l => l.Id == qp.LinkId))
+                var lastQuizPerformance = lhPerformances
                     .OrderByDescending(qp => qp.LastAttemptAt ?? qp.CompletedAt)
                     .FirstOrDefault();
 
                 var lastExercise = lastQuizPerformance?.Quiz?.Link?.Title ?? "Nuk ka ushtrime të përfunduara";
-                var lastExerciseLinkId = lastQuizPerformance?.LinkId;
+                var pointsEarned = lhPerformances.Sum(qp => qp.PointsEarned);
+                var totalPossiblePoints = learnHub.Links.Sum(l => l.Quizzes.Sum(q => q.Points));
 
-                // Get points earned in this LearnHub
-                var pointsEarned = quizPerformances
-                    .Where(qp => learnHubLinks.Any(l => l.Id == qp.LinkId))
-                    .Sum(qp => qp.PointsEarned);
-
-                var totalPossiblePoints = learnHubLinks.Sum(l => l.Quizzes.Sum(q => q.Points));
-
-                latestLearnHubs.Add(new LearnHubProgressDTO
+                result.Add(new LearnHubProgressDTO
                 {
                     Id = learnHub.Id,
                     Title = learnHub.Title,
                     ProgressPercentage = Math.Round(progressPercentage, 1),
                     LastExercise = lastExercise,
-                    LastExerciseLinkId = lastExerciseLinkId,
+                    LastExerciseLinkId = lastQuizPerformance?.LinkId,
                     LastActivityAt = lastQuizPerformance?.LastAttemptAt ?? lastQuizPerformance?.CompletedAt,
                     PointsEarned = pointsEarned,
                     TotalPossiblePoints = totalPossiblePoints
                 });
             }
 
-            return latestLearnHubs;
+            return result;
         }
     }
 }

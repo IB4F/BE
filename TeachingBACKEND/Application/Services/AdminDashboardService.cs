@@ -10,128 +10,195 @@ namespace TeachingBACKEND.Application.Services
     public class AdminDashboardService : IAdminDashboardService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public AdminDashboardService(ApplicationDbContext context)
+        public AdminDashboardService(
+            ApplicationDbContext context,
+            IDbContextFactory<ApplicationDbContext> contextFactory)
         {
             _context = context;
+            _contextFactory = contextFactory;
         }
+
+        // ── Public interface methods ──────────────────────────────────────────
 
         public async Task<AdminDashboardDTO> GetDashboardOverviewAsync()
         {
-            var stats = await GetAdminStatsAsync();
-            var recentActivities = await GetRecentActivitiesAsync(10);
-            var registrationStats = await GetUserRegistrationStatsAsync();
-            var learnHubStats = await GetLearnHubStatsAsync();
-            var quizStats = await GetQuizStatsAsync();
-            var subscriptionStats = await GetSubscriptionStatsAsync();
+            await using var ctx1 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx2 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx3 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx4 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx5 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx6 = await _contextFactory.CreateDbContextAsync();
+
+            var statsTask          = GetAdminStatsInternalAsync(ctx1);
+            var activitiesTask     = GetRecentActivitiesInternalAsync(ctx2, 10);
+            var registrationTask   = GetUserRegistrationStatsInternalAsync(ctx3);
+            var learnHubTask       = GetLearnHubStatsInternalAsync(ctx4);
+            var quizTask           = GetQuizStatsInternalAsync(ctx5);
+            var subscriptionTask   = GetSubscriptionStatsInternalAsync(ctx6);
+
+            await Task.WhenAll(statsTask, activitiesTask, registrationTask, learnHubTask, quizTask, subscriptionTask);
 
             return new AdminDashboardDTO
             {
-                Stats = stats,
-                RecentActivities = recentActivities,
-                RegistrationStats = registrationStats,
-                LearnHubStats = learnHubStats,
-                QuizStats = quizStats,
-                SubscriptionStats = subscriptionStats
+                Stats              = statsTask.Result,
+                RecentActivities   = activitiesTask.Result,
+                RegistrationStats  = registrationTask.Result,
+                LearnHubStats      = learnHubTask.Result,
+                QuizStats          = quizTask.Result,
+                SubscriptionStats  = subscriptionTask.Result
             };
         }
 
-        public async Task<AdminStatsDTO> GetAdminStatsAsync()
+        public Task<AdminStatsDTO> GetAdminStatsAsync()
+            => GetAdminStatsInternalAsync(_context);
+
+        public Task<List<RecentActivityDTO>> GetRecentActivitiesAsync(int limit = 10)
+            => GetRecentActivitiesInternalAsync(_context, limit);
+
+        public Task<List<UserRegistrationStatsDTO>> GetUserRegistrationStatsAsync()
+            => GetUserRegistrationStatsInternalAsync(_context);
+
+        public Task<List<LearnHubStatsDTO>> GetLearnHubStatsAsync()
+            => GetLearnHubStatsInternalAsync(_context);
+
+        public Task<List<QuizStatsDTO>> GetQuizStatsAsync()
+            => GetQuizStatsInternalAsync(_context);
+
+        public Task<List<SubscriptionStatsDTO>> GetSubscriptionStatsAsync()
+            => GetSubscriptionStatsInternalAsync(_context);
+
+        public async Task<AdminAnalyticsDTO> GetAnalyticsAsync()
         {
-            var activeLearnHubs = await _context.LearnHubs.CountAsync();
-            var totalUsers = await _context.Users.CountAsync();
-            var completedQuizzes = await _context.StudentQuizPerformances
+            await using var ctx1 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx2 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx3 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx4 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx5 = await _contextFactory.CreateDbContextAsync();
+
+            var monthlyTask    = GetMonthlyRevenueInternalAsync(ctx1, 12);
+            var growthTask     = GetUserGrowthInternalAsync(ctx2, 30);
+            var topHubsTask    = GetTopPerformingLearnHubsInternalAsync(ctx3, 10);
+            var challengeTask  = GetMostChallengingQuizzesInternalAsync(ctx4, 10);
+            var geoTask        = GetGeographicDistributionInternalAsync(ctx5);
+
+            await Task.WhenAll(monthlyTask, growthTask, topHubsTask, challengeTask, geoTask);
+
+            return new AdminAnalyticsDTO
+            {
+                MonthlyRevenue          = monthlyTask.Result,
+                UserGrowth              = growthTask.Result,
+                TopPerformingLearnHubs  = topHubsTask.Result,
+                MostChallengingQuizzes  = challengeTask.Result,
+                GeographicDistribution  = geoTask.Result
+            };
+        }
+
+        public Task<List<MonthlyRevenueDTO>> GetMonthlyRevenueAsync(int months = 12)
+            => GetMonthlyRevenueInternalAsync(_context, months);
+
+        public Task<List<UserGrowthDTO>> GetUserGrowthAsync(int days = 30)
+            => GetUserGrowthInternalAsync(_context, days);
+
+        public Task<List<LearnHubPerformanceDTO>> GetTopPerformingLearnHubsAsync(int limit = 10)
+            => GetTopPerformingLearnHubsInternalAsync(_context, limit);
+
+        public Task<List<QuizPerformanceDTO>> GetMostChallengingQuizzesAsync(int limit = 10)
+            => GetMostChallengingQuizzesInternalAsync(_context, limit);
+
+        public Task<List<GeographicStatsDTO>> GetGeographicDistributionAsync()
+            => GetGeographicDistributionInternalAsync(_context);
+
+        public Task<Dictionary<string, object>> GetSystemHealthAsync()
+            => GetSystemHealthInternalAsync(_context);
+
+        // ── Private internal implementations ──────────────────────────────────
+
+        private async Task<AdminStatsDTO> GetAdminStatsInternalAsync(ApplicationDbContext db)
+        {
+            // One query for all user counts instead of 6 separate round-trips
+            var userSummary = await db.Users
+                .AsNoTracking()
+                .Select(u => new { u.Role, u.ApprovalStatus })
+                .ToListAsync();
+
+            var activeLearnHubs = await db.LearnHubs.CountAsync();
+            var completedQuizzes = await db.StudentQuizPerformances
                 .Where(sqp => sqp.IsCompleted)
                 .CountAsync();
-            var activeAdmins = await _context.Users
-                .Where(u => u.Role == UserRole.Admin)
-                .CountAsync();
-            var totalSchools = await _context.Users
-                .Where(u => u.Role == UserRole.Supervisor)
-                .CountAsync();
-            var totalStudents = await _context.Users
-                .Where(u => u.Role == UserRole.Student)
-                .CountAsync();
-            var totalFamilies = await _context.Users
-                .Where(u => u.Role == UserRole.Family)
-                .CountAsync();
-            var pendingApprovals = await _context.Users
-                .Where(u => u.ApprovalStatus == ApprovalStatus.Pending)
-                .CountAsync();
-            var totalRevenue = await _context.SubscriptionPayments
+            var totalRevenue = await db.SubscriptionPayments
                 .Where(sp => sp.Status == PaymentStatus.Succeeded)
-                .SumAsync(sp => sp.Amount) / 100m; // Convert from cents
-            var activeSubscriptions = await _context.Subscriptions
+                .SumAsync(sp => (long?)sp.Amount) ?? 0L;
+            var activeSubscriptions = await db.Subscriptions
                 .Where(s => s.Status == SubscriptionStatus.Active)
                 .CountAsync();
 
             return new AdminStatsDTO
             {
-                ActiveLearnHubs = activeLearnHubs,
-                TotalRegisteredUsers = totalUsers,
-                CompletedQuizzes = completedQuizzes,
-                ActiveAdministrators = activeAdmins,
-                TotalSchools = totalSchools,
-                TotalStudents = totalStudents,
-                TotalFamilies = totalFamilies,
-                PendingApprovals = pendingApprovals,
-                TotalRevenue = totalRevenue,
-                ActiveSubscriptions = activeSubscriptions
+                ActiveLearnHubs        = activeLearnHubs,
+                TotalRegisteredUsers   = userSummary.Count,
+                CompletedQuizzes       = completedQuizzes,
+                ActiveAdministrators   = userSummary.Count(u => u.Role == UserRole.Admin),
+                TotalSchools           = userSummary.Count(u => u.Role == UserRole.Supervisor),
+                TotalStudents          = userSummary.Count(u => u.Role == UserRole.Student),
+                TotalFamilies          = userSummary.Count(u => u.Role == UserRole.Family),
+                PendingApprovals       = userSummary.Count(u => u.ApprovalStatus == ApprovalStatus.Pending),
+                TotalRevenue           = totalRevenue / 100m,
+                ActiveSubscriptions    = activeSubscriptions
             };
         }
 
-        public async Task<List<RecentActivityDTO>> GetRecentActivitiesAsync(int limit = 10)
+        private async Task<List<RecentActivityDTO>> GetRecentActivitiesInternalAsync(ApplicationDbContext db, int limit)
         {
-            var activities = new List<RecentActivityDTO>();
-
-            // Get recent LearnHub creations
-                var recentLearnHubs = await _context.LearnHubs
+            var recentLearnHubs = await db.LearnHubs
+                .AsNoTracking()
                 .OrderByDescending(lh => lh.CreatedAt)
                 .Take(5)
                 .ToListAsync();
 
             var learnHubActivities = recentLearnHubs.Select(lh => new RecentActivityDTO
             {
-                Id = lh.Id,
-                Type = "learnhub_created",
+                Id          = lh.Id,
+                Type        = "learnhub_created",
                 Description = $"LearnHub '{lh.Title}' è stato creato",
-                UserName = "Sistema", // You might want to track who created it
-                UserRole = "Admin",
-                Timestamp = lh.CreatedAt,
-                Icon = "book",
-                Metadata = new Dictionary<string, object>
+                UserName    = "Sistema",
+                UserRole    = "Admin",
+                Timestamp   = lh.CreatedAt,
+                Icon        = "book",
+                Metadata    = new Dictionary<string, object>
                 {
                     ["learnHubId"] = lh.Id,
-                    ["title"] = lh.Title,
-                    ["subject"] = lh.Subject
+                    ["title"]      = lh.Title,
+                    ["subject"]    = lh.Subject
                 }
             }).ToList();
 
-            // Get recent user registrations
-            var recentUsers = await _context.Users
+            var recentUsers = await db.Users
+                .AsNoTracking()
                 .OrderByDescending(u => u.CreateAt)
                 .Take(5)
                 .ToListAsync();
 
             var userActivities = recentUsers.Select(u => new RecentActivityDTO
             {
-                Id = u.Id,
-                Type = "user_registered",
+                Id          = u.Id,
+                Type        = "user_registered",
                 Description = $"Nuovo utente registrato: {u.FirstName} {u.LastName}",
-                UserName = $"{u.FirstName} {u.LastName}",
-                UserRole = u.Role.ToString(),
-                Timestamp = u.CreateAt,
-                Icon = "user-plus",
-                Metadata = new Dictionary<string, object>
+                UserName    = $"{u.FirstName} {u.LastName}",
+                UserRole    = u.Role.ToString(),
+                Timestamp   = u.CreateAt,
+                Icon        = "user-plus",
+                Metadata    = new Dictionary<string, object>
                 {
                     ["userId"] = u.Id,
-                    ["email"] = u.Email,
-                    ["role"] = u.Role.ToString()
+                    ["email"]  = u.Email,
+                    ["role"]   = u.Role.ToString()
                 }
             }).ToList();
 
-            // Get recent quiz completions
-            var recentQuizCompletions = await _context.StudentQuizPerformances
+            var recentQuizCompletions = await db.StudentQuizPerformances
+                .AsNoTracking()
                 .Where(sqp => sqp.IsCompleted)
                 .Include(sqp => sqp.Student)
                 .Include(sqp => sqp.Quiz)
@@ -143,29 +210,25 @@ namespace TeachingBACKEND.Application.Services
 
             var quizActivities = recentQuizCompletions.Select(sqp => new RecentActivityDTO
             {
-                Id = sqp.Id,
-                Type = "quiz_completed",
+                Id          = sqp.Id,
+                Type        = "quiz_completed",
                 Description = $"Quiz completato in '{sqp.Quiz.Link.LearnHub.Title}'",
-                UserName = $"{sqp.Student.FirstName} {sqp.Student.LastName}",
-                UserRole = sqp.Student.Role.ToString(),
-                Timestamp = sqp.CompletedAt,
-                Icon = "check-circle",
-                Metadata = new Dictionary<string, object>
+                UserName    = $"{sqp.Student.FirstName} {sqp.Student.LastName}",
+                UserRole    = sqp.Student.Role.ToString(),
+                Timestamp   = sqp.CompletedAt,
+                Icon        = "check-circle",
+                Metadata    = new Dictionary<string, object>
                 {
-                    ["quizId"] = sqp.QuizId,
-                    ["learnHubId"] = sqp.Quiz.Link.LearnHubId,
+                    ["quizId"]      = sqp.QuizId,
+                    ["learnHubId"]  = sqp.Quiz.Link.LearnHubId,
                     ["pointsEarned"] = sqp.PointsEarned
                 }
             }).ToList();
 
-            // Get recent profile updates (placeholder - you might want to add an UpdatedAt field)
-            var recentProfileUpdates = new List<RecentActivityDTO>();
-
-            // Combine and sort all activities
+            var activities = new List<RecentActivityDTO>();
             activities.AddRange(learnHubActivities);
             activities.AddRange(userActivities);
             activities.AddRange(quizActivities);
-            activities.AddRange(recentProfileUpdates);
 
             return activities
                 .OrderByDescending(a => a.Timestamp)
@@ -173,381 +236,394 @@ namespace TeachingBACKEND.Application.Services
                 .ToList();
         }
 
-        public async Task<List<UserRegistrationStatsDTO>> GetUserRegistrationStatsAsync()
+        // One DB query instead of 55+ (4 per role × N roles + 7 daily queries per role)
+        private async Task<List<UserRegistrationStatsDTO>> GetUserRegistrationStatsInternalAsync(ApplicationDbContext db)
         {
-            var stats = new List<UserRegistrationStatsDTO>();
-            var roles = Enum.GetValues<UserRole>();
+            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+            var sevenDaysAgo  = DateTime.UtcNow.AddDays(-7);
+            var today         = DateTime.UtcNow.Date;
 
-            foreach (var role in roles)
+            var allUsers = await db.Users
+                .AsNoTracking()
+                .Select(u => new { u.Role, u.CreateAt })
+                .ToListAsync();
+
+            return Enum.GetValues<UserRole>().Select(role =>
             {
-                var totalCount = await _context.Users
-                    .Where(u => u.Role == role)
-                    .CountAsync();
-
-                var thisMonth = await _context.Users
-                    .Where(u => u.Role == role && u.CreateAt >= DateTime.UtcNow.AddDays(-30))
-                    .CountAsync();
-
-                var thisWeek = await _context.Users
-                    .Where(u => u.Role == role && u.CreateAt >= DateTime.UtcNow.AddDays(-7))
-                    .CountAsync();
-
-                var today = await _context.Users
-                    .Where(u => u.Role == role && u.CreateAt >= DateTime.UtcNow.Date)
-                    .CountAsync();
-
-                // Get last 7 days data
-                var last7Days = new List<DailyRegistrationDTO>();
-                for (int i = 6; i >= 0; i--)
-                {
-                    var date = DateTime.UtcNow.AddDays(-i).Date;
-                    var count = await _context.Users
-                        .Where(u => u.Role == role && u.CreateAt.Date == date)
-                        .CountAsync();
-
-                    last7Days.Add(new DailyRegistrationDTO
+                var roleUsers = allUsers.Where(u => u.Role == role).ToList();
+                var last7Days = Enumerable.Range(0, 7)
+                    .Select(i => today.AddDays(i - 6))
+                    .Select(date => new DailyRegistrationDTO
                     {
-                        Date = date,
-                        Count = count
-                    });
-                }
+                        Date  = date,
+                        Count = roleUsers.Count(u => u.CreateAt.Date == date)
+                    })
+                    .ToList();
 
-                stats.Add(new UserRegistrationStatsDTO
+                return new UserRegistrationStatsDTO
                 {
-                    Role = role,
-                    TotalCount = totalCount,
-                    ThisMonth = thisMonth,
-                    ThisWeek = thisWeek,
-                    Today = today,
-                    Last7Days = last7Days
-                });
-            }
-
-            return stats;
+                    Role       = role,
+                    TotalCount = roleUsers.Count,
+                    ThisMonth  = roleUsers.Count(u => u.CreateAt >= thirtyDaysAgo),
+                    ThisWeek   = roleUsers.Count(u => u.CreateAt >= sevenDaysAgo),
+                    Today      = roleUsers.Count(u => u.CreateAt >= today),
+                    Last7Days  = last7Days
+                };
+            }).ToList();
         }
 
-        public async Task<List<LearnHubStatsDTO>> GetLearnHubStatsAsync()
+        // 2 queries instead of N+1 (one per LearnHub)
+        private async Task<List<LearnHubStatsDTO>> GetLearnHubStatsInternalAsync(ApplicationDbContext db)
         {
-            var learnHubs = await _context.LearnHubs
+            var learnHubs = await db.LearnHubs
+                .AsNoTracking()
                 .Include(lh => lh.Links)
                     .ThenInclude(l => l.Quizzes)
                 .ToListAsync();
 
-            var stats = new List<LearnHubStatsDTO>();
+            var allQuizIds = learnHubs
+                .SelectMany(lh => lh.Links.SelectMany(l => l.Quizzes.Select(q => q.Id)))
+                .ToList();
 
-            foreach (var learnHub in learnHubs)
+            var allPerformances = allQuizIds.Count > 0
+                ? await db.StudentQuizPerformances
+                    .AsNoTracking()
+                    .Where(sqp => allQuizIds.Contains(sqp.QuizId))
+                    .ToListAsync()
+                : new List<StudentQuizPerformance>();
+
+            var quizToLearnHubId = learnHubs
+                .SelectMany(lh => lh.Links.SelectMany(l =>
+                    l.Quizzes.Select(q => new { QuizId = q.Id, LearnHubId = lh.Id })))
+                .ToDictionary(x => x.QuizId, x => x.LearnHubId);
+
+            var perfByLearnHub = allPerformances
+                .Where(p => quizToLearnHubId.ContainsKey(p.QuizId))
+                .GroupBy(p => quizToLearnHubId[p.QuizId])
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return learnHubs.Select(lh =>
             {
-                var totalLinks = learnHub.Links.Count;
-                var totalQuizzes = learnHub.Links.Sum(l => l.Quizzes.Count);
+                var perfs           = perfByLearnHub.TryGetValue(lh.Id, out var p) ? p : new List<StudentQuizPerformance>();
+                var totalAttempts   = perfs.Count;
+                var uniqueStudents  = perfs.Select(x => x.StudentId).Distinct().Count();
+                var averageScore    = totalAttempts > 0 ? perfs.Average(x => x.IsCorrect ? 1.0 : 0.0) : 0;
+                var completionRate  = totalAttempts > 0 ? (double)perfs.Count(x => x.IsCompleted) / totalAttempts * 100 : 0;
 
-                // Get quiz performance data
-                var learnHubQuizIds = learnHub.Links.SelectMany(l => l.Quizzes.Select(q => q.Id)).ToList();
-                var quizPerformances = await _context.StudentQuizPerformances
-                    .Where(sqp => learnHubQuizIds.Contains(sqp.QuizId))
-                    .ToListAsync();
-
-                var totalAttempts = quizPerformances.Count;
-                var uniqueStudents = quizPerformances.Select(sqp => sqp.StudentId).Distinct().Count();
-                var averageScore = quizPerformances.Any() ? quizPerformances.Average(sqp => sqp.IsCorrect ? 1.0 : 0.0) : 0;
-                var completionRate = quizPerformances.Any() ? 
-                    (double)quizPerformances.Count(sqp => sqp.IsCompleted) / quizPerformances.Count * 100 : 0;
-
-                stats.Add(new LearnHubStatsDTO
+                return new LearnHubStatsDTO
                 {
-                    Id = learnHub.Id,
-                    Title = learnHub.Title,
-                    Subject = learnHub.Subject,
-                    ClassType = learnHub.ClassType,
-                    Difficulty = learnHub.Difficulty,
-                    IsFree = learnHub.IsFree,
-                    CreatedAt = learnHub.CreatedAt,
-                    TotalLinks = totalLinks,
-                    TotalQuizzes = totalQuizzes,
-                    TotalAttempts = totalAttempts,
+                    Id             = lh.Id,
+                    Title          = lh.Title,
+                    Subject        = lh.Subject,
+                    ClassType      = lh.ClassType,
+                    Difficulty     = lh.Difficulty,
+                    IsFree         = lh.IsFree,
+                    CreatedAt      = lh.CreatedAt,
+                    TotalLinks     = lh.Links.Count,
+                    TotalQuizzes   = lh.Links.Sum(l => l.Quizzes.Count),
+                    TotalAttempts  = totalAttempts,
                     UniqueStudents = uniqueStudents,
-                    AverageScore = Math.Round(averageScore, 2),
+                    AverageScore   = Math.Round(averageScore, 2),
                     CompletionRate = Math.Round(completionRate, 2)
-                });
-            }
-
-            return stats.OrderByDescending(s => s.TotalAttempts).ToList();
+                };
+            })
+            .OrderByDescending(s => s.TotalAttempts)
+            .ToList();
         }
 
-        public async Task<List<QuizStatsDTO>> GetQuizStatsAsync()
+        // 2 queries instead of N+1 (one per quiz)
+        private async Task<List<QuizStatsDTO>> GetQuizStatsInternalAsync(ApplicationDbContext db)
         {
-            var quizzes = await _context.Quizzes
+            var quizzes = await db.Quizzes
+                .AsNoTracking()
                 .Include(q => q.Link)
                     .ThenInclude(l => l.LearnHub)
                 .ToListAsync();
 
-            var stats = new List<QuizStatsDTO>();
+            var quizIds = quizzes.Select(q => q.Id).ToHashSet();
+            var allPerformances = quizIds.Count > 0
+                ? await db.StudentQuizPerformances
+                    .AsNoTracking()
+                    .Where(sqp => quizIds.Contains(sqp.QuizId))
+                    .ToListAsync()
+                : new List<StudentQuizPerformance>();
 
-            foreach (var quiz in quizzes)
+            var perfByQuiz = allPerformances
+                .GroupBy(p => p.QuizId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return quizzes.Select(q =>
             {
-                var performances = await _context.StudentQuizPerformances
-                    .Where(sqp => sqp.QuizId == quiz.Id)
-                    .ToListAsync();
+                var perfs           = perfByQuiz.TryGetValue(q.Id, out var p) ? p : new List<StudentQuizPerformance>();
+                var totalAttempts   = perfs.Count;
+                var correctAttempts = perfs.Count(x => x.IsCompleted && x.IsCorrect);
+                var successRate     = totalAttempts > 0 ? (double)correctAttempts / totalAttempts * 100 : 0;
+                var avgTime         = perfs.Count > 0 ? perfs.Average(x => x.TimeSpentSeconds) : 0;
 
-                var totalAttempts = performances.Count;
-                var correctAttempts = performances.Count(sqp => sqp.IsCompleted && sqp.IsCorrect);
-                var successRate = totalAttempts > 0 ? (double)correctAttempts / totalAttempts * 100 : 0;
-                var averageTimeSpent = performances.Any() ? performances.Average(sqp => sqp.TimeSpentSeconds) : 0;
-
-                stats.Add(new QuizStatsDTO
+                return new QuizStatsDTO
                 {
-                    Id = quiz.Id,
-                    Question = quiz.Question,
-                    LearnHubTitle = quiz.Link.LearnHub.Title,
-                    LinkTitle = quiz.Link.Title,
-                    Points = quiz.Points,
-                    CreatedAt = quiz.CreatedAt,
-                    TotalAttempts = totalAttempts,
-                    CorrectAttempts = correctAttempts,
-                    SuccessRate = Math.Round(successRate, 2),
-                    AverageTimeSpent = Math.Round(averageTimeSpent, 2)
-                });
-            }
-
-            return stats.OrderByDescending(s => s.TotalAttempts).ToList();
+                    Id               = q.Id,
+                    Question         = q.Question,
+                    LearnHubTitle    = q.Link.LearnHub.Title,
+                    LinkTitle        = q.Link.Title,
+                    Points           = q.Points,
+                    CreatedAt        = q.CreatedAt,
+                    TotalAttempts    = totalAttempts,
+                    CorrectAttempts  = correctAttempts,
+                    SuccessRate      = Math.Round(successRate, 2),
+                    AverageTimeSpent = Math.Round(avgTime, 2)
+                };
+            })
+            .OrderByDescending(s => s.TotalAttempts)
+            .ToList();
         }
 
-        public async Task<List<SubscriptionStatsDTO>> GetSubscriptionStatsAsync()
+        // 2 queries instead of N+1 (one totalRevenue query per package)
+        private async Task<List<SubscriptionStatsDTO>> GetSubscriptionStatsInternalAsync(ApplicationDbContext db)
         {
-            var packages = await _context.SubscriptionPackages
+            var packages = await db.SubscriptionPackages
+                .AsNoTracking()
                 .Include(sp => sp.Subscriptions)
                 .ToListAsync();
 
-            var stats = new List<SubscriptionStatsDTO>();
+            // Load all revenue in one query via navigation join
+            var revenueByPackage = (await db.SubscriptionPayments
+                .AsNoTracking()
+                .Where(sp => sp.Status == PaymentStatus.Succeeded)
+                .Select(sp => new { PackageId = sp.Subscription.SubscriptionPackageId, sp.Amount })
+                .ToListAsync())
+                .GroupBy(r => r.PackageId)
+                .ToDictionary(g => g.Key, g => g.Sum(r => r.Amount));
 
-            foreach (var package in packages)
+            var thisMonth = DateTime.UtcNow.AddDays(-30);
+
+            return packages.Select(package =>
             {
-                var activeSubscriptions = package.Subscriptions.Count(s => s.Status == SubscriptionStatus.Active);
-                var monthlyRevenue = package.Subscriptions
+                var activeSubscriptions      = package.Subscriptions.Count(s => s.Status == SubscriptionStatus.Active);
+                var monthlyRevenue           = package.Subscriptions
                     .Where(s => s.Status == SubscriptionStatus.Active)
-                    .Sum(s => s.Amount) / 100m; // Convert from cents
+                    .Sum(s => s.Amount) / 100m;
+                var totalRevenue             = revenueByPackage.TryGetValue(package.Id, out var rev) ? rev / 100m : 0m;
+                var newSubscriptionsThisMonth = package.Subscriptions.Count(s => s.CreatedAt >= thisMonth);
+                var cancellationsThisMonth   = package.Subscriptions
+                    .Count(s => s.CanceledAt.HasValue && s.CanceledAt.Value >= thisMonth);
 
-                var totalRevenue = await _context.SubscriptionPayments
-                    .Where(sp => sp.Subscription.SubscriptionPackageId == package.Id && sp.Status == PaymentStatus.Succeeded)
-                    .SumAsync(sp => sp.Amount) / 100m;
-
-                var thisMonth = DateTime.UtcNow.AddDays(-30);
-                var newSubscriptionsThisMonth = package.Subscriptions
-                    .Count(s => s.CreatedAt >= thisMonth);
-                var cancellationsThisMonth = package.Subscriptions
-                    .Count(s => s.CanceledAt >= thisMonth);
-
-                stats.Add(new SubscriptionStatsDTO
+                return new SubscriptionStatsDTO
                 {
-                    Id = package.Id,
-                    PackageName = package.Name,
-                    UserType = package.UserType,
-                    Status = SubscriptionStatus.Active, // This represents the package status
-                    ActiveSubscriptions = activeSubscriptions,
-                    MonthlyRevenue = monthlyRevenue,
-                    TotalRevenue = totalRevenue,
-                    CreatedAt = package.CreatedAt,
+                    Id                       = package.Id,
+                    PackageName              = package.Name,
+                    UserType                 = package.UserType,
+                    Status                   = SubscriptionStatus.Active,
+                    ActiveSubscriptions      = activeSubscriptions,
+                    MonthlyRevenue           = monthlyRevenue,
+                    TotalRevenue             = totalRevenue,
+                    CreatedAt                = package.CreatedAt,
                     NewSubscriptionsThisMonth = newSubscriptionsThisMonth,
-                    CancellationsThisMonth = cancellationsThisMonth
-                });
-            }
-
-            return stats.OrderByDescending(s => s.ActiveSubscriptions).ToList();
+                    CancellationsThisMonth   = cancellationsThisMonth
+                };
+            })
+            .OrderByDescending(s => s.ActiveSubscriptions)
+            .ToList();
         }
 
-        public async Task<AdminAnalyticsDTO> GetAnalyticsAsync()
+        // 2 queries instead of 36 (3 per month × 12 months)
+        private async Task<List<MonthlyRevenueDTO>> GetMonthlyRevenueInternalAsync(ApplicationDbContext db, int months)
         {
-            var monthlyRevenue = await GetMonthlyRevenueAsync(12);
-            var userGrowth = await GetUserGrowthAsync(30);
-            var topPerformingLearnHubs = await GetTopPerformingLearnHubsAsync(10);
-            var mostChallengingQuizzes = await GetMostChallengingQuizzesAsync(10);
-            var geographicDistribution = await GetGeographicDistributionAsync();
-
-            return new AdminAnalyticsDTO
-            {
-                MonthlyRevenue = monthlyRevenue,
-                UserGrowth = userGrowth,
-                TopPerformingLearnHubs = topPerformingLearnHubs,
-                MostChallengingQuizzes = mostChallengingQuizzes,
-                GeographicDistribution = geographicDistribution
-            };
-        }
-
-        public async Task<List<MonthlyRevenueDTO>> GetMonthlyRevenueAsync(int months = 12)
-        {
-            var revenueData = new List<MonthlyRevenueDTO>();
             var startDate = DateTime.UtcNow.AddMonths(-(months - 1));
 
-            for (int i = 0; i < months; i++)
+            var payments = await db.SubscriptionPayments
+                .AsNoTracking()
+                .Where(sp => sp.CreatedAt >= startDate && sp.Status == PaymentStatus.Succeeded)
+                .Select(sp => new { sp.CreatedAt, sp.Amount })
+                .ToListAsync();
+
+            var subscriptions = await db.Subscriptions
+                .AsNoTracking()
+                .Where(s => s.CreatedAt >= startDate || (s.CanceledAt != null && s.CanceledAt >= startDate))
+                .Select(s => new { s.CreatedAt, s.CanceledAt })
+                .ToListAsync();
+
+            return Enumerable.Range(0, months).Select(i =>
             {
                 var monthStart = startDate.AddMonths(i);
-                var monthEnd = monthStart.AddMonths(1);
-
-                var revenue = await _context.SubscriptionPayments
-                    .Where(sp => sp.CreatedAt >= monthStart && sp.CreatedAt < monthEnd && sp.Status == PaymentStatus.Succeeded)
-                    .SumAsync(sp => sp.Amount) / 100m;
-
-                var newSubscriptions = await _context.Subscriptions
-                    .Where(s => s.CreatedAt >= monthStart && s.CreatedAt < monthEnd)
-                    .CountAsync();
-
-                var cancellations = await _context.Subscriptions
-                    .Where(s => s.CanceledAt >= monthStart && s.CanceledAt < monthEnd)
-                    .CountAsync();
-
-                revenueData.Add(new MonthlyRevenueDTO
+                var monthEnd   = monthStart.AddMonths(1);
+                return new MonthlyRevenueDTO
                 {
-                    Year = monthStart.Year,
-                    Month = monthStart.Month,
-                    Revenue = revenue,
-                    NewSubscriptions = newSubscriptions,
-                    Cancellations = cancellations
-                });
-            }
-
-            return revenueData;
+                    Year              = monthStart.Year,
+                    Month             = monthStart.Month,
+                    Revenue           = payments
+                        .Where(p => p.CreatedAt >= monthStart && p.CreatedAt < monthEnd)
+                        .Sum(p => (decimal)p.Amount) / 100m,
+                    NewSubscriptions  = subscriptions.Count(s => s.CreatedAt >= monthStart && s.CreatedAt < monthEnd),
+                    Cancellations     = subscriptions.Count(s =>
+                        s.CanceledAt.HasValue && s.CanceledAt.Value >= monthStart && s.CanceledAt.Value < monthEnd)
+                };
+            }).ToList();
         }
 
-        public async Task<List<UserGrowthDTO>> GetUserGrowthAsync(int days = 30)
+        // 1 query instead of ~180 (2 per day × 30 days × N roles)
+        private async Task<List<UserGrowthDTO>> GetUserGrowthInternalAsync(ApplicationDbContext db, int days)
         {
-            var growthData = new List<UserGrowthDTO>();
             var startDate = DateTime.UtcNow.AddDays(-days);
+
+            var allUsers = await db.Users
+                .AsNoTracking()
+                .Select(u => new { u.Role, u.CreateAt })
+                .ToListAsync();
+
+            var roles  = Enum.GetValues<UserRole>();
+            var result = new List<UserGrowthDTO>();
 
             for (int i = 0; i < days; i++)
             {
-                var date = startDate.AddDays(i);
+                var date     = startDate.AddDays(i);
                 var nextDate = date.AddDays(1);
+                var dayUsers = allUsers.Where(u => u.CreateAt >= date && u.CreateAt < nextDate).ToList();
+                var total    = allUsers.Count(u => u.CreateAt < nextDate);
 
-                var newUsers = await _context.Users
-                    .Where(u => u.CreateAt >= date && u.CreateAt < nextDate)
-                    .CountAsync();
-
-                var totalUsers = await _context.Users
-                    .Where(u => u.CreateAt < nextDate)
-                    .CountAsync();
-
-                // Get growth by role
-                var roles = Enum.GetValues<UserRole>();
                 foreach (var role in roles)
                 {
-                    var newUsersByRole = await _context.Users
-                        .Where(u => u.Role == role && u.CreateAt >= date && u.CreateAt < nextDate)
-                        .CountAsync();
-
-                    if (newUsersByRole > 0)
+                    var newByRole = dayUsers.Count(u => u.Role == role);
+                    if (newByRole > 0)
                     {
-                        growthData.Add(new UserGrowthDTO
+                        result.Add(new UserGrowthDTO
                         {
-                            Date = date,
-                            NewUsers = newUsersByRole,
-                            TotalUsers = totalUsers,
-                            Role = role
+                            Date      = date,
+                            NewUsers  = newByRole,
+                            TotalUsers = total,
+                            Role      = role
                         });
                     }
                 }
             }
 
-            return growthData.OrderBy(g => g.Date).ToList();
+            return result.OrderBy(g => g.Date).ToList();
         }
 
-        public async Task<List<LearnHubPerformanceDTO>> GetTopPerformingLearnHubsAsync(int limit = 10)
+        // 2 queries instead of N+1
+        private async Task<List<LearnHubPerformanceDTO>> GetTopPerformingLearnHubsInternalAsync(ApplicationDbContext db, int limit)
         {
-            var learnHubs = await _context.LearnHubs
+            var learnHubs = await db.LearnHubs
+                .AsNoTracking()
                 .Include(lh => lh.Links)
                     .ThenInclude(l => l.Quizzes)
                 .ToListAsync();
 
-            var performances = new List<LearnHubPerformanceDTO>();
+            var allQuizIds = learnHubs
+                .SelectMany(lh => lh.Links.SelectMany(l => l.Quizzes.Select(q => q.Id)))
+                .ToHashSet();
 
-            foreach (var learnHub in learnHubs)
+            var allPerformances = allQuizIds.Count > 0
+                ? await db.StudentQuizPerformances
+                    .AsNoTracking()
+                    .Where(sqp => allQuizIds.Contains(sqp.QuizId))
+                    .ToListAsync()
+                : new List<StudentQuizPerformance>();
+
+            var quizToLearnHubId = learnHubs
+                .SelectMany(lh => lh.Links.SelectMany(l =>
+                    l.Quizzes.Select(q => new { QuizId = q.Id, LearnHubId = lh.Id })))
+                .ToDictionary(x => x.QuizId, x => x.LearnHubId);
+
+            var perfByLearnHub = allPerformances
+                .Where(p => quizToLearnHubId.ContainsKey(p.QuizId))
+                .GroupBy(p => quizToLearnHubId[p.QuizId])
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return learnHubs.Select(lh =>
             {
-                var learnHubQuizIds = learnHub.Links.SelectMany(l => l.Quizzes.Select(q => q.Id)).ToList();
-                var quizPerformances = await _context.StudentQuizPerformances
-                    .Where(sqp => learnHubQuizIds.Contains(sqp.QuizId))
-                    .ToListAsync();
-
-                var totalStudents = quizPerformances.Select(sqp => sqp.StudentId).Distinct().Count();
-                var averageScore = quizPerformances.Any() ? quizPerformances.Average(sqp => sqp.IsCorrect ? 1.0 : 0.0) : 0;
-                var completionRate = quizPerformances.Any() ? 
-                    (double)quizPerformances.Count(sqp => sqp.IsCompleted) / quizPerformances.Count * 100 : 0;
-                var totalAttempts = quizPerformances.Count;
+                var perfs           = perfByLearnHub.TryGetValue(lh.Id, out var p) ? p : new List<StudentQuizPerformance>();
+                var totalStudents   = perfs.Select(x => x.StudentId).Distinct().Count();
+                var averageScore    = perfs.Count > 0 ? perfs.Average(x => x.IsCorrect ? 1.0 : 0.0) : 0;
+                var completionRate  = perfs.Count > 0 ? (double)perfs.Count(x => x.IsCompleted) / perfs.Count * 100 : 0;
+                var totalAttempts   = perfs.Count;
                 var engagementScore = totalStudents * 0.4 + averageScore * 0.3 + completionRate * 0.3;
 
-                performances.Add(new LearnHubPerformanceDTO
+                return new LearnHubPerformanceDTO
                 {
-                    Id = learnHub.Id,
-                    Title = learnHub.Title,
-                    TotalStudents = totalStudents,
-                    AverageScore = Math.Round(averageScore, 2),
-                    CompletionRate = Math.Round(completionRate, 2),
-                    TotalAttempts = totalAttempts,
+                    Id              = lh.Id,
+                    Title           = lh.Title,
+                    TotalStudents   = totalStudents,
+                    AverageScore    = Math.Round(averageScore, 2),
+                    CompletionRate  = Math.Round(completionRate, 2),
+                    TotalAttempts   = totalAttempts,
                     EngagementScore = Math.Round(engagementScore, 2)
-                });
-            }
-
-            return performances.OrderByDescending(p => p.EngagementScore).Take(limit).ToList();
+                };
+            })
+            .OrderByDescending(p => p.EngagementScore)
+            .Take(limit)
+            .ToList();
         }
 
-        public async Task<List<QuizPerformanceDTO>> GetMostChallengingQuizzesAsync(int limit = 10)
+        // 2 queries instead of N+1
+        private async Task<List<QuizPerformanceDTO>> GetMostChallengingQuizzesInternalAsync(ApplicationDbContext db, int limit)
         {
-            var quizzes = await _context.Quizzes
+            var quizzes = await db.Quizzes
+                .AsNoTracking()
                 .Include(q => q.Link)
                     .ThenInclude(l => l.LearnHub)
                 .ToListAsync();
 
-            var performances = new List<QuizPerformanceDTO>();
+            var quizIds = quizzes.Select(q => q.Id).ToHashSet();
+            var allPerformances = quizIds.Count > 0
+                ? await db.StudentQuizPerformances
+                    .AsNoTracking()
+                    .Where(sqp => quizIds.Contains(sqp.QuizId))
+                    .ToListAsync()
+                : new List<StudentQuizPerformance>();
 
-            foreach (var quiz in quizzes)
+            var perfByQuiz = allPerformances
+                .GroupBy(p => p.QuizId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return quizzes.Select(q =>
             {
-                var quizPerformances = await _context.StudentQuizPerformances
-                    .Where(sqp => sqp.QuizId == quiz.Id)
-                    .ToListAsync();
+                var perfs         = perfByQuiz.TryGetValue(q.Id, out var p) ? p : new List<StudentQuizPerformance>();
+                var totalAttempts = perfs.Count;
+                var successRate   = totalAttempts > 0
+                    ? (double)perfs.Count(x => x.IsCompleted && x.IsCorrect) / totalAttempts * 100
+                    : 0;
+                var avgTime = perfs.Count > 0 ? perfs.Average(x => x.TimeSpentSeconds) : 0;
 
-                var totalAttempts = quizPerformances.Count;
-                var successRate = totalAttempts > 0 ? 
-                    (double)quizPerformances.Count(sqp => sqp.IsCompleted && sqp.IsCorrect) / totalAttempts * 100 : 0;
-                var averageTimeSpent = quizPerformances.Any() ? quizPerformances.Average(sqp => sqp.TimeSpentSeconds) : 0;
-
-                performances.Add(new QuizPerformanceDTO
+                return new QuizPerformanceDTO
                 {
-                    Id = quiz.Id,
-                    Question = quiz.Question,
-                    LearnHubTitle = quiz.Link.LearnHub.Title,
-                    SuccessRate = Math.Round(successRate, 2),
-                    TotalAttempts = totalAttempts,
-                    AverageTimeSpent = Math.Round(averageTimeSpent, 2),
-                    Difficulty = quiz.Points // Using points as difficulty indicator
-                });
-            }
-
-            return performances.OrderBy(p => p.SuccessRate).Take(limit).ToList();
+                    Id               = q.Id,
+                    Question         = q.Question,
+                    LearnHubTitle    = q.Link.LearnHub.Title,
+                    SuccessRate      = Math.Round(successRate, 2),
+                    TotalAttempts    = totalAttempts,
+                    AverageTimeSpent = Math.Round(avgTime, 2),
+                    Difficulty       = q.Points
+                };
+            })
+            .OrderBy(p => p.SuccessRate)
+            .Take(limit)
+            .ToList();
         }
 
-        public async Task<List<GeographicStatsDTO>> GetGeographicDistributionAsync()
+        private async Task<List<GeographicStatsDTO>> GetGeographicDistributionInternalAsync(ApplicationDbContext db)
         {
-            var stats = await _context.Users
+            return await db.Users
+                .AsNoTracking()
                 .Where(u => !string.IsNullOrEmpty(u.City))
                 .GroupBy(u => u.City)
                 .Select(g => new GeographicStatsDTO
                 {
-                    City = g.Key,
-                    UserCount = g.Count(),
+                    City        = g.Key,
+                    UserCount   = g.Count(),
                     SchoolCount = g.Count(u => u.Role == UserRole.Supervisor),
-                    Revenue = 0 // You might want to calculate this based on subscriptions
+                    Revenue     = 0
                 })
                 .OrderByDescending(s => s.UserCount)
                 .ToListAsync();
-
-            return stats;
         }
 
-        public async Task<Dictionary<string, object>> GetSystemHealthAsync()
+        private async Task<Dictionary<string, object>> GetSystemHealthInternalAsync(ApplicationDbContext db)
         {
             var health = new Dictionary<string, object>();
-
-            // Database connectivity
             try
             {
-                await _context.Database.ExecuteSqlRawAsync("SELECT 1");
+                await db.Database.ExecuteSqlRawAsync("SELECT 1");
                 health["database"] = "healthy";
             }
             catch
@@ -555,16 +631,14 @@ namespace TeachingBACKEND.Application.Services
                 health["database"] = "unhealthy";
             }
 
-            // System metrics
-            health["totalUsers"] = await _context.Users.CountAsync();
-            health["activeSubscriptions"] = await _context.Subscriptions
+            health["totalUsers"] = await db.Users.CountAsync();
+            health["activeSubscriptions"] = await db.Subscriptions
                 .Where(s => s.Status == SubscriptionStatus.Active)
                 .CountAsync();
-            health["pendingApprovals"] = await _context.Users
+            health["pendingApprovals"] = await db.Users
                 .Where(u => u.ApprovalStatus == ApprovalStatus.Pending)
                 .CountAsync();
             health["lastUpdate"] = DateTime.UtcNow;
-
             return health;
         }
     }
