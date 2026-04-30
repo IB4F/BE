@@ -67,6 +67,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.EnableSensitiveDataLogging();
 });
 
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")),
+    ServiceLifetime.Scoped);
+
+builder.Services.AddMemoryCache();
+
 builder.Services
   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
   .AddJwtBearer(options =>
@@ -239,8 +245,12 @@ builder.Services.AddAutoMapper(typeof(LearnHubProfile).Assembly);
 Stripe.StripeConfiguration.ApiKey = builder.Configuration["STRIPE_SECRET_KEY"];
 
 
+var minLogLevel = builder.Environment.IsDevelopment()
+    ? Serilog.Events.LogEventLevel.Debug
+    : Serilog.Events.LogEventLevel.Warning;
+
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Debug()
+    .MinimumLevel.Is(minLogLevel)
     .WriteTo.Console()
     .WriteTo.Seq("http://localhost:5341")
     .Enrich.FromLogContext()
