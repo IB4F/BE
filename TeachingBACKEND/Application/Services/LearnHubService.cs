@@ -333,6 +333,7 @@ public class LearnHubService : ILearnHubService
                 ClassType = lh.ClassType,
                 Subject = lh.Subject,
                 IsFree = lh.IsFree,
+                RequiredTier = lh.RequiredTier,
                 CreatedAt = lh.CreatedAt,
                 Links = lh.Links.Select(link => new LinkDTO
                 {
