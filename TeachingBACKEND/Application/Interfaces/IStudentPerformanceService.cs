@@ -42,4 +42,9 @@ public interface IStudentPerformanceService
     /// Update performance summary for a student-link combination
     /// </summary>
     Task UpdatePerformanceSummary(Guid studentId, Guid linkId);
+
+    /// <summary>
+    /// Get ordered quiz results for a student in a link (for the results screen)
+    /// </summary>
+    Task<List<QuizResultDTO>> GetQuizResultsAsync(Guid linkId, Guid studentId);
 }

@@ -9,13 +9,20 @@
         public List<OptionDTO> Options { get; set; }
         public bool IsAnswered { get; set; }
         public string? QuestionAudioId { get; set; }
+        public string? QuestionImageId { get; set; }
         public string? ExplanationAudioId { get; set; }
         public string? ExplanationImageId { get; set; }
         public string? QuestionAudioUrl { get; set; }
+        public string? QuestionImageUrl { get; set; }
         public string? ExplanationAudioUrl { get; set; }
         public string? ExplanationImageUrl { get; set; }
         public string QuizType { get; set; }
-        public Guid? ParentQuizId { get; set; } // Parent quiz ID if this is a child quiz
-        public List<object> ChildQuizzes { get; set; } = new List<object>(); // Child quizzes if this is a parent
+        public Guid? ParentQuizId { get; set; }
+        public List<object> ChildQuizzes { get; set; } = new List<object>();
+
+        // DnD payloads — only the relevant one is populated based on quiz type
+        public DragSpellAdminDTO? DndSpell { get; set; }
+        public DragOrderAdminDTO? DndOrder { get; set; }
+        public DragMatchAdminDTO? DndMatch { get; set; }
     }
 }

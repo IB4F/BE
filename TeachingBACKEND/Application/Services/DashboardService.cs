@@ -50,11 +50,13 @@ namespace TeachingBACKEND.Application.Services
 
             var stats = CalculateDashboardStats(learnHubs, studentPerformances, quizPerformances);
             var latestLearnHubs = GetLatestLearnHubsWithProgress(studentId, learnHubs, studentPerformances, quizPerformances);
+            var weeklyActivity = CalculateWeeklyActivity(quizPerformances);
 
             return new DashboardDTO
             {
                 Stats = stats,
-                LatestLearnHubs = latestLearnHubs
+                LatestLearnHubs = latestLearnHubs,
+                WeeklyActivity = weeklyActivity
             };
         }
 
@@ -88,12 +90,28 @@ namespace TeachingBACKEND.Application.Services
 
             var totalProgress = totalLearnHubs > 0 ? totalProgressSum / totalLearnHubs : 0;
 
+            // Change 1 — average accuracy
+            double? averageAccuracy = null;
+            if (quizPerformances.Count > 0)
+            {
+                var correctCount = quizPerformances.Count(qp => qp.IsCorrect);
+                averageAccuracy = Math.Round((double)correctCount / quizPerformances.Count * 100, 1);
+            }
+
+            // Change 2 — daily goal
+            var todayUtc = DateTime.UtcNow.Date;
+            var todayExercisesCompleted = quizPerformances.Count(qp =>
+                (qp.LastAttemptAt ?? qp.CompletedAt).Date == todayUtc);
+
             return new DashboardStatsDTO
             {
                 TotalProgress = Math.Round(totalProgress, 1),
                 PointsCollected = totalPointsCollected,
                 CompletedLearnHubs = completedLearnHubs,
-                TotalLearnHubs = totalLearnHubs
+                TotalLearnHubs = totalLearnHubs,
+                AverageAccuracy = averageAccuracy,
+                TodayExercisesCompleted = todayExercisesCompleted,
+                DailyGoal = 5
             };
         }
 
@@ -103,10 +121,10 @@ namespace TeachingBACKEND.Application.Services
             List<StudentPerformanceSummary> studentPerformances,
             List<StudentQuizPerformance> quizPerformances)
         {
+            // All LearnHubs the student has ever touched, ordered by most recent activity DESC
             var recentLearnHubIds = quizPerformances
                 .GroupBy(qp => qp.Quiz.Link.LearnHubId)
                 .OrderByDescending(g => g.Max(qp => qp.LastAttemptAt ?? qp.CompletedAt))
-                .Take(3)
                 .Select(g => g.Key)
                 .ToList();
 
@@ -123,7 +141,10 @@ namespace TeachingBACKEND.Application.Services
                 if (totalQuizzesInLearnHub == 0) continue;
 
                 var lhPerformances = quizPerformances.Where(qp => linkIds.Contains(qp.LinkId)).ToList();
-                var progressPercentage = (double)lhPerformances.Count / totalQuizzesInLearnHub * 100;
+
+                // Cap at exactly 100 so completed hubs never show 99.x or 100.something
+                var rawProgress = (double)lhPerformances.Count / totalQuizzesInLearnHub * 100;
+                var progressPercentage = Math.Min(100.0, Math.Round(rawProgress, 1));
 
                 var lastQuizPerformance = lhPerformances
                     .OrderByDescending(qp => qp.LastAttemptAt ?? qp.CompletedAt)
@@ -137,7 +158,7 @@ namespace TeachingBACKEND.Application.Services
                 {
                     Id = learnHub.Id,
                     Title = learnHub.Title,
-                    ProgressPercentage = Math.Round(progressPercentage, 1),
+                    ProgressPercentage = progressPercentage,
                     LastExercise = lastExercise,
                     LastExerciseLinkId = lastQuizPerformance?.LinkId,
                     LastActivityAt = lastQuizPerformance?.LastAttemptAt ?? lastQuizPerformance?.CompletedAt,
@@ -147,6 +168,36 @@ namespace TeachingBACKEND.Application.Services
             }
 
             return result;
+        }
+
+        private static List<WeeklyActivityDayDTO> CalculateWeeklyActivity(List<StudentQuizPerformance> quizPerformances)
+        {
+            var today = DateTime.UtcNow.Date;
+
+            // ISO week: Monday = 0 … Sunday = 6
+            var dow = (int)today.DayOfWeek; // 0=Sun, 1=Mon, …, 6=Sat
+            var daysFromMonday = dow == 0 ? 6 : dow - 1;
+            var monday = today.AddDays(-daysFromMonday);
+
+            return Enumerable.Range(0, 7).Select(i =>
+            {
+                var day = monday.AddDays(i);
+
+                if (day > today)
+                    return new WeeklyActivityDayDTO { DayIndex = i, Date = day.ToString("yyyy-MM-dd"), ExercisesCompleted = 0, PointsEarned = 0 };
+
+                var dayPerfs = quizPerformances
+                    .Where(qp => (qp.LastAttemptAt ?? qp.CompletedAt).Date == day)
+                    .ToList();
+
+                return new WeeklyActivityDayDTO
+                {
+                    DayIndex = i,
+                    Date = day.ToString("yyyy-MM-dd"),
+                    ExercisesCompleted = dayPerfs.Count,
+                    PointsEarned = dayPerfs.Sum(qp => qp.PointsEarned)
+                };
+            }).ToList();
         }
     }
 }

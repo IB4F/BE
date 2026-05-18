@@ -122,10 +122,15 @@ public class StudentController : ControllerBase
             if (submission.QuizId == Guid.Empty)
                 return BadRequest(new { error = "Valid quiz ID is required" });
 
-            // Validate that at least one answer is provided
-            if (string.IsNullOrWhiteSpace(submission.AnswerId) && 
-                (submission.AnswerIds == null || !submission.AnswerIds.Any()))
-                return BadRequest(new { error = "Either AnswerId or AnswerIds is required" });
+            // Validate that at least one answer type is provided (MCQ or DnD)
+            var hasMcqAnswer = !string.IsNullOrWhiteSpace(submission.AnswerId) ||
+                               (submission.AnswerIds != null && submission.AnswerIds.Any());
+            var hasDndAnswer = (submission.OrderedLetters != null && submission.OrderedLetters.Any()) ||
+                               (submission.OrderedTileIds != null && submission.OrderedTileIds.Any()) ||
+                               (submission.Matches != null && submission.Matches.Any());
+
+            if (!hasMcqAnswer && !hasDndAnswer)
+                return BadRequest(new { error = "At least one answer type is required" });
 
             // Get the current user's ID from the JWT token
             var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -137,6 +142,27 @@ public class StudentController : ControllerBase
 
             var result = await _performanceService.SubmitAnswer(submission, studentId);
             return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore interno del server." });
+        }
+    }
+
+    /// <summary>
+    /// Get per-quiz results for the current student in a link (for the results screen)
+    /// </summary>
+    [HttpGet("quizzes/{linkId}/results")]
+    public async Task<IActionResult> GetQuizResults(Guid linkId)
+    {
+        try
+        {
+            var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(studentIdClaim) || !Guid.TryParse(studentIdClaim, out var studentId))
+                return Unauthorized(new { error = "Invalid user authentication" });
+
+            var results = await _performanceService.GetQuizResultsAsync(linkId, studentId);
+            return Ok(results);
         }
         catch (Exception ex)
         {

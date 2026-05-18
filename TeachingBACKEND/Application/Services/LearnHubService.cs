@@ -258,10 +258,13 @@ public class LearnHubService : ILearnHubService
             {
                 if (quiz.QuestionAudioId.HasValue)
                     filesToDelete.Add(quiz.QuestionAudioId.Value);
-                    
+
+                if (quiz.QuestionImageId.HasValue)
+                    filesToDelete.Add(quiz.QuestionImageId.Value);
+
                 if (quiz.ExplanationAudioId.HasValue)
                     filesToDelete.Add(quiz.ExplanationAudioId.Value);
-                    
+
                 foreach (var option in quiz.Options)
                 {
                     if (option.OptionImageId.HasValue)
@@ -273,10 +276,13 @@ public class LearnHubService : ILearnHubService
                 {
                     if (childQuiz.QuestionAudioId.HasValue)
                         filesToDelete.Add(childQuiz.QuestionAudioId.Value);
-                        
+
+                    if (childQuiz.QuestionImageId.HasValue)
+                        filesToDelete.Add(childQuiz.QuestionImageId.Value);
+
                     if (childQuiz.ExplanationAudioId.HasValue)
                         filesToDelete.Add(childQuiz.ExplanationAudioId.Value);
-                        
+
                     foreach (var option in childQuiz.Options)
                     {
                         if (option.OptionImageId.HasValue)
@@ -478,10 +484,13 @@ public class LearnHubService : ILearnHubService
         {
             if (quiz.QuestionAudioId.HasValue)
                 filesToDelete.Add(quiz.QuestionAudioId.Value);
-                
+
+            if (quiz.QuestionImageId.HasValue)
+                filesToDelete.Add(quiz.QuestionImageId.Value);
+
             if (quiz.ExplanationAudioId.HasValue)
                 filesToDelete.Add(quiz.ExplanationAudioId.Value);
-                
+
             foreach (var option in quiz.Options)
             {
                 if (option.OptionImageId.HasValue)
@@ -556,6 +565,7 @@ public class LearnHubService : ILearnHubService
             Points = dto.Points,
             CreatedAt = DateTime.UtcNow,
             QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null,
+            QuestionImageId = !string.IsNullOrEmpty(dto.QuestionImageId) ? Guid.Parse(dto.QuestionImageId) : null,
             ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null,
             ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null,
             ParentQuizId = parentQuizId,
@@ -569,7 +579,100 @@ public class LearnHubService : ILearnHubService
 
         _context.Quizzes.Add(newQuizz);
         await _context.SaveChangesAsync();
+
+        await SaveDndPayloadAsync(newQuizz.Id, quizType.Name, dto);
+
         return newQuizz.Id;
+    }
+
+    private async Task SaveDndPayloadAsync(Guid quizzId, string quizTypeName, CreateQuizzDTO dto)
+    {
+        if (quizTypeName == "DragSpell" && dto.DndSpell != null)
+        {
+            var payload = new DragSpellPayload
+            {
+                Id = Guid.NewGuid(),
+                QuizzId = quizzId,
+                Word = dto.DndSpell.Word,
+                Letters = string.Join(",", dto.DndSpell.Letters),
+                Hint = dto.DndSpell.Hint,
+                ImageFileId = !string.IsNullOrEmpty(dto.DndSpell.ImageFileId) ? Guid.Parse(dto.DndSpell.ImageFileId) : null
+            };
+            _context.DragSpellPayloads.Add(payload);
+            await _context.SaveChangesAsync();
+        }
+        else if (quizTypeName == "DragOrder" && dto.DndOrder != null)
+        {
+            var payload = new DragOrderPayload
+            {
+                Id = Guid.NewGuid(),
+                QuizzId = quizzId,
+                CorrectOrder = string.Empty
+            };
+            _context.DragOrderPayloads.Add(payload);
+            await _context.SaveChangesAsync();
+
+            var tiles = dto.DndOrder.Tiles.Select((t, i) => new DragOrderTile
+            {
+                Id = Guid.NewGuid(),
+                DragOrderPayloadId = payload.Id,
+                Text = t.Text,
+                SortOrder = i
+            }).ToList();
+            _context.DragOrderTiles.AddRange(tiles);
+
+            // Map 0-based indices from the admin DTO to stable tile UUIDs
+            payload.CorrectOrder = string.Join(",", dto.DndOrder.CorrectOrder.Select(idx => tiles[idx].Id.ToString()));
+            await _context.SaveChangesAsync();
+        }
+        else if (quizTypeName == "DragMatch" && dto.DndMatch != null)
+        {
+            var payload = new DragMatchPayload
+            {
+                Id = Guid.NewGuid(),
+                QuizzId = quizzId
+            };
+            _context.DragMatchPayloads.Add(payload);
+            await _context.SaveChangesAsync();
+
+            var pairs = dto.DndMatch.Pairs.Select(p => new DragMatchPair
+            {
+                Id = Guid.NewGuid(),
+                DragMatchPayloadId = payload.Id,
+                Word = p.Word,
+                ImageFileId = !string.IsNullOrEmpty(p.ImageFileId) ? Guid.Parse(p.ImageFileId) : null
+            }).ToList();
+            _context.DragMatchPairs.AddRange(pairs);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task DeleteDndPayloadAsync(Guid quizzId)
+    {
+        var spell = await _context.DragSpellPayloads.FirstOrDefaultAsync(p => p.QuizzId == quizzId);
+        if (spell != null)
+        {
+            _context.DragSpellPayloads.Remove(spell);
+            await _context.SaveChangesAsync();
+        }
+
+        var order = await _context.DragOrderPayloads
+            .Include(p => p.Tiles)
+            .FirstOrDefaultAsync(p => p.QuizzId == quizzId);
+        if (order != null)
+        {
+            _context.DragOrderPayloads.Remove(order);
+            await _context.SaveChangesAsync();
+        }
+
+        var match = await _context.DragMatchPayloads
+            .Include(p => p.Pairs)
+            .FirstOrDefaultAsync(p => p.QuizzId == quizzId);
+        if (match != null)
+        {
+            _context.DragMatchPayloads.Remove(match);
+            await _context.SaveChangesAsync();
+        }
     }
     public async Task<List<QuizDTO>> GetQuizzesByLinkId(Guid linkId)
     {
@@ -621,21 +724,41 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.Options)
                 .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuestionAudio)
+            .Include(q => q.QuestionImage)
             .Include(q => q.ExplanationAudio)
             .Include(q => q.ExplanationImage)
             .Include(q => q.QuizzType)
+            .Include(q => q.DragSpellPayload)
+                .ThenInclude(p => p.ImageFile)
+            .Include(q => q.DragOrderPayload)
+                .ThenInclude(p => p.Tiles)
+            .Include(q => q.DragMatchPayload)
+                .ThenInclude(p => p.Pairs)
+                    .ThenInclude(pair => pair.ImageFile)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.Options)
                     .ThenInclude(o => o.OptionImage)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.QuestionAudio)
             .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.QuestionImage)
+            .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.ExplanationAudio)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.ExplanationImage)
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.QuizzType)
-            .AsNoTracking() // Performance optimization for read-only complex data
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.DragSpellPayload)
+                    .ThenInclude(p => p.ImageFile)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.DragOrderPayload)
+                    .ThenInclude(p => p.Tiles)
+            .Include(q => q.ChildQuizzes)
+                .ThenInclude(cq => cq.DragMatchPayload)
+                    .ThenInclude(p => p.Pairs)
+                        .ThenInclude(pair => pair.ImageFile)
+            .AsNoTracking()
             .FirstOrDefaultAsync(q => q.Id == id);
 
         if (quiz == null)
@@ -653,9 +776,11 @@ public class LearnHubService : ILearnHubService
             Explanation = quiz.Explanation,
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
+            QuestionImageId = quiz.QuestionImageId.HasValue ? quiz.QuestionImageId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
             ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            QuestionImageUrl = GetFullUrl(quiz.QuestionImage?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
@@ -668,7 +793,55 @@ public class LearnHubService : ILearnHubService
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
             }).ToList(),
             IsAnswered = quiz.IsAnswered,
-            ChildQuizzes = quiz.ParentQuizId == null ? quiz.ChildQuizzes.Select(cq => (object)MapToChildGetQuizzDTO(cq)).ToList() : new List<object>()
+            ChildQuizzes = quiz.ParentQuizId == null ? quiz.ChildQuizzes.Select(cq => (object)MapToChildGetQuizzDTO(cq)).ToList() : new List<object>(),
+            DndSpell = MapDndSpellAdmin(quiz.DragSpellPayload),
+            DndOrder = MapDndOrderAdmin(quiz.DragOrderPayload),
+            DndMatch = MapDndMatchAdmin(quiz.DragMatchPayload)
+        };
+    }
+
+    private DragSpellAdminDTO? MapDndSpellAdmin(DragSpellPayload? payload)
+    {
+        if (payload == null) return null;
+        return new DragSpellAdminDTO
+        {
+            Word = payload.Word,
+            Letters = payload.Letters.Split(',').ToList(),
+            Hint = payload.Hint,
+            ImageFileId = payload.ImageFileId?.ToString(),
+            ImageUrl = GetFullUrl(payload.ImageFile?.FileUrl)
+        };
+    }
+
+    private DragOrderAdminDTO? MapDndOrderAdmin(DragOrderPayload? payload)
+    {
+        if (payload == null) return null;
+        var tileById = payload.Tiles.ToDictionary(t => t.Id.ToString());
+        return new DragOrderAdminDTO
+        {
+            Tiles = payload.Tiles.OrderBy(t => t.SortOrder).Select(t => new DragOrderTileDTO
+            {
+                Id = t.Id.ToString(),
+                Text = t.Text
+            }).ToList(),
+            CorrectOrder = payload.CorrectOrder.Split(',')
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToList()
+        };
+    }
+
+    private DragMatchAdminDTO? MapDndMatchAdmin(DragMatchPayload? payload)
+    {
+        if (payload == null) return null;
+        return new DragMatchAdminDTO
+        {
+            Pairs = payload.Pairs.Select(p => new DragMatchPairAdminDTO
+            {
+                Id = p.Id.ToString(),
+                Word = p.Word,
+                ImageFileId = p.ImageFileId?.ToString(),
+                ImageUrl = GetFullUrl(p.ImageFile?.FileUrl)
+            }).ToList()
         };
     }
 
@@ -681,9 +854,11 @@ public class LearnHubService : ILearnHubService
             Explanation = quiz.Explanation,
             Points = quiz.Points,
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
+            QuestionImageId = quiz.QuestionImageId.HasValue ? quiz.QuestionImageId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
             ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            QuestionImageUrl = GetFullUrl(quiz.QuestionImage?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuizType = quiz.QuizzTypeId.ToString("D"),
@@ -695,8 +870,10 @@ public class LearnHubService : ILearnHubService
                 OptionImageId = o.OptionImageId.HasValue ? o.OptionImageId.Value.ToString() : null,
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
             }).ToList(),
-            IsAnswered = quiz.IsAnswered
-            // No ChildQuizzes property - child quizzes don't have children
+            IsAnswered = quiz.IsAnswered,
+            DndSpell = MapDndSpellAdmin(quiz.DragSpellPayload),
+            DndOrder = MapDndOrderAdmin(quiz.DragOrderPayload),
+            DndMatch = MapDndMatchAdmin(quiz.DragMatchPayload)
         };
     }
     public async Task<Quizz> UpdateQuizz(Guid id, CreateQuizzDTO dto)
@@ -747,6 +924,7 @@ public class LearnHubService : ILearnHubService
 
         // Store old file IDs for cleanup
         var oldQuestionAudioId = quizz.QuestionAudioId;
+        var oldQuestionImageId = quizz.QuestionImageId;
         var oldExplanationAudioId = quizz.ExplanationAudioId;
         var oldExplanationImageId = quizz.ExplanationImageId;
         var oldOptionImageIds = quizz.Options
@@ -759,6 +937,7 @@ public class LearnHubService : ILearnHubService
         quizz.Points = dto.Points;
         quizz.QuizzTypeId = quizTypeId;
         quizz.QuestionAudioId = !string.IsNullOrEmpty(dto.QuestionAudioId) ? Guid.Parse(dto.QuestionAudioId) : null;
+        quizz.QuestionImageId = !string.IsNullOrEmpty(dto.QuestionImageId) ? Guid.Parse(dto.QuestionImageId) : null;
         quizz.ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null;
         quizz.ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null;
         quizz.ParentQuizId = parentQuizId;
@@ -776,38 +955,56 @@ public class LearnHubService : ILearnHubService
 
         await _context.SaveChangesAsync();
 
+        // Collect old DnD image file IDs before replacing the payload
+        var oldDndImageIds = await CollectDndImageFileIds(quizz.Id);
+
+        // Replace DnD payload (delete old, create new)
+        await DeleteDndPayloadAsync(quizz.Id);
+        await SaveDndPayloadAsync(quizz.Id, quizType.Name, dto);
+
         // Clean up old files that are no longer referenced
-        await CleanupUnusedFiles(oldQuestionAudioId, oldExplanationAudioId, oldExplanationImageId, oldOptionImageIds, dto);
+        await CleanupUnusedFiles(oldQuestionAudioId, oldQuestionImageId, oldExplanationAudioId, oldExplanationImageId, oldOptionImageIds, dto, oldDndImageIds);
 
         return quizz;
     }
 
-    private async Task CleanupUnusedFiles(Guid? oldQuestionAudioId, Guid? oldExplanationAudioId, Guid? oldExplanationImageId, List<Guid> oldOptionImageIds, CreateQuizzDTO newDto)
+    private async Task<List<Guid>> CollectDndImageFileIds(Guid quizzId)
+    {
+        var ids = new List<Guid>();
+
+        var spell = await _context.DragSpellPayloads.FirstOrDefaultAsync(p => p.QuizzId == quizzId);
+        if (spell?.ImageFileId.HasValue == true)
+            ids.Add(spell.ImageFileId.Value);
+
+        var match = await _context.DragMatchPayloads
+            .Include(p => p.Pairs)
+            .FirstOrDefaultAsync(p => p.QuizzId == quizzId);
+        if (match != null)
+            ids.AddRange(match.Pairs.Where(p => p.ImageFileId.HasValue).Select(p => p.ImageFileId.Value));
+
+        return ids;
+    }
+
+    private async Task CleanupUnusedFiles(Guid? oldQuestionAudioId, Guid? oldQuestionImageId, Guid? oldExplanationAudioId, Guid? oldExplanationImageId, List<Guid> oldOptionImageIds, CreateQuizzDTO newDto, List<Guid>? oldDndImageIds = null)
     {
         var filesToDelete = new List<Guid>();
 
-        // Check if question audio was replaced
-        if (oldQuestionAudioId.HasValue && 
+        if (oldQuestionAudioId.HasValue &&
             (string.IsNullOrEmpty(newDto.QuestionAudioId) || Guid.Parse(newDto.QuestionAudioId) != oldQuestionAudioId.Value))
-        {
-            filesToDelete.Add(oldQuestionAudioId.Value);    
-        }
+            filesToDelete.Add(oldQuestionAudioId.Value);
 
-        // Check if explanation audio was replaced
+        if (oldQuestionImageId.HasValue &&
+            (string.IsNullOrEmpty(newDto.QuestionImageId) || Guid.Parse(newDto.QuestionImageId) != oldQuestionImageId.Value))
+            filesToDelete.Add(oldQuestionImageId.Value);
+
         if (oldExplanationAudioId.HasValue &&
             (string.IsNullOrEmpty(newDto.ExplanationAudioId) || Guid.Parse(newDto.ExplanationAudioId) != oldExplanationAudioId.Value))
-        {
             filesToDelete.Add(oldExplanationAudioId.Value);
-        }
 
-        // Check if explanation image was replaced
         if (oldExplanationImageId.HasValue &&
             (string.IsNullOrEmpty(newDto.ExplanationImageId) || Guid.Parse(newDto.ExplanationImageId) != oldExplanationImageId.Value))
-        {
             filesToDelete.Add(oldExplanationImageId.Value);
-        }
 
-        // Check option images that were replaced
         var newOptionImageIds = newDto.Options
             .Where(o => !string.IsNullOrEmpty(o.OptionImageId))
             .Select(o => Guid.Parse(o.OptionImageId))
@@ -816,12 +1013,27 @@ public class LearnHubService : ILearnHubService
         foreach (var oldImageId in oldOptionImageIds)
         {
             if (!newOptionImageIds.Contains(oldImageId))
-            {
                 filesToDelete.Add(oldImageId);
+        }
+
+        // Collect new DnD image IDs so we can keep any that are reused
+        var newDndImageIds = new List<Guid>();
+        if (newDto.DndSpell?.ImageFileId != null)
+            newDndImageIds.Add(Guid.Parse(newDto.DndSpell.ImageFileId));
+        if (newDto.DndMatch?.Pairs != null)
+            newDndImageIds.AddRange(newDto.DndMatch.Pairs
+                .Where(p => !string.IsNullOrEmpty(p.ImageFileId))
+                .Select(p => Guid.Parse(p.ImageFileId)));
+
+        if (oldDndImageIds != null)
+        {
+            foreach (var oldId in oldDndImageIds)
+            {
+                if (!newDndImageIds.Contains(oldId))
+                    filesToDelete.Add(oldId);
             }
         }
 
-        // Delete the unused files
         foreach (var fileId in filesToDelete)
         {
             try
@@ -830,8 +1042,6 @@ public class LearnHubService : ILearnHubService
             }
             catch (Exception ex)
             {
-                // Log the error but don't fail the update
-                // You might want to add proper logging here
                 Console.WriteLine($"Failed to delete file {fileId}: {ex.Message}");
             }
         }
@@ -849,10 +1059,12 @@ public class LearnHubService : ILearnHubService
 
         // Collect all file IDs to delete (including child quizzes)
         var filesToDelete = new List<Guid>();
-        
-        // Collect files from parent quiz
+
         if (quizz.QuestionAudioId.HasValue)
             filesToDelete.Add(quizz.QuestionAudioId.Value);
+
+        if (quizz.QuestionImageId.HasValue)
+            filesToDelete.Add(quizz.QuestionImageId.Value);
 
         if (quizz.ExplanationAudioId.HasValue)
             filesToDelete.Add(quizz.ExplanationAudioId.Value);
@@ -866,11 +1078,17 @@ public class LearnHubService : ILearnHubService
                 filesToDelete.Add(option.OptionImageId.Value);
         }
 
+        // Collect DnD image files for parent quiz
+        filesToDelete.AddRange(await CollectDndImageFileIds(quizz.Id));
+
         // Collect files from child quizzes
         foreach (var childQuiz in quizz.ChildQuizzes)
         {
             if (childQuiz.QuestionAudioId.HasValue)
                 filesToDelete.Add(childQuiz.QuestionAudioId.Value);
+
+            if (childQuiz.QuestionImageId.HasValue)
+                filesToDelete.Add(childQuiz.QuestionImageId.Value);
 
             if (childQuiz.ExplanationAudioId.HasValue)
                 filesToDelete.Add(childQuiz.ExplanationAudioId.Value);
@@ -883,6 +1101,8 @@ public class LearnHubService : ILearnHubService
                 if (option.OptionImageId.HasValue)
                     filesToDelete.Add(option.OptionImageId.Value);
             }
+
+            filesToDelete.AddRange(await CollectDndImageFileIds(childQuiz.Id));
         }
 
         // Remove child quizzes first (since we use NoAction instead of Cascade)
@@ -936,7 +1156,8 @@ public class LearnHubService : ILearnHubService
                 Id = q.Id,
                 Question = q.Question,
                 QuizType = q.QuizzTypeId.ToString("D"),
-                ParentQuizId = q.ParentQuizId // Add this temporarily for debugging
+                ParentQuizId = q.ParentQuizId,
+                Points = q.Points
             })
             .ToListAsync();
 
@@ -983,8 +1204,17 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.Options)
                 .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuestionAudio)
+            .Include(q => q.QuestionImage)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.ExplanationImage)
             .Include(q => q.QuizzType)
+            .Include(q => q.DragSpellPayload)
+                .ThenInclude(p => p.ImageFile)
+            .Include(q => q.DragOrderPayload)
+                .ThenInclude(p => p.Tiles)
+            .Include(q => q.DragMatchPayload)
+                .ThenInclude(p => p.Pairs)
+                    .ThenInclude(pair => pair.ImageFile)
             .ToListAsync();
 
         return childQuizzes.Select(q => MapToChildQuizDTO(q)).ToList();
@@ -1000,11 +1230,18 @@ public class LearnHubService : ILearnHubService
             Points = quiz.Points,
             IsAnswered = quiz.IsAnswered,
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            QuestionImageUrl = GetFullUrl(quiz.QuestionImage?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            ExplanationImageUrl = GetFullUrl(quiz.ExplanationImage?.FileUrl),
             QuestionAudioId = quiz.QuestionAudioId.HasValue ? quiz.QuestionAudioId.Value.ToString() : null,
+            QuestionImageId = quiz.QuestionImageId.HasValue ? quiz.QuestionImageId.Value.ToString() : null,
             ExplanationAudioId = quiz.ExplanationAudioId.HasValue ? quiz.ExplanationAudioId.Value.ToString() : null,
+            ExplanationImageId = quiz.ExplanationImageId.HasValue ? quiz.ExplanationImageId.Value.ToString() : null,
             QuizType = quiz.QuizzTypeId.ToString("D"),
             ParentQuizId = quiz.ParentQuizId,
+            DndSpell = MapDndSpellAdmin(quiz.DragSpellPayload),
+            DndOrder = MapDndOrderAdmin(quiz.DragOrderPayload),
+            DndMatch = MapDndMatchAdmin(quiz.DragMatchPayload),
             Options = quiz.Options.Select(o => new OptionTextDTO
             {
                 OptionText = o.OptionText,

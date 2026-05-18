@@ -238,10 +238,10 @@ namespace TeachingBACKEND.Application.Services
                     _context.StudentPerformanceSummaries.Add(summary);
                 }
 
-                // Update summary data
+                // Update summary data (PenaltyPoints is preserved — only SubmitAnswer increments it)
                 summary.TotalQuizzes = totalQuizzes;
                 summary.CompletedQuizzes = completedQuizzes;
-                summary.TotalPointsEarned = totalPointsEarned;
+                summary.TotalPointsEarned = Math.Max(0, totalPointsEarned - summary.PenaltyPoints);
                 summary.TotalPossiblePoints = totalPossiblePoints;
                 summary.CompletionRate = completionRate;
                 summary.AverageScore = averageScore;
@@ -249,6 +249,9 @@ namespace TeachingBACKEND.Application.Services
                 summary.AverageTimePerQuiz = completedQuizzes > 0 ? totalTimeSpent / completedQuizzes : 0;
                 summary.FirstAttemptAt = firstAttempt;
                 summary.LastAttemptAt = lastAttempt;
+                summary.CorrectAnswerQuiz = performances.Count(p => p.IsCorrect);
+                var lastCorrect = performances.Where(p => p.IsCorrect).OrderByDescending(p => p.CompletedAt).FirstOrDefault();
+                summary.LastCompletedQuizId = lastCorrect?.QuizId;
                 summary.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();

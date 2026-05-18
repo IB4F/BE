@@ -14,6 +14,8 @@
         public DateTime CreatedAt { get; set; }
         public Guid? QuestionAudioId { get; set; }
         public UploadedFile QuestionAudio { get; set; }
+        public Guid? QuestionImageId { get; set; }
+        public UploadedFile QuestionImage { get; set; }
         public Guid? ExplanationAudioId { get; set; }
         public UploadedFile ExplanationAudio { get; set; }
         public Guid? ExplanationImageId { get; set; }
@@ -25,5 +27,9 @@
         public ICollection<Quizz> ChildQuizzes { get; set; } = new List<Quizz>();
         
         public ICollection<Option> Options { get; set; } = new List<Option>();
+
+        public DragSpellPayload? DragSpellPayload { get; set; }
+        public DragOrderPayload? DragOrderPayload { get; set; }
+        public DragMatchPayload? DragMatchPayload { get; set; }
     }
 }

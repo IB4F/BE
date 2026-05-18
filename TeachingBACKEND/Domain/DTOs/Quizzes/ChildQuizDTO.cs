@@ -11,11 +11,18 @@ namespace TeachingBACKEND.Domain.DTOs.Quizzes
         public List<OptionTextDTO> Options { get; set; }
         public bool IsAnswered { get; set; }
         public string? QuestionAudioUrl { get; set; }
+        public string? QuestionImageUrl { get; set; }
         public string? ExplanationAudioUrl { get; set; }
+        public string? ExplanationImageUrl { get; set; }
         public string? QuestionAudioId { get; set; }
+        public string? QuestionImageId { get; set; }
         public string? ExplanationAudioId { get; set; }
+        public string? ExplanationImageId { get; set; }
         public string QuizType { get; set; }
         public Guid? ParentQuizId { get; set; }
-        // No ChildQuizzes property since child quizzes don't have children
+
+        public DragSpellAdminDTO? DndSpell { get; set; }
+        public DragOrderAdminDTO? DndOrder { get; set; }
+        public DragMatchAdminDTO? DndMatch { get; set; }
     }
 }

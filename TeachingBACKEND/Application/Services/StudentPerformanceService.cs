@@ -95,40 +95,72 @@ namespace TeachingBACKEND.Application.Services;
             .Include(q => q.Options)
             .Include(q => q.ChildQuizzes)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.QuizzType)
             .FirstOrDefaultAsync(q => q.Id == submission.QuizId);
 
         if (quiz == null)
             throw new Exception("Quiz not found");
 
-        // Check if the answer(s) is/are correct
-        var correctOptions = quiz.Options.Where(o => o.IsCorrect).ToList();
-        var correctOptionIds = correctOptions.Select(o => o.Id.ToString()).ToHashSet();
-        
         bool isCorrect;
         List<string> submittedAnswerIds;
-        
-        // Collect all submitted answers (both single and multiple)
-        submittedAnswerIds = new List<string>();
-        
-        // Add single answer if provided
-        if (!string.IsNullOrWhiteSpace(submission.AnswerId))
+        var quizTypeName = quiz.QuizzType.Name;
+
+        if (quizTypeName == "DragSpell" && submission.OrderedLetters != null)
         {
-            submittedAnswerIds.Add(submission.AnswerId);
+            var payload = await _context.DragSpellPayloads.FirstOrDefaultAsync(p => p.QuizzId == quiz.Id);
+            if (payload == null)
+                throw new Exception("DragSpell payload not found");
+
+            var submitted = string.Join("", submission.OrderedLetters);
+            isCorrect = string.Equals(submitted, payload.Word, StringComparison.OrdinalIgnoreCase);
+            submittedAnswerIds = new List<string> { submitted };
         }
-        
-        // Add multiple answers if provided
-        if (submission.AnswerIds != null && submission.AnswerIds.Any())
+        else if (quizTypeName == "DragOrder" && submission.OrderedTileIds != null)
         {
-            submittedAnswerIds.AddRange(submission.AnswerIds);
+            var payload = await _context.DragOrderPayloads.FirstOrDefaultAsync(p => p.QuizzId == quiz.Id);
+            if (payload == null)
+                throw new Exception("DragOrder payload not found");
+
+            var correctOrder = payload.CorrectOrder.Split(',')
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToList();
+            isCorrect = submission.OrderedTileIds.SequenceEqual(correctOrder);
+            submittedAnswerIds = submission.OrderedTileIds;
         }
-        
-        // Remove duplicates and validate
-        submittedAnswerIds = submittedAnswerIds.Distinct().ToList();
-        
-        // Check if all submitted answers are correct and match the correct answers exactly
-        isCorrect = submittedAnswerIds.Count == correctOptionIds.Count && 
-                   submittedAnswerIds.All(id => correctOptionIds.Contains(id));
-        
+        else if (quizTypeName == "DragMatch" && submission.Matches != null)
+        {
+            var matchPayload = await _context.DragMatchPayloads
+                .Include(p => p.Pairs)
+                .FirstOrDefaultAsync(p => p.QuizzId == quiz.Id);
+            if (matchPayload == null)
+                throw new Exception("DragMatch payload not found");
+
+            isCorrect = submission.Matches.Count == matchPayload.Pairs.Count &&
+                        submission.Matches.All(m =>
+                        {
+                            if (!Guid.TryParse(m.WordId, out var wordId)) return false;
+                            if (!Guid.TryParse(m.ImageId, out var imageId)) return false;
+                            var pair = matchPayload.Pairs.FirstOrDefault(p => p.Id == wordId);
+                            return pair != null && imageId == DeriveImageId(pair.Id, matchPayload.Id);
+                        });
+            submittedAnswerIds = submission.Matches.Select(m => $"{m.WordId}:{m.ImageId}").ToList();
+        }
+        else
+        {
+            // MCQ evaluation (existing logic)
+            var correctOptionIds = quiz.Options.Where(o => o.IsCorrect).Select(o => o.Id.ToString()).ToHashSet();
+
+            submittedAnswerIds = new List<string>();
+            if (!string.IsNullOrWhiteSpace(submission.AnswerId))
+                submittedAnswerIds.Add(submission.AnswerId);
+            if (submission.AnswerIds != null && submission.AnswerIds.Any())
+                submittedAnswerIds.AddRange(submission.AnswerIds);
+            submittedAnswerIds = submittedAnswerIds.Distinct().ToList();
+
+            isCorrect = submittedAnswerIds.Count == correctOptionIds.Count &&
+                        submittedAnswerIds.All(id => correctOptionIds.Contains(id));
+        }
+
         var pointsEarned = isCorrect ? quiz.Points : 0;
 
         var completedAt = DateTime.UtcNow;
@@ -184,7 +216,7 @@ namespace TeachingBACKEND.Application.Services;
 
         // Close the active session
         var activeSession = await _context.StudentQuizSessions
-            .FirstOrDefaultAsync(sqs => sqs.StudentId == studentId && 
+            .FirstOrDefaultAsync(sqs => sqs.StudentId == studentId &&
                                        sqs.QuizId == submission.QuizId &&
                                        sqs.LinkId == quiz.LinkId &&
                                        sqs.IsActive);
@@ -197,14 +229,50 @@ namespace TeachingBACKEND.Application.Services;
 
         await _context.SaveChangesAsync();
 
+        // Apply -2 penalty for wrong answers (before UpdatePerformanceSummary so it sees the updated value)
+        if (!isCorrect)
+        {
+            var penaltySummary = await _context.StudentPerformanceSummaries
+                .FirstOrDefaultAsync(sps => sps.StudentId == studentId && sps.LinkId == quiz.LinkId);
+            if (penaltySummary == null)
+            {
+                penaltySummary = new StudentPerformanceSummary
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    LinkId = quiz.LinkId
+                };
+                _context.StudentPerformanceSummaries.Add(penaltySummary);
+            }
+            penaltySummary.PenaltyPoints += 2;
+            await _context.SaveChangesAsync();
+        }
+
         // If this is a child quiz, check if parent quiz should be marked as completed
         if (quiz.ParentQuizId.HasValue)
         {
             await CheckAndMarkParentQuizAsCompleted(studentId, quiz.ParentQuizId.Value, quiz.LinkId, isCorrect);
         }
 
-        // Update performance summary
+        // Update performance summary (uses PenaltyPoints already persisted above)
         await UpdatePerformanceSummary(studentId, quiz.LinkId);
+
+        // Build progress DTO from the now-updated summary
+        var updatedSummary = await _context.StudentPerformanceSummaries
+            .FirstOrDefaultAsync(sps => sps.StudentId == studentId && sps.LinkId == quiz.LinkId);
+        var parentQuizCountForProgress = await _context.Quizzes
+            .CountAsync(q => q.LinkId == quiz.LinkId && q.ParentQuizId == null);
+        var progressDto = updatedSummary != null ? new StudentProgressSummaryDTO
+        {
+            TotalQuizzes = parentQuizCountForProgress,
+            CompletedQuizzes = updatedSummary.CompletedQuizzes,
+            CurrentQuizIndex = updatedSummary.CompletedQuizzes,
+            TotalPointsEarned = updatedSummary.TotalPointsEarned,
+            TotalPossiblePoints = updatedSummary.TotalPossiblePoints,
+            LastCompletedQuizId = updatedSummary.LastCompletedQuizId,
+            LastCompletedAt = updatedSummary.LastAttemptAt,
+            CorrectAnswerQuiz = updatedSummary.CorrectAnswerQuiz
+        } : null;
 
         // Determine next quiz based on answer correctness
         var nextQuizId = await DetermineNextQuiz(quiz, isCorrect);
@@ -235,13 +303,45 @@ namespace TeachingBACKEND.Application.Services;
             }
         }
 
+        // Persist result for parent quizzes only (child quizzes are not shown in the results list)
+        if (quiz.ParentQuizId == null)
+        {
+            var pointsDelta = isCorrect ? quiz.Points : -2;
+            var hasChildQuiz = childQuizId != null;
+            var existingResult = await _context.StudentQuizResults
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.QuizId == quiz.Id);
+            if (existingResult == null)
+            {
+                _context.StudentQuizResults.Add(new StudentQuizResult
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    LinkId = quiz.LinkId,
+                    QuizId = quiz.Id,
+                    IsCorrect = isCorrect,
+                    PointsDelta = pointsDelta,
+                    HasChildQuiz = hasChildQuiz,
+                    AttemptedAt = completedAt
+                });
+            }
+            else
+            {
+                existingResult.IsCorrect = isCorrect;
+                existingResult.PointsDelta = pointsDelta;
+                existingResult.HasChildQuiz = hasChildQuiz;
+                existingResult.AttemptedAt = completedAt;
+            }
+            await _context.SaveChangesAsync();
+        }
+
         return new StudentQuizSubmissionResponseDTO
         {
             Answer = isCorrect,
             ParentQuizId = parentQuizId,
             ChildQuizId = childQuizId,
             Explanation = isCorrect ? null : quiz.Explanation,
-            ExplanationAudioUrl = isCorrect ? null : GetFullUrl(quiz.ExplanationAudio?.FileUrl)
+            ExplanationAudioUrl = isCorrect ? null : GetFullUrl(quiz.ExplanationAudio?.FileUrl),
+            Progress = progressDto
         };
     }
 
@@ -275,9 +375,6 @@ namespace TeachingBACKEND.Application.Services;
             .Where(sqp => sqp.StudentId == studentId && sqp.LinkId == linkId)
             .ToListAsync();
 
-        // Get count of correctly answered quizzes
-        var correctAnswerQuizCount = allQuizPerformances.Count(p => p.IsCorrect);
-
         var progress = new StudentProgressSummaryDTO
         {
             TotalQuizzes = parentQuizzes.Count,
@@ -285,9 +382,9 @@ namespace TeachingBACKEND.Application.Services;
             CurrentQuizIndex = performanceSummary?.CompletedQuizzes ?? 0,
             TotalPointsEarned = performanceSummary?.TotalPointsEarned ?? 0,
             TotalPossiblePoints = allQuizzes.Sum(q => q.Points),
-            LastCompletedQuizId = null, // Would need to query from performance records
+            LastCompletedQuizId = performanceSummary?.LastCompletedQuizId,
             LastCompletedAt = performanceSummary?.LastAttemptAt,
-            CorrectAnswerQuiz = correctAnswerQuizCount
+            CorrectAnswerQuiz = performanceSummary?.CorrectAnswerQuiz ?? 0
         };
 
         var parentQuizIds = parentQuizzes.Select(q => q.Id).ToList();
@@ -306,13 +403,20 @@ namespace TeachingBACKEND.Application.Services;
                 .ThenInclude(o => o.OptionImage)
             .Include(q => q.QuizzType)
             .Include(q => q.QuestionAudio)
+            .Include(q => q.QuestionImage)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.DragSpellPayload)
+                .ThenInclude(p => p.ImageFile)
+            .Include(q => q.DragOrderPayload)
+                .ThenInclude(p => p.Tiles)
+            .Include(q => q.DragMatchPayload)
+                .ThenInclude(p => p.Pairs)
+                    .ThenInclude(pair => pair.ImageFile)
             .FirstOrDefaultAsync(q => q.Id == quizId);
 
         if (quiz == null)
             return null;
 
-        // Count how many options are correct to determine if this is a multiple answer question
         var correctOptionsCount = quiz.Options.Count(o => o.IsCorrect);
         var multipleAnswer = correctOptionsCount > 1;
 
@@ -329,10 +433,39 @@ namespace TeachingBACKEND.Application.Services;
                 OptionImageUrl = GetFullUrl(o.OptionImage?.FileUrl)
             }).ToList(),
             QuestionAudioUrl = GetFullUrl(quiz.QuestionAudio?.FileUrl),
+            QuestionImageUrl = GetFullUrl(quiz.QuestionImage?.FileUrl),
             ExplanationAudioUrl = GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             QuizzTypeName = quiz.QuizzType.Name,
             ParentQuizId = quiz.ParentQuizId,
-            MultipleAnswer = multipleAnswer
+            MultipleAnswer = multipleAnswer,
+            DndSpell = quiz.DragSpellPayload != null ? new DragSpellStudentDTO
+            {
+                WordLength = quiz.DragSpellPayload.Word.Length,
+                Letters = quiz.DragSpellPayload.Letters.Split(',').ToList(),
+                Hint = quiz.DragSpellPayload.Hint,
+                ImageUrl = GetFullUrl(quiz.DragSpellPayload.ImageFile?.FileUrl)
+            } : null,
+            DndOrder = quiz.DragOrderPayload != null ? new DragOrderStudentDTO
+            {
+                Tiles = quiz.DragOrderPayload.Tiles.OrderBy(_ => Guid.NewGuid()).Select(t => new DragOrderTileDTO
+                {
+                    Id = t.Id.ToString(),
+                    Text = t.Text
+                }).ToList()
+            } : null,
+            DndMatch = quiz.DragMatchPayload != null ? new DragMatchStudentDTO
+            {
+                Words = quiz.DragMatchPayload.Pairs.OrderBy(_ => Guid.NewGuid()).Select(p => new DragMatchWordDTO
+                {
+                    WordId = p.Id.ToString(),
+                    Text = p.Word
+                }).ToList(),
+                Images = quiz.DragMatchPayload.Pairs.OrderBy(_ => Guid.NewGuid()).Select(p => new DragMatchImageDTO
+                {
+                    ImageId = DeriveImageId(p.Id, quiz.DragMatchPayload.Id).ToString(),
+                    ImageUrl = GetFullUrl(p.ImageFile?.FileUrl)
+                }).ToList()
+            } : null
         };
     }
 
@@ -437,12 +570,13 @@ namespace TeachingBACKEND.Application.Services;
 
         // Update metrics
         summary.TotalQuizzes = parentQuizzes.Count;
-        
+
         // Count completed quizzes: parent quizzes that have been answered (either directly or through child quizzes)
         var completedQuizzesCount = await CountCompletedParentQuizzes(studentId, linkId, parentQuizzes, performances);
         summary.CompletedQuizzes = completedQuizzesCount;
-        
-        summary.TotalPointsEarned = performances.Sum(sqp => sqp.PointsEarned);
+
+        var grossPoints = performances.Sum(sqp => sqp.PointsEarned);
+        summary.TotalPointsEarned = Math.Max(0, grossPoints - summary.PenaltyPoints);
         summary.TotalPossiblePoints = allQuizzes.Sum(q => q.Points);
         summary.CompletionRate = summary.TotalQuizzes > 0 ? (double)summary.CompletedQuizzes / summary.TotalQuizzes * 100 : 0;
         summary.AverageScore = summary.CompletedQuizzes > 0 ? (double)summary.TotalPointsEarned / summary.CompletedQuizzes : 0;
@@ -450,6 +584,9 @@ namespace TeachingBACKEND.Application.Services;
         summary.AverageTimePerQuiz = summary.CompletedQuizzes > 0 ? (double)summary.TotalTimeSpent / summary.CompletedQuizzes : 0;
         summary.FirstAttemptAt = performances.Any() ? performances.Min(sqp => sqp.StartedAt) : null;
         summary.LastAttemptAt = performances.Any() ? performances.Max(sqp => sqp.CompletedAt) : null;
+        summary.CorrectAnswerQuiz = performances.Count(sqp => sqp.IsCorrect);
+        var lastCorrect = performances.Where(sqp => sqp.IsCorrect).OrderByDescending(sqp => sqp.CompletedAt).FirstOrDefault();
+        summary.LastCompletedQuizId = lastCorrect?.QuizId;
         summary.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -656,6 +793,33 @@ namespace TeachingBACKEND.Application.Services;
                 }
             }
         }
+    }
+
+    // XOR pairId with payloadId to produce a deterministic but opaque imageId.
+    // The same operation reverses itself, so validation: DeriveImageId(pairId, payloadId) == submittedImageId.
+    private static Guid DeriveImageId(Guid pairId, Guid payloadId)
+    {
+        var a = pairId.ToByteArray();
+        var b = payloadId.ToByteArray();
+        var xor = new byte[16];
+        for (int i = 0; i < 16; i++) xor[i] = (byte)(a[i] ^ b[i]);
+        return new Guid(xor);
+    }
+
+    public async Task<List<QuizResultDTO>> GetQuizResultsAsync(Guid linkId, Guid studentId)
+    {
+        return await _context.StudentQuizResults
+            .Where(r => r.StudentId == studentId && r.LinkId == linkId)
+            .Include(r => r.Quiz)
+            .OrderBy(r => r.AttemptedAt)
+            .Select(r => new QuizResultDTO
+            {
+                Question = r.Quiz.Question,
+                IsCorrect = r.IsCorrect,
+                PointsDelta = r.PointsDelta,
+                HasChildQuiz = r.HasChildQuiz
+            })
+            .ToListAsync();
     }
 
     private async Task<int> CountCompletedParentQuizzes(Guid studentId, Guid linkId, List<Quizz> parentQuizzes, List<StudentQuizPerformance> performances)

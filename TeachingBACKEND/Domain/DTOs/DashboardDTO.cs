@@ -4,14 +4,26 @@ namespace TeachingBACKEND.Domain.DTOs
     {
         public DashboardStatsDTO Stats { get; set; }
         public List<LearnHubProgressDTO> LatestLearnHubs { get; set; }
+        public List<WeeklyActivityDayDTO> WeeklyActivity { get; set; }
     }
 
     public class DashboardStatsDTO
     {
-        public double TotalProgress { get; set; } // Overall progress percentage (e.g., 72%)
-        public int PointsCollected { get; set; } // Total points earned (e.g., 1450)
-        public int CompletedLearnHubs { get; set; } // Number of completed LearnHubs (e.g., 3)
-        public int TotalLearnHubs { get; set; } // Total available LearnHubs (e.g., 5)
+        public double TotalProgress { get; set; }
+        public int PointsCollected { get; set; }
+        public int CompletedLearnHubs { get; set; }
+        public int TotalLearnHubs { get; set; }
+        public double? AverageAccuracy { get; set; }
+        public int TodayExercisesCompleted { get; set; }
+        public int DailyGoal { get; set; }
+    }
+
+    public class WeeklyActivityDayDTO
+    {
+        public int DayIndex { get; set; }
+        public string Date { get; set; }
+        public int ExercisesCompleted { get; set; }
+        public int PointsEarned { get; set; }
     }
 
     public class LearnHubProgressDTO

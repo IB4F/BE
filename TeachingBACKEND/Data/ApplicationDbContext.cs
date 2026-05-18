@@ -29,6 +29,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<StudentQuizPerformance> StudentQuizPerformances { get; set; }
     public DbSet<StudentQuizSession> StudentQuizSessions { get; set; }
     public DbSet<StudentPerformanceSummary> StudentPerformanceSummaries { get; set; }
+    public DbSet<DragSpellPayload> DragSpellPayloads { get; set; }
+    public DbSet<DragOrderPayload> DragOrderPayloads { get; set; }
+    public DbSet<DragOrderTile> DragOrderTiles { get; set; }
+    public DbSet<DragMatchPayload> DragMatchPayloads { get; set; }
+    public DbSet<DragMatchPair> DragMatchPairs { get; set; }
+    public DbSet<StudentQuizResult> StudentQuizResults { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -251,6 +257,12 @@ public class ApplicationDbContext : DbContext
         .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Quizz>()
+        .HasOne(q => q.QuestionImage)
+        .WithMany()
+        .HasForeignKey(q => q.QuestionImageId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Quizz>()
         .HasOne(q => q.ExplanationAudio)
         .WithMany()
         .HasForeignKey(q => q.ExplanationAudioId)
@@ -303,15 +315,37 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.NoAction);
         });
 
+        modelBuilder.Entity<StudentQuizResult>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+
+            entity.HasOne(r => r.Student)
+                .WithMany()
+                .HasForeignKey(r => r.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(r => r.Link)
+                .WithMany()
+                .HasForeignKey(r => r.LinkId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(r => r.Quiz)
+                .WithMany()
+                .HasForeignKey(r => r.QuizId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasIndex(r => new { r.StudentId, r.QuizId }).IsUnique();
+        });
+
         modelBuilder.Entity<StudentPerformanceSummary>(entity =>
         {
             entity.HasKey(sps => sps.Id);
-            
+
             entity.HasOne(sps => sps.Student)
                 .WithMany()
                 .HasForeignKey(sps => sps.StudentId)
                 .OnDelete(DeleteBehavior.NoAction);
-                
+
             entity.HasOne(sps => sps.Link)
                 .WithMany()
                 .HasForeignKey(sps => sps.LinkId)
@@ -717,8 +751,56 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<QuizType>().HasData(
             new QuizType { Id = Guid.Parse("b1b1b1b1-b1b1-1111-1111-111111111111"), Name = "text" },
-            new QuizType { Id = Guid.Parse("b2b2b2b2-b2b2-2222-2222-222222222222"), Name = "imazhe" }
+            new QuizType { Id = Guid.Parse("b2b2b2b2-b2b2-2222-2222-222222222222"), Name = "imazhe" },
+            new QuizType { Id = Guid.Parse("c1c1c1c1-c1c1-1111-1111-111111111111"), Name = "DragSpell" },
+            new QuizType { Id = Guid.Parse("c2c2c2c2-c2c2-2222-2222-222222222222"), Name = "DragOrder" },
+            new QuizType { Id = Guid.Parse("c3c3c3c3-c3c3-3333-3333-333333333333"), Name = "DragMatch" }
         );
+
+        // DragSpellPayload — 1-to-1 with Quizz
+        modelBuilder.Entity<DragSpellPayload>()
+            .HasOne(d => d.Quizz)
+            .WithOne(q => q.DragSpellPayload)
+            .HasForeignKey<DragSpellPayload>(d => d.QuizzId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DragSpellPayload>()
+            .HasOne(d => d.ImageFile)
+            .WithMany()
+            .HasForeignKey(d => d.ImageFileId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // DragOrderPayload — 1-to-1 with Quizz
+        modelBuilder.Entity<DragOrderPayload>()
+            .HasOne(d => d.Quizz)
+            .WithOne(q => q.DragOrderPayload)
+            .HasForeignKey<DragOrderPayload>(d => d.QuizzId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DragOrderTile>()
+            .HasOne(t => t.Payload)
+            .WithMany(p => p.Tiles)
+            .HasForeignKey(t => t.DragOrderPayloadId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // DragMatchPayload — 1-to-1 with Quizz
+        modelBuilder.Entity<DragMatchPayload>()
+            .HasOne(d => d.Quizz)
+            .WithOne(q => q.DragMatchPayload)
+            .HasForeignKey<DragMatchPayload>(d => d.QuizzId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DragMatchPair>()
+            .HasOne(p => p.Payload)
+            .WithMany(mp => mp.Pairs)
+            .HasForeignKey(p => p.DragMatchPayloadId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DragMatchPair>()
+            .HasOne(p => p.ImageFile)
+            .WithMany()
+            .HasForeignKey(p => p.ImageFileId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var adminEmail = "admin@braingainalbania.al";

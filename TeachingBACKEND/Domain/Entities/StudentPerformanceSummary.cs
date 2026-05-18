@@ -23,6 +23,9 @@ public class StudentPerformanceSummary
     public int CompletedQuizzes { get; set; }
     public int TotalPointsEarned { get; set; }
     public int TotalPossiblePoints { get; set; }
+    public int PenaltyPoints { get; set; }
+    public int CorrectAnswerQuiz { get; set; }
+    public Guid? LastCompletedQuizId { get; set; }
     
     // Performance statistics
     public double CompletionRate { get; set; } // Percentage of completed quizzes
