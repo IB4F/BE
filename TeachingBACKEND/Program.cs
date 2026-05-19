@@ -231,6 +231,7 @@ builder.Services.AddScoped<IStudentProgressService, StudentProgressService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
 builder.Services.AddScoped<FamilyPricingService>();
 builder.Services.AddScoped<StripePricingService>();
+builder.Services.AddHostedService<OrphanedFilesCleanupJob>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

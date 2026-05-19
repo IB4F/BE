@@ -1,3 +1,5 @@
+using TeachingBACKEND.Domain.Exceptions;
+
 namespace TeachingBACKEND.Middleware
 {
     public class ExceptionHandlingMiddleware
@@ -16,6 +18,12 @@ namespace TeachingBACKEND.Middleware
             try
             {
                 await _next(context);
+            }
+            catch (QuizValidationException ex)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new { message = ex.Message });
             }
             catch (Exception ex)
             {

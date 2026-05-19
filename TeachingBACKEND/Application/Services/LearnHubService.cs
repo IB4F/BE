@@ -4,6 +4,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.DTOs.Quizzes;
 using TeachingBACKEND.Domain.Entities;
+using TeachingBACKEND.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using TeachingBACKEND.Application.Interfaces;
 
@@ -13,13 +14,15 @@ public class LearnHubService : ILearnHubService
     private readonly IMapper _mapper;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IFileService _fileService;
+    private readonly ILogger<LearnHubService> _logger;
 
-    public LearnHubService(ApplicationDbContext context, IMapper mapper, IHttpContextAccessor httpContextAccessor, IFileService fileService)
+    public LearnHubService(ApplicationDbContext context, IMapper mapper, IHttpContextAccessor httpContextAccessor, IFileService fileService, ILogger<LearnHubService> logger)
     {
         _context = context;
         _mapper = mapper;
         _httpContextAccessor = httpContextAccessor;
         _fileService = fileService;
+        _logger = logger;
     }
 
     private string GetFullUrl(string relativeUrl)
@@ -535,6 +538,8 @@ public class LearnHubService : ILearnHubService
         if (quizType == null)
             throw new Exception("Quiz type not found");
 
+        ValidateQuizDto(quizType.Name, dto);
+
         // Validate parent quiz if provided
         Guid? parentQuizId = null;
         if (!string.IsNullOrEmpty(dto.ParentQuizId))
@@ -583,6 +588,92 @@ public class LearnHubService : ILearnHubService
         await SaveDndPayloadAsync(newQuizz.Id, quizType.Name, dto);
 
         return newQuizz.Id;
+    }
+
+    private static void ValidateQuizDto(string quizTypeName, CreateQuizzDTO dto)
+    {
+        var isDragSpell = quizTypeName == "DragSpell";
+        var isDragOrder = quizTypeName == "DragOrder";
+        var isDragMatch = quizTypeName == "DragMatch";
+        var isDnD = isDragSpell || isDragOrder || isDragMatch;
+
+        if (isDnD)
+        {
+            if (isDragSpell)
+            {
+                if (dto.DndSpell == null)
+                    throw new QuizValidationException("dndSpell është i detyrueshëm për tipin DragSpell");
+                if (dto.DndOrder != null || dto.DndMatch != null)
+                    throw new QuizValidationException("Vetëm dndSpell duhet të jetë i pranishëm për tipin DragSpell");
+
+                var spell = dto.DndSpell;
+                if (string.IsNullOrWhiteSpace(spell.Word))
+                    throw new QuizValidationException("dndSpell.word është i detyrueshëm për tipin DragSpell");
+                if (spell.Letters == null || spell.Letters.Count < 2)
+                    throw new QuizValidationException("dndSpell.letters duhet të ketë të paktën 2 elemente");
+                if (spell.Letters.Any(l => string.IsNullOrWhiteSpace(l) || l.Trim().Length != 1))
+                    throw new QuizValidationException("dndSpell.letters çdo element duhet të jetë një karakter i vetëm");
+
+                // Verify letters contain all characters needed to form the word
+                var wordUpper = spell.Word.Trim().ToUpperInvariant();
+                var letterList = spell.Letters.Select(l => l.Trim().ToUpperInvariant()[0]).ToList();
+                var wordFreq = wordUpper.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
+                var letterFreq = letterList.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
+                foreach (var kvp in wordFreq)
+                {
+                    if (!letterFreq.TryGetValue(kvp.Key, out int count) || count < kvp.Value)
+                        throw new QuizValidationException("dndSpell.letters nuk përmbajnë të gjitha karakteret e nevojshme për të formuar fjalën");
+                }
+            }
+            else if (isDragOrder)
+            {
+                if (dto.DndOrder == null)
+                    throw new QuizValidationException("dndOrder është i detyrueshëm për tipin DragOrder");
+                if (dto.DndSpell != null || dto.DndMatch != null)
+                    throw new QuizValidationException("Vetëm dndOrder duhet të jetë i pranishëm për tipin DragOrder");
+
+                var order = dto.DndOrder;
+                if (order.Tiles == null || order.Tiles.Count < 2)
+                    throw new QuizValidationException("dndOrder.tiles duhet të ketë të paktën 2 elementë");
+                if (order.Tiles.Any(t => string.IsNullOrWhiteSpace(t.Text)))
+                    throw new QuizValidationException("dndOrder.tiles çdo pllakë duhet të ketë tekst");
+                if (order.CorrectOrder == null || order.CorrectOrder.Count == 0)
+                    throw new QuizValidationException("dndOrder.correctOrder është i detyrueshëm");
+                if (order.CorrectOrder.Count != order.Tiles.Count)
+                    throw new QuizValidationException("dndOrder.correctOrder duhet të ketë të njëjtin numër elementësh si tiles");
+                if (order.CorrectOrder.Any(i => i < 0 || i >= order.Tiles.Count))
+                    throw new QuizValidationException("dndOrder.correctOrder ka indekse jo të vlefshëm");
+                if (order.CorrectOrder.Distinct().Count() != order.CorrectOrder.Count)
+                    throw new QuizValidationException("dndOrder.correctOrder ka indekse të përsëritur");
+            }
+            else // isDragMatch
+            {
+                if (dto.DndMatch == null)
+                    throw new QuizValidationException("dndMatch është i detyrueshëm për tipin DragMatch");
+                if (dto.DndSpell != null || dto.DndOrder != null)
+                    throw new QuizValidationException("Vetëm dndMatch duhet të jetë i pranishëm për tipin DragMatch");
+
+                var match = dto.DndMatch;
+                if (match.Pairs == null || match.Pairs.Count < 2)
+                    throw new QuizValidationException("dndMatch.pairs duhet të ketë të paktën 2 çifte");
+                if (match.Pairs.Any(p => string.IsNullOrWhiteSpace(p.Word)))
+                    throw new QuizValidationException("dndMatch.pairs çdo çift duhet të ketë fjalën");
+
+                var words = match.Pairs.Select(p => p.Word.Trim().ToLowerInvariant()).ToList();
+                if (words.Distinct().Count() != words.Count)
+                    throw new QuizValidationException("dndMatch.pairs fjalët nuk duhet të përsëriten");
+            }
+        }
+        else
+        {
+            // Non-DnD: validate options
+            if (dto.Options == null || dto.Options.Count < 2)
+                throw new QuizValidationException("Kërkohen të paktën 2 opsione");
+            if (!dto.Options.Any(o => o.IsCorrect))
+                throw new QuizValidationException("Të paktën një opsion duhet të jetë i saktë");
+            if (dto.Options.Any(o => string.IsNullOrWhiteSpace(o.OptionText)))
+                throw new QuizValidationException("Çdo opsion duhet të ketë tekst");
+        }
     }
 
     private async Task SaveDndPayloadAsync(Guid quizzId, string quizTypeName, CreateQuizzDTO dto)
@@ -880,6 +971,10 @@ public class LearnHubService : ILearnHubService
     {
         var quizz = await _context.Quizzes
             .Include(q => q.Options)
+            .Include(q => q.QuizzType)
+            .Include(q => q.DragSpellPayload)
+            .Include(q => q.DragOrderPayload).ThenInclude(p => p.Tiles)
+            .Include(q => q.DragMatchPayload).ThenInclude(p => p.Pairs)
             .FirstOrDefaultAsync(q => q.Id == id);
 
         if (quizz == null)
@@ -892,6 +987,27 @@ public class LearnHubService : ILearnHubService
         var quizType = await _context.QuizTypes.FindAsync(quizTypeId);
         if (quizType == null)
             throw new Exception("Quiz type not found");
+
+        // Collect old DnD image IDs now, before any payload is deleted, so they can be
+        // cleaned up from storage after the transaction commits
+        var oldDndImageIds = await CollectDndImageFileIds(quizz.Id);
+
+        // Type-change cleanup: if the quiz type is changing, mark the old DnD payload for
+        // deletion so it is removed together with the rest of the update in one transaction
+        var oldTypeName = quizz.QuizzType.Name;
+        var newTypeName = quizType.Name;
+
+        if (oldTypeName != newTypeName)
+        {
+            if (oldTypeName == "DragSpell" && quizz.DragSpellPayload != null)
+                _context.DragSpellPayloads.Remove(quizz.DragSpellPayload);
+            else if (oldTypeName == "DragOrder" && quizz.DragOrderPayload != null)
+                _context.DragOrderPayloads.Remove(quizz.DragOrderPayload);
+            else if (oldTypeName == "DragMatch" && quizz.DragMatchPayload != null)
+                _context.DragMatchPayloads.Remove(quizz.DragMatchPayload);
+        }
+
+        ValidateQuizDto(newTypeName, dto);
 
         // Validate parent quiz if provided
         Guid? parentQuizId = null;
@@ -953,16 +1069,14 @@ public class LearnHubService : ILearnHubService
             OptionImageId = !string.IsNullOrEmpty(o.OptionImageId) ? Guid.Parse(o.OptionImageId) : null
         }).ToList();
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
         await _context.SaveChangesAsync();
-
-        // Collect old DnD image file IDs before replacing the payload
-        var oldDndImageIds = await CollectDndImageFileIds(quizz.Id);
-
-        // Replace DnD payload (delete old, create new)
         await DeleteDndPayloadAsync(quizz.Id);
-        await SaveDndPayloadAsync(quizz.Id, quizType.Name, dto);
+        await SaveDndPayloadAsync(quizz.Id, newTypeName, dto);
+        await transaction.CommitAsync();
 
-        // Clean up old files that are no longer referenced
+        // Clean up old files that are no longer referenced (runs after commit so storage
+        // cleanup never races with a potential transaction rollback)
         await CleanupUnusedFiles(oldQuestionAudioId, oldQuestionImageId, oldExplanationAudioId, oldExplanationImageId, oldOptionImageIds, dto, oldDndImageIds);
 
         return quizz;
@@ -1034,18 +1148,39 @@ public class LearnHubService : ILearnHubService
             }
         }
 
+        var anyOrphaned = false;
         foreach (var fileId in filesToDelete)
         {
-            try
+            if (!await TryDeleteOrOrphanAsync(fileId, "quiz-update"))
+                anyOrphaned = true;
+        }
+        if (anyOrphaned)
+            await _context.SaveChangesAsync();
+    }
+
+    // Attempts to delete a file from storage. On failure, logs an OrphanedFile record so the
+    // nightly cleanup job can retry. Returns true if the file was deleted (or already gone).
+    private async Task<bool> TryDeleteOrOrphanAsync(Guid fileId, string reason)
+    {
+        try
+        {
+            await _fileService.DeleteFileAsync(fileId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete file {FileId} ({Reason}), logging as orphaned", fileId, reason);
+            _context.OrphanedFiles.Add(new OrphanedFile
             {
-                await _fileService.DeleteFileAsync(fileId);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to delete file {fileId}: {ex.Message}");
-            }
+                Id = Guid.NewGuid(),
+                FileId = fileId,
+                CreatedAt = DateTime.UtcNow,
+                Reason = reason
+            });
+            return false;
         }
     }
+
     public async Task DeleteQuizz(Guid id)
     {
         var quizz = await _context.Quizzes
@@ -1115,19 +1250,15 @@ public class LearnHubService : ILearnHubService
         _context.Quizzes.Remove(quizz);
         await _context.SaveChangesAsync();
 
-        // Delete associated files
+        // Delete associated files; failures are logged as OrphanedFiles for the cleanup job
+        var anyOrphaned = false;
         foreach (var fileId in filesToDelete)
         {
-            try
-            {
-                await _fileService.DeleteFileAsync(fileId);
-            }
-            catch (Exception ex)
-            {
-                // Log the error but don't fail the deletion
-                Console.WriteLine($"Failed to delete file {fileId} during quiz deletion: {ex.Message}");
-            }
+            if (!await TryDeleteOrOrphanAsync(fileId, "quiz-deleted"))
+                anyOrphaned = true;
         }
+        if (anyOrphaned)
+            await _context.SaveChangesAsync();
     }
     public async Task<PaginatedResultDTO<SimpleQuizDTO>> GetPaginatedQuizzesAsync(Guid linkId, PaginationRequestDTO dto)
     {

@@ -35,6 +35,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DragMatchPayload> DragMatchPayloads { get; set; }
     public DbSet<DragMatchPair> DragMatchPairs { get; set; }
     public DbSet<StudentQuizResult> StudentQuizResults { get; set; }
+    public DbSet<OrphanedFile> OrphanedFiles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
