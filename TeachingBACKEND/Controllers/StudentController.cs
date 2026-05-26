@@ -171,6 +171,31 @@ public class StudentController : ControllerBase
     }
 
     /// <summary>
+    /// Reset all quiz progress for the current student on a specific link
+    /// </summary>
+    [HttpPost("quizzes/{linkId}/reset")]
+    public async Task<IActionResult> ResetQuizProgress(Guid linkId)
+    {
+        try
+        {
+            var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(studentIdClaim) || !Guid.TryParse(studentIdClaim, out var studentId))
+                return Unauthorized(new { error = "Invalid user authentication" });
+
+            await _performanceService.ResetLinkProgressAsync(linkId, studentId);
+            return Ok(new { success = true });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Link not found" });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Errore interno del server." });
+        }
+    }
+
+    /// <summary>
     /// Get detailed performance analytics for the current student
     /// </summary>
     /// <param name="linkId">The ID of the link to get analytics for</param>

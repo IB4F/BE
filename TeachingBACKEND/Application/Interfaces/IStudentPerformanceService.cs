@@ -47,4 +47,10 @@ public interface IStudentPerformanceService
     /// Get ordered quiz results for a student in a link (for the results screen)
     /// </summary>
     Task<List<QuizResultDTO>> GetQuizResultsAsync(Guid linkId, Guid studentId);
+
+    /// <summary>
+    /// Reset all quiz progress for a student on a specific link.
+    /// Throws KeyNotFoundException if the link does not exist.
+    /// </summary>
+    Task ResetLinkProgressAsync(Guid linkId, Guid studentId);
 }

@@ -822,6 +822,35 @@ namespace TeachingBACKEND.Application.Services;
             .ToListAsync();
     }
 
+    public async Task ResetLinkProgressAsync(Guid linkId, Guid studentId)
+    {
+        var linkExists = await _context.Links.AnyAsync(l => l.Id == linkId);
+        if (!linkExists)
+            throw new KeyNotFoundException($"Link {linkId} not found");
+
+        var performances = await _context.StudentQuizPerformances
+            .Where(p => p.StudentId == studentId && p.LinkId == linkId)
+            .ToListAsync();
+        _context.StudentQuizPerformances.RemoveRange(performances);
+
+        var sessions = await _context.StudentQuizSessions
+            .Where(s => s.StudentId == studentId && s.LinkId == linkId)
+            .ToListAsync();
+        _context.StudentQuizSessions.RemoveRange(sessions);
+
+        var results = await _context.StudentQuizResults
+            .Where(r => r.StudentId == studentId && r.LinkId == linkId)
+            .ToListAsync();
+        _context.StudentQuizResults.RemoveRange(results);
+
+        var summary = await _context.StudentPerformanceSummaries
+            .FirstOrDefaultAsync(s => s.StudentId == studentId && s.LinkId == linkId);
+        if (summary != null)
+            _context.StudentPerformanceSummaries.Remove(summary);
+
+        await _context.SaveChangesAsync();
+    }
+
     private async Task<int> CountCompletedParentQuizzes(Guid studentId, Guid linkId, List<Quizz> parentQuizzes, List<StudentQuizPerformance> performances)
     {
         int completedCount = 0;
