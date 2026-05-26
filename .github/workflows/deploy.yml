@@ -17,29 +17,21 @@ jobs:
         uses: actions/checkout@v4
 
       # ─────────────────────────────────────────
-      # 2. SETUP .NET
-      # ─────────────────────────────────────────
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      # ─────────────────────────────────────────
-      # 3. RESTORE
+      # 2. RESTORE
       # ─────────────────────────────────────────
       - name: Restore dependencies
         run: dotnet restore TeachingBACKEND.sln
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 4. BUILD
+      # 3. BUILD
       # ─────────────────────────────────────────
       - name: Build
         run: dotnet build TeachingBACKEND.sln --configuration Release --no-restore
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 5. TEST (saltato se non ci sono test projects)
+      # 4. TEST (saltato se non ci sono test projects)
       # ─────────────────────────────────────────
       - name: Test
         run: |
@@ -55,7 +47,7 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 6. PUBLISH
+      # 5. PUBLISH
       # ─────────────────────────────────────────
       - name: Publish
         run: |
@@ -66,7 +58,7 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 7. EF CORE MIGRATIONS
+      # 6. EF CORE MIGRATIONS
       # ─────────────────────────────────────────
       - name: Install EF Core tools
         run: |
@@ -91,7 +83,7 @@ jobs:
           ConnectionStrings__DefaultConnection: ${{ secrets.DB_CONNECTION_STRING }}
 
       # ─────────────────────────────────────────
-      # 8. STOP APP POOL
+      # 7. STOP APP POOL
       # ─────────────────────────────────────────
       - name: Stop IIS App Pool
         run: |
@@ -108,7 +100,7 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 9. DEPLOY FILES (web.config escluso)
+      # 8. DEPLOY FILES (web.config escluso)
       # ─────────────────────────────────────────
       - name: Deploy files to IIS
         run: |
@@ -130,8 +122,8 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 10. START APP POOL — always() per non lasciare il sito offline
-      #     anche in caso di errore nei passi precedenti
+      # 9. START APP POOL — always() per non lasciare il sito offline
+      #    anche in caso di errore nei passi precedenti
       # ─────────────────────────────────────────
       - name: Start IIS App Pool
         if: always()
@@ -144,7 +136,7 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 11. HEALTH CHECK
+      # 10. HEALTH CHECK
       # ─────────────────────────────────────────
       - name: Health check
         run: |
@@ -173,7 +165,7 @@ jobs:
         shell: pwsh
 
       # ─────────────────────────────────────────
-      # 12. NOTIFICA FINALE (sempre eseguita)
+      # 11. NOTIFICA FINALE (sempre eseguita)
       # ─────────────────────────────────────────
       - name: Deployment summary
         if: always()
