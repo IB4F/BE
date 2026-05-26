@@ -21,14 +21,14 @@ jobs:
       # ─────────────────────────────────────────
       - name: Restore dependencies
         run: dotnet restore TeachingBACKEND.sln
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 3. BUILD
       # ─────────────────────────────────────────
       - name: Build
         run: dotnet build TeachingBACKEND.sln --configuration Release --no-restore
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 4. TEST (saltato se non ci sono test projects)
@@ -44,7 +44,7 @@ jobs:
           } else {
             Write-Host "Nessun progetto di test trovato, step saltato."
           }
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 5. PUBLISH
@@ -55,7 +55,7 @@ jobs:
             --configuration Release `
             --output ./publish `
             --no-build
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 6. EF CORE MIGRATIONS
@@ -67,7 +67,7 @@ jobs:
             Write-Host "Già installato, aggiorno..."
             dotnet tool update --global dotnet-ef --version 8.0.*
           }
-        shell: pwsh
+        shell: powershell
 
       - name: Apply EF Core migrations
         run: |
@@ -76,7 +76,7 @@ jobs:
             --startup-project TeachingBACKEND/TeachingBACKEND.csproj `
             --no-build `
             --verbose
-        shell: pwsh
+        shell: powershell
         env:
           # Inietta la connection string senza toccare il web.config di produzione.
           # La chiave deve corrispondere al nome usato nel DbContext: "DefaultConnection"
@@ -97,7 +97,7 @@ jobs:
           } else {
             Write-Host "App Pool '$appPool' era già fermo (state: $state)."
           }
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 8. DEPLOY FILES (web.config escluso)
@@ -119,7 +119,7 @@ jobs:
             Write-Error "Robocopy fallito (exit code: $LASTEXITCODE)."
             exit $LASTEXITCODE
           }
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 9. START APP POOL — always() per non lasciare il sito offline
@@ -133,7 +133,7 @@ jobs:
 
           & $appcmd start apppool /apppool.name:$appPool
           Write-Host "App Pool '$appPool' avviato."
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 10. HEALTH CHECK
@@ -162,7 +162,7 @@ jobs:
 
           Write-Error "Health check fallito dopo $retries tentativi su $url"
           exit 1
-        shell: pwsh
+        shell: powershell
 
       # ─────────────────────────────────────────
       # 11. NOTIFICA FINALE (sempre eseguita)
@@ -200,4 +200,4 @@ jobs:
           Write-Host "  Autore : ${{ github.actor }}"
           Write-Host "  Data   : ${now} UTC"
           Write-Host "=================================="
-        shell: pwsh
+        shell: powershell
