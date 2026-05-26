@@ -74,7 +74,6 @@ jobs:
           dotnet ef database update `
             --project TeachingBACKEND/TeachingBACKEND.csproj `
             --startup-project TeachingBACKEND/TeachingBACKEND.csproj `
-            --no-build `
             --verbose
         shell: powershell
         env:
@@ -87,16 +86,9 @@ jobs:
       # ─────────────────────────────────────────
       - name: Stop IIS App Pool
         run: |
-          $appPool = "${{ secrets.IIS_APP_POOL_NAME }}"
-          $appcmd  = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
-
-          $state = & $appcmd list apppool $appPool /text:state 2>&1
-          if ($state -eq "Started") {
-            & $appcmd stop apppool /apppool.name:$appPool
-            Write-Host "App Pool '$appPool' fermato."
-          } else {
-            Write-Host "App Pool '$appPool' era già fermo (state: $state)."
-          }
+          Import-Module WebAdministration
+          Stop-WebAppPool -Name "${{ secrets.IIS_APP_POOL_NAME }}"
+          Write-Host "App Pool '${{ secrets.IIS_APP_POOL_NAME }}' fermato."
         shell: powershell
 
       # ─────────────────────────────────────────
@@ -128,11 +120,9 @@ jobs:
       - name: Start IIS App Pool
         if: always()
         run: |
-          $appPool = "${{ secrets.IIS_APP_POOL_NAME }}"
-          $appcmd  = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
-
-          & $appcmd start apppool /apppool.name:$appPool
-          Write-Host "App Pool '$appPool' avviato."
+          Import-Module WebAdministration
+          Start-WebAppPool -Name "${{ secrets.IIS_APP_POOL_NAME }}"
+          Write-Host "App Pool '${{ secrets.IIS_APP_POOL_NAME }}' avviato."
         shell: powershell
 
       # ─────────────────────────────────────────
