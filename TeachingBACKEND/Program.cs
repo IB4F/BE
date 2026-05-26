@@ -72,6 +72,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     ServiceLifetime.Scoped);
 
 builder.Services.AddMemoryCache();
+builder.Services.AddHealthChecks();
 
 builder.Services
   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -300,5 +301,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();

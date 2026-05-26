@@ -1,0 +1,211 @@
+name: Build and Deploy to IIS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      # ─────────────────────────────────────────
+      # 1. CHECKOUT
+      # ─────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────
+      # 2. SETUP .NET
+      # ─────────────────────────────────────────
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ─────────────────────────────────────────
+      # 3. RESTORE
+      # ─────────────────────────────────────────
+      - name: Restore dependencies
+        run: dotnet restore TeachingBACKEND.sln
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 4. BUILD
+      # ─────────────────────────────────────────
+      - name: Build
+        run: dotnet build TeachingBACKEND.sln --configuration Release --no-restore
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 5. TEST (saltato se non ci sono test projects)
+      # ─────────────────────────────────────────
+      - name: Test
+        run: |
+          $testProjects = Get-ChildItem -Recurse -Filter "*.csproj" |
+            Where-Object { Select-String -Path $_.FullName -Pattern "IsTestProject" -Quiet }
+
+          if ($testProjects.Count -gt 0) {
+            Write-Host "Trovati $($testProjects.Count) progetto/i di test. Eseguo i test..."
+            dotnet test TeachingBACKEND.sln --no-build --configuration Release --verbosity normal
+          } else {
+            Write-Host "Nessun progetto di test trovato, step saltato."
+          }
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 6. PUBLISH
+      # ─────────────────────────────────────────
+      - name: Publish
+        run: |
+          dotnet publish TeachingBACKEND/TeachingBACKEND.csproj `
+            --configuration Release `
+            --output ./publish `
+            --no-build
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 7. EF CORE MIGRATIONS
+      # ─────────────────────────────────────────
+      - name: Install EF Core tools
+        run: |
+          dotnet tool install --global dotnet-ef --version 8.0.* 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Già installato, aggiorno..."
+            dotnet tool update --global dotnet-ef --version 8.0.*
+          }
+        shell: pwsh
+
+      - name: Apply EF Core migrations
+        run: |
+          dotnet ef database update `
+            --project TeachingBACKEND/TeachingBACKEND.csproj `
+            --startup-project TeachingBACKEND/TeachingBACKEND.csproj `
+            --no-build `
+            --verbose
+        shell: pwsh
+        env:
+          # Inietta la connection string senza toccare il web.config di produzione.
+          # La chiave deve corrispondere al nome usato nel DbContext: "DefaultConnection"
+          ConnectionStrings__DefaultConnection: ${{ secrets.DB_CONNECTION_STRING }}
+
+      # ─────────────────────────────────────────
+      # 8. STOP APP POOL
+      # ─────────────────────────────────────────
+      - name: Stop IIS App Pool
+        run: |
+          $appPool = "${{ secrets.IIS_APP_POOL_NAME }}"
+          $appcmd  = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
+
+          $state = & $appcmd list apppool $appPool /text:state 2>&1
+          if ($state -eq "Started") {
+            & $appcmd stop apppool /apppool.name:$appPool
+            Write-Host "App Pool '$appPool' fermato."
+          } else {
+            Write-Host "App Pool '$appPool' era già fermo (state: $state)."
+          }
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 9. DEPLOY FILES (web.config escluso)
+      # ─────────────────────────────────────────
+      - name: Deploy files to IIS
+        run: |
+          $src  = ".\publish"
+          $dest = "${{ secrets.BACKEND_DEPLOY_PATH }}"
+
+          Write-Host "Copio da '$src' a '$dest' (web.config escluso)..."
+
+          robocopy $src $dest /MIR /XF web.config /R:3 /W:5 /NFL /NDL /NJH /NJS
+
+          # robocopy: codici 0-7 = successo, 8+ = errore reale
+          if ($LASTEXITCODE -le 7) {
+            Write-Host "Robocopy completato (exit code: $LASTEXITCODE)."
+            exit 0
+          } else {
+            Write-Error "Robocopy fallito (exit code: $LASTEXITCODE)."
+            exit $LASTEXITCODE
+          }
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 10. START APP POOL — always() per non lasciare il sito offline
+      #     anche in caso di errore nei passi precedenti
+      # ─────────────────────────────────────────
+      - name: Start IIS App Pool
+        if: always()
+        run: |
+          $appPool = "${{ secrets.IIS_APP_POOL_NAME }}"
+          $appcmd  = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
+
+          & $appcmd start apppool /apppool.name:$appPool
+          Write-Host "App Pool '$appPool' avviato."
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 11. HEALTH CHECK
+      # ─────────────────────────────────────────
+      - name: Health check
+        run: |
+          $url     = "https://app.braingainalbania.al/health"
+          $retries = 12
+          $delayS  = 5
+
+          Write-Host "Attendo che l'app risponda su $url (max $($retries * $delayS)s)..."
+
+          for ($i = 1; $i -le $retries; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+              if ($resp.StatusCode -eq 200) {
+                Write-Host "Health check OK al tentativo $i — $($resp.StatusCode)"
+                exit 0
+              }
+              Write-Host "Tentativo $i/$retries — status $($resp.StatusCode), riprovo tra ${delayS}s"
+            } catch {
+              Write-Host "Tentativo $i/$retries — errore: $($_.Exception.Message), riprovo tra ${delayS}s"
+            }
+            Start-Sleep -Seconds $delayS
+          }
+
+          Write-Error "Health check fallito dopo $retries tentativi su $url"
+          exit 1
+        shell: pwsh
+
+      # ─────────────────────────────────────────
+      # 12. NOTIFICA FINALE (sempre eseguita)
+      # ─────────────────────────────────────────
+      - name: Deployment summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          $icon    = if ($env:JOB_STATUS -eq "success") { "✅" } else { "❌" }
+          $label   = if ($env:JOB_STATUS -eq "success") { "SUCCESSO" } else { "FALLITO" }
+          $now     = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+          $sha     = "${{ github.sha }}".Substring(0, 7)
+
+          $summary = @"
+          ## $icon Deploy $label
+
+          | | |
+          |---|---|
+          | **App**    | https://app.braingainalbania.al |
+          | **Branch** | ${{ github.ref_name }} |
+          | **Commit** | [$sha](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |
+          | **Autore** | ${{ github.actor }} |
+          | **Data**   | ${now} UTC |
+          | **Run**    | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          "@
+
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          Write-Host ""
+          Write-Host "=================================="
+          Write-Host "  DEPLOY $label  $icon"
+          Write-Host "=================================="
+          Write-Host "  Commit : $sha"
+          Write-Host "  Autore : ${{ github.actor }}"
+          Write-Host "  Data   : ${now} UTC"
+          Write-Host "=================================="
+        shell: pwsh

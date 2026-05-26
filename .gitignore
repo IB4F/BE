@@ -31,5 +31,3 @@ artifacts/
 # Ignore IDE-specific files (VSCode, JetBrains, etc.)
 .vscode/
 
-# Ignore GitHub-related files (optional)
-.github/
