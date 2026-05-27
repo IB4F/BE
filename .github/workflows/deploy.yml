@@ -129,29 +129,31 @@ jobs:
       # 10. HEALTH CHECK
       # ─────────────────────────────────────────
       - name: Health check
+        if: success()
         run: |
-          $url     = "https://app.braingainalbania.al/health"
+          $url = "https://app.braingainalbania.al/health"
           $retries = 12
-          $delayS  = 5
-
-          Write-Host "Attendo che l'app risponda su $url (max $($retries * $delayS)s)..."
+          $delay = 5
+          $success = $false
 
           for ($i = 1; $i -le $retries; $i++) {
             try {
-              $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-              if ($resp.StatusCode -eq 200) {
-                Write-Host "Health check OK al tentativo $i — $($resp.StatusCode)"
-                exit 0
+              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10
+              if ($response.StatusCode -eq 200) {
+                Write-Host "Health check OK al tentativo $i"
+                $success = $true
+                break
               }
-              Write-Host "Tentativo $i/$retries — status $($resp.StatusCode), riprovo tra ${delayS}s"
             } catch {
-              Write-Host "Tentativo $i/$retries — errore: $($_.Exception.Message), riprovo tra ${delayS}s"
+              Write-Host "Tentativo $i fallito: $_"
             }
-            Start-Sleep -Seconds $delayS
+            Start-Sleep -Seconds $delay
           }
 
-          Write-Error "Health check fallito dopo $retries tentativi su $url"
-          exit 1
+          if (-not $success) {
+            Write-Host "Health check fallito dopo $retries tentativi"
+            exit 1
+          }
         shell: powershell
 
       # ─────────────────────────────────────────
