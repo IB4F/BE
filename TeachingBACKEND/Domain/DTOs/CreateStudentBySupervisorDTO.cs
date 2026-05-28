@@ -7,6 +7,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public string CurrentClass { get; set; }
         public string School { get; set; }
         public DateTime DateOfBirth { get; set; }
+        public string? Notes { get; set; }
         // Email nuk përfshihet - gjenerohet automatikisht si firstname.lastname@bga.al
     }
 }

@@ -206,6 +206,7 @@ namespace TeachingBACKEND.Application.Services
                     LastName = model.LastName,
                     CurrentClass = model.CurrentClass,
                     School = model.School,
+                    Notes = string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim(),
                     DateOfBirth = model.DateOfBirth,
                     Role = UserRole.Student,
                     SupervisorId = supervisorId,
@@ -317,44 +318,54 @@ namespace TeachingBACKEND.Application.Services
             };
         }
 
-        public async Task<bool> HandlePasswordResetRequest(Guid studentId, bool approve)
+        public async Task<PasswordResetApprovalResultDTO> HandlePasswordResetRequest(Guid studentId, bool approve, Guid supervisorId)
         {
             try
             {
                 var student = await _context.Users
                     .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == UserRole.Student);
 
-                if (student == null)
+                if (student == null || student.SupervisorId != supervisorId)
+                    throw new UnauthorizedAccessException("Student does not belong to this supervisor");
+
+                var hasPendingRequest = student.PasswordResetToken.HasValue
+                    && student.PasswordResetTokenExpiry > DateTime.UtcNow;
+
+                if (!approve)
                 {
-                    throw new ArgumentException("Student not found");
+                    if (hasPendingRequest)
+                    {
+                        student.PasswordResetToken = null;
+                        student.PasswordResetTokenExpiry = null;
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("Password reset rejected for student {StudentId}", studentId);
+                        return new PasswordResetApprovalResultDTO { Message = "Kërkesa u refuzua." };
+                    }
+
+                    return new PasswordResetApprovalResultDTO { Message = "Nuk ka kërkesa në pritje." };
                 }
 
-                if (approve)
-                {
-                    // Generate new password
-                    var newPassword = GenerateStudentPassword();
-                    student.PasswordHash = _passwordService.HashPassword(newPassword);
-                    student.MustChangePasswordOnNextLogin = true;
-                    student.IsOneTimeLoginUsed = false;
-                    
-                    // Clear the password reset token since it's been handled
-                    student.PasswordResetToken = null;
-                    student.PasswordResetTokenExpiry = null;
-                }
-                else
-                {
-                    // If rejected, clear the password reset token
-                    student.PasswordResetToken = null;
-                    student.PasswordResetTokenExpiry = null;
-                }
+                // approve == true: generate new password regardless of pending request
+                var newPassword = _passwordService.GenerateRandomPassword();
+                student.PasswordHash = _passwordService.HashPassword(newPassword);
+                student.MustChangePasswordOnNextLogin = true;
+                student.IsOneTimeLoginUsed = false;
+                student.PasswordResetToken = null;
+                student.PasswordResetTokenExpiry = null;
 
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Password reset request for student {StudentId} {Status}", 
-                    studentId, approve ? "approved" : "rejected");
-                return true;
+                _logger.LogInformation("Password reset approved for student {StudentId} (proactive: {Proactive})",
+                    studentId, !hasPendingRequest);
+
+                return new PasswordResetApprovalResultDTO
+                {
+                    StudentName = $"{student.FirstName} {student.LastName}",
+                    StudentEmail = student.Email,
+                    NewPassword = newPassword
+                };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not UnauthorizedAccessException)
             {
                 _logger.LogError(ex, "Error handling password reset request for student {StudentId}", studentId);
                 throw;
@@ -379,7 +390,7 @@ namespace TeachingBACKEND.Application.Services
                         StudentEmail = u.Email,
                         RequestDate = u.PasswordResetTokenExpiry.Value.AddHours(-1), // Approximate request time
                         ResetToken = u.PasswordResetToken.Value,
-                        Reason = "Student requested password reset"
+                        Reason = "Harroi fjalëkalimin"
                     })
                     .ToListAsync();
 
@@ -399,53 +410,90 @@ namespace TeachingBACKEND.Application.Services
         {
             try
             {
+                var now = DateTime.UtcNow;
+                var sevenDaysAgo = now.AddDays(-7);
+                var threeDaysAgo = now.AddDays(-3);
+
                 var students = await _context.Users
                     .AsNoTracking()
                     .Where(u => u.SupervisorId == supervisorId && u.Role == UserRole.Student)
                     .ToListAsync();
 
-                var totalStudents = students.Count;
-                var activeStudents = students.Count(s => s.ApprovalStatus == ApprovalStatus.Approved);
-
-                // Get real progress data for all students
                 var studentIds = students.Select(s => s.Id).ToList();
-                var studentProgress = await _studentProgressService.CalculateStudentsProgressAsync(studentIds);
 
-                // Calculate average progress from real data
+                // Load performance summaries for status & activity calculations
+                var perfSummaries = await _context.StudentPerformanceSummaries
+                    .AsNoTracking()
+                    .Where(s => studentIds.Contains(s.StudentId))
+                    .Include(s => s.Link)
+                        .ThenInclude(l => l.LearnHub)
+                    .ToListAsync();
+
+                var lastActivityByStudent = perfSummaries
+                    .GroupBy(s => s.StudentId)
+                    .ToDictionary(g => g.Key, g => g.Max(s => s.LastAttemptAt));
+
+                // Progress
+                var studentProgress = await _studentProgressService.CalculateStudentsProgressAsync(studentIds);
                 var averageProgress = studentProgress.Values.Any() ? studentProgress.Values.Average() : 0.0;
 
-                // Get all class names for the students
+                // Class names
                 var classIds = students.Where(s => !string.IsNullOrEmpty(s.CurrentClass)).Select(s => s.CurrentClass).ToList();
                 var classes = await _context.Classes
                     .AsNoTracking()
                     .Where(c => classIds.Contains(c.Id.ToString()))
                     .ToDictionaryAsync(c => c.Id.ToString(), c => c.Name);
 
-                var studentCredentials = students.Select(s => new StudentCredentialsDTO
+                // Build student list with status
+                var studentCredentials = students.Select(s =>
                 {
-                    StudentId = s.Id,
-                    FirstName = s.FirstName,
-                    LastName = s.LastName,
-                    Email = s.Email,
-                    Password = "***", // Don't return actual password for security
-                    CurrentClass = !string.IsNullOrEmpty(s.CurrentClass) && classes.ContainsKey(s.CurrentClass) 
-                        ? classes[s.CurrentClass] 
-                        : s.CurrentClass ?? "N/A", // Return class name or fallback to ID or N/A
-                    School = s.School,
-                    DateOfBirth = s.DateOfBirth ?? DateTime.UtcNow,
-                    IsActive = s.ApprovalStatus == ApprovalStatus.Approved,
-                    ProgressPercentage = studentProgress.GetValueOrDefault(s.Id, 0.0) // Real progress calculation
+                    var isNew = s.CreateAt >= sevenDaysAgo;
+                    var isApproved = s.ApprovalStatus == ApprovalStatus.Approved;
+                    var lastActivity = lastActivityByStudent.GetValueOrDefault(s.Id);
+                    var isRecentlyActive = lastActivity.HasValue && lastActivity.Value >= threeDaysAgo;
+
+                    var status = isNew ? "new"
+                        : (isApproved && isRecentlyActive) ? "aktiv"
+                        : "idle";
+
+                    return new StudentCredentialsDTO
+                    {
+                        StudentId = s.Id,
+                        FirstName = s.FirstName,
+                        LastName = s.LastName,
+                        Email = s.Email,
+                        Password = "***",
+                        CurrentClass = !string.IsNullOrEmpty(s.CurrentClass) && classes.ContainsKey(s.CurrentClass)
+                            ? classes[s.CurrentClass]
+                            : s.CurrentClass ?? "N/A",
+                        School = s.School,
+                        DateOfBirth = s.DateOfBirth ?? DateTime.UtcNow,
+                        IsActive = isApproved,
+                        ProgressPercentage = studentProgress.GetValueOrDefault(s.Id, 0.0),
+                        Status = status
+                    };
                 }).ToList();
 
-                // Get the actual count of pending password reset requests
+                var newStudents = studentCredentials.Count(s => s.Status == "new");
+
+                // Pending password resets
                 var pendingPasswordResetRequests = await GetPendingPasswordResetRequests(supervisorId);
+
+                // Weekly progress trend
+                var weeklyTrend = await BuildWeeklyProgressTrend(studentIds, now);
+
+                // Recent activities
+                var recentActivities = await BuildRecentActivities(students, perfSummaries, lastActivityByStudent, sevenDaysAgo, threeDaysAgo, now);
 
                 return new SupervisorDashboardDTO
                 {
-                    TotalStudents = totalStudents,
-                    ActiveStudents = activeStudents,
+                    TotalStudents = students.Count,
+                    ActiveStudents = studentCredentials.Count(s => s.IsActive),
+                    NewStudents = newStudents,
                     AverageProgress = averageProgress,
                     PendingPasswordResetRequests = pendingPasswordResetRequests.Count,
+                    WeeklyProgressTrend = weeklyTrend,
+                    RecentActivities = recentActivities,
                     Students = studentCredentials
                 };
             }
@@ -454,6 +502,156 @@ namespace TeachingBACKEND.Application.Services
                 _logger.LogError(ex, "Error getting dashboard data for supervisor {SupervisorId}", supervisorId);
                 throw;
             }
+        }
+
+        private async Task<List<double?>> BuildWeeklyProgressTrend(List<Guid> studentIds, DateTime now)
+        {
+            if (studentIds.Count == 0)
+                return Enumerable.Repeat<double?>(0.0, 7).ToList();
+
+            var totalQuizzes = await _context.Quizzes.CountAsync();
+            if (totalQuizzes == 0)
+                return Enumerable.Repeat<double?>(0.0, 7).ToList();
+
+            // Load all completion timestamps for these students (lightweight projection)
+            var completions = await _context.StudentQuizPerformances
+                .AsNoTracking()
+                .Where(p => studentIds.Contains(p.StudentId))
+                .Select(p => new { p.StudentId, p.CompletedAt })
+                .ToListAsync();
+
+            var trend = new List<double?>(7);
+            double? lastValue = null;
+
+            for (int i = 6; i >= 0; i--)
+            {
+                var dayEnd = now.Date.AddDays(-i + 1); // exclusive upper bound for day (today - i)
+                var perStudentProgress = studentIds.Select(id =>
+                {
+                    var count = completions.Count(c => c.StudentId == id && c.CompletedAt < dayEnd);
+                    return Math.Min(100.0, count * 100.0 / totalQuizzes);
+                });
+
+                var avg = perStudentProgress.Average();
+                // Forward-fill: if no change, carry last value
+                lastValue = Math.Round(avg, 1);
+                trend.Add(lastValue);
+            }
+
+            return trend;
+        }
+
+        private async Task<List<SupervisorActivityDTO>> BuildRecentActivities(
+            List<User> students,
+            List<StudentPerformanceSummary> perfSummaries,
+            Dictionary<Guid, DateTime?> lastActivityByStudent,
+            DateTime sevenDaysAgo,
+            DateTime threeDaysAgo,
+            DateTime now)
+        {
+            var studentById = students.ToDictionary(s => s.Id);
+            var activities = new List<(DateTime Timestamp, SupervisorActivityDTO Dto)>();
+
+            // ok — module/link completions (CompletedQuizzes == TotalQuizzes) updated in last 7 days
+            var completedSummaries = perfSummaries
+                .Where(s => s.TotalQuizzes > 0
+                    && s.CompletedQuizzes >= s.TotalQuizzes
+                    && s.UpdatedAt >= sevenDaysAgo
+                    && studentById.ContainsKey(s.StudentId))
+                .GroupBy(s => s.StudentId)
+                .Select(g => g.OrderByDescending(s => s.UpdatedAt).First());
+
+            foreach (var summary in completedSummaries)
+            {
+                var student = studentById[summary.StudentId];
+                var linkTitle = summary.Link?.Title ?? "";
+                var hubTitle = summary.Link?.LearnHub?.Title ?? "";
+                var moduleLabel = string.IsNullOrEmpty(hubTitle) ? linkTitle : $"{hubTitle} · {linkTitle}";
+                var score = $"{summary.CorrectAnswerQuiz}/{summary.TotalQuizzes}";
+                var raw = $"Përfundoi modulin '{moduleLabel}' me {score}";
+                activities.Add((summary.UpdatedAt, new SupervisorActivityDTO
+                {
+                    StudentId = student.Id,
+                    StudentName = $"{student.FirstName} {student.LastName}",
+                    Type = "ok",
+                    Description = raw.Length > 80 ? raw[..80] : raw,
+                    TimeAgo = FormatTimeAgo(now - summary.UpdatedAt)
+                }));
+            }
+
+            // warn — no activity for 3+ days (students who had activity but went quiet)
+            var inactiveStudents = students
+                .Where(s => lastActivityByStudent.TryGetValue(s.Id, out var last)
+                    && last.HasValue && last.Value < threeDaysAgo);
+
+            foreach (var student in inactiveStudents)
+            {
+                var last = lastActivityByStudent[student.Id]!.Value;
+                var daysSince = (int)(now - last).TotalDays;
+                var desc = $"Nuk ka aktivitet që prej {daysSince} ditësh — kontaktoni familjen";
+                activities.Add((last, new SupervisorActivityDTO
+                {
+                    StudentId = student.Id,
+                    StudentName = $"{student.FirstName} {student.LastName}",
+                    Type = "warn",
+                    Description = desc.Length > 80 ? desc[..80] : desc,
+                    TimeAgo = FormatTimeAgo(now - last)
+                }));
+            }
+
+            // default — new student registrations in last 7 days
+            foreach (var student in students.Where(s => s.CreateAt >= sevenDaysAgo))
+            {
+                activities.Add((student.CreateAt, new SupervisorActivityDTO
+                {
+                    StudentId = student.Id,
+                    StudentName = $"{student.FirstName} {student.LastName}",
+                    Type = "default",
+                    Description = "U regjistrua dhe filloi onboarding-un",
+                    TimeAgo = FormatTimeAgo(now - student.CreateAt)
+                }));
+            }
+
+            // info — reached 50%+ completion on a module for the first time (UpdatedAt recent)
+            var milestoneSummaries = perfSummaries
+                .Where(s => s.TotalQuizzes > 0
+                    && (double)s.CompletedQuizzes / s.TotalQuizzes >= 0.5
+                    && s.CompletedQuizzes < s.TotalQuizzes  // not fully completed (already captured above)
+                    && s.UpdatedAt >= sevenDaysAgo
+                    && studentById.ContainsKey(s.StudentId))
+                .GroupBy(s => s.StudentId)
+                .Select(g => g.OrderByDescending(s => s.UpdatedAt).First());
+
+            foreach (var summary in milestoneSummaries)
+            {
+                var student = studentById[summary.StudentId];
+                var pct = (int)Math.Round((double)summary.CompletedQuizzes / summary.TotalQuizzes * 100);
+                var linkTitle = summary.Link?.Title ?? "";
+                var raw = $"Ka arritur {pct}% të progresit në '{linkTitle}'";
+                activities.Add((summary.UpdatedAt, new SupervisorActivityDTO
+                {
+                    StudentId = student.Id,
+                    StudentName = $"{student.FirstName} {student.LastName}",
+                    Type = "info",
+                    Description = raw.Length > 80 ? raw[..80] : raw,
+                    TimeAgo = FormatTimeAgo(now - summary.UpdatedAt)
+                }));
+            }
+
+            return activities
+                .OrderByDescending(a => a.Timestamp)
+                .Take(5)
+                .Select(a => a.Dto)
+                .ToList();
+        }
+
+        private static string FormatTimeAgo(TimeSpan elapsed)
+        {
+            if (elapsed.TotalMinutes < 60)
+                return $"{(int)elapsed.TotalMinutes} min";
+            if (elapsed.TotalHours < 24)
+                return $"{(int)elapsed.TotalHours} orë";
+            return $"{(int)elapsed.TotalDays} ditë";
         }
 
         public async Task<bool> IsSupervisorApproved(Guid supervisorId)
@@ -584,20 +782,64 @@ namespace TeachingBACKEND.Application.Services
             }
         }
 
+        public async Task<UpdatedStudentDTO> UpdateStudentAsync(Guid studentId, Guid supervisorId, UpdateStudentBySupervisorDTO dto)
+        {
+            try
+            {
+                var student = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == UserRole.Student);
+
+                if (student == null)
+                    throw new KeyNotFoundException("Student not found");
+
+                if (student.SupervisorId != supervisorId)
+                    throw new UnauthorizedAccessException("Student does not belong to this supervisor");
+
+                student.FirstName = dto.FirstName.Trim();
+                student.LastName = dto.LastName.Trim();
+                student.CurrentClass = dto.CurrentClass;
+                student.DateOfBirth = DateTime.Parse(dto.DateOfBirth);
+                student.Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim();
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Student {StudentId} updated by supervisor {SupervisorId}", studentId, supervisorId);
+
+                return new UpdatedStudentDTO
+                {
+                    StudentId = student.Id,
+                    FirstName = student.FirstName,
+                    LastName = student.LastName,
+                    Email = student.Email,
+                    CurrentClass = student.CurrentClass,
+                    School = student.School,
+                    DateOfBirth = student.DateOfBirth ?? DateTime.UtcNow,
+                    Notes = student.Notes
+                };
+            }
+            catch (Exception ex) when (ex is not KeyNotFoundException && ex is not UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "Error updating student {StudentId} for supervisor {SupervisorId}", studentId, supervisorId);
+                throw;
+            }
+        }
+
         public async Task<StudentProgressDetailDTO> GetStudentProgressDetail(Guid studentId)
         {
             try
             {
-                // Get the progress detail from the student progress service
                 var progressDetail = await _studentProgressService.GetStudentProgressDetailAsync(studentId);
-                
-                // Get the student to check if they have logged in for the first time
+
                 var student = await _context.Users
                     .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == UserRole.Student);
-                
-                // Password is no longer stored in DB — sent via email only at creation/reset
+
                 progressDetail.GeneratedPassword = null;
-                
+                progressDetail.Notes = student?.Notes;
+                progressDetail.FirstName = student?.FirstName;
+                progressDetail.LastName = student?.LastName;
+                progressDetail.CurrentClass = student?.CurrentClass;
+                progressDetail.DateOfBirth = student?.DateOfBirth?.ToString("O");
+
                 return progressDetail;
             }
             catch (Exception ex)

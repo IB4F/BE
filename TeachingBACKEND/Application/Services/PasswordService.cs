@@ -55,25 +55,10 @@ namespace TeachingBACKEND.Application.Services
 
                 await _context.SaveChangesAsync();
 
-                // Check if this is a @bga.al email (student created by supervisor)
+                // @bga.al emails are internal — no real mailbox exists, notify supervisor via dashboard only
                 if (email.EndsWith("@bga.al"))
                 {
-                    // Find the supervisor for this student
-                    if (user.SupervisorId.HasValue)
-                    {
-                        var supervisor = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.SupervisorId.Value);
-                        if (supervisor != null)
-                        {
-                            // Send notification to supervisor instead of student
-                            await _notificationService.SendStudentPasswordResetRequestToSupervisor(
-                                supervisor.Email, 
-                                $"{supervisor.FirstName} {supervisor.LastName}", 
-                                $"{user.FirstName} {user.LastName}", 
-                                user.Email, 
-                                resetToken);
-                            return "Kërkesa për rivendosjen e fjalëkalimit është dërguar te supervizori juaj. Ai do ta aprovojë së shpejti.";
-                        }
-                    }
+                    return "Kërkesa juaj u regjistrua. Kontaktoni supervizorin tuaj.";
                 }
 
                 // Determine the email address to send the reset email to

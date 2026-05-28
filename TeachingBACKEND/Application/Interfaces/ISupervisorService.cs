@@ -14,9 +14,10 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<List<StudentCreatedResponseDTO>> GetSupervisedStudents(Guid supervisorId);
         Task<PaginatedResponseDTO<StudentCreatedResponseDTO>> GetSupervisedStudentsPaged(Guid supervisorId, int page, int pageSize);
         Task<bool> DeleteStudent(Guid studentId, Guid supervisorId);
+        Task<UpdatedStudentDTO> UpdateStudentAsync(Guid studentId, Guid supervisorId, UpdateStudentBySupervisorDTO dto);
         
         // Password Reset Management
-        Task<bool> HandlePasswordResetRequest(Guid studentId, bool approve);
+        Task<PasswordResetApprovalResultDTO> HandlePasswordResetRequest(Guid studentId, bool approve, Guid supervisorId);
         Task<List<PasswordResetRequestDTO>> GetPendingPasswordResetRequests(Guid supervisorId);
         
         // Dashboard

@@ -211,6 +211,36 @@ namespace TeachingBACKEND.Controllers
             }
         }
 
+        [HttpPut("students/{studentId}")]
+        [Authorize(Roles = "Supervisor")]
+        public async Task<IActionResult> UpdateStudent(Guid studentId, [FromBody] UpdateStudentBySupervisorDTO dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var supervisorId))
+                return Unauthorized("Token i pavlefshëm.");
+
+            try
+            {
+                var result = await _supervisorService.UpdateStudentAsync(studentId, supervisorId, dto);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Studenti nuk u gjet." });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating student {StudentId}", studentId);
+                return StatusCode(500, "Ndodhi një gabim gjatë përditësimit të nxënësit.");
+            }
+        }
+
         /// <summary>
         /// Trajton kërkesën për rivendosje të fjalëkalimit për një nxënës
         /// </summary>
@@ -230,17 +260,16 @@ namespace TeachingBACKEND.Controllers
                     return Unauthorized("Token i pavlefshëm.");
                 }
 
-                var result = await _supervisorService.HandlePasswordResetRequest(studentId, approve);
-                
-                if (result)
-                {
-                    var message = approve ? "Kërkesa për rivendosje të fjalëkalimit u pranua." : "Kërkesa për rivendosje të fjalëkalimit u refuzua.";
-                    _logger.LogInformation("Password reset request for student {StudentId} {Status} by supervisor {SupervisorId}", 
-                        studentId, approve ? "approved" : "rejected", supervisorId);
-                    return Ok(new { Message = message });
-                }
-                
-                return BadRequest("Ndodhi një gabim gjatë përpunimit të kërkesës.");
+                var result = await _supervisorService.HandlePasswordResetRequest(studentId, approve, supervisorId);
+
+                _logger.LogInformation("Password reset request for student {StudentId} {Status} by supervisor {SupervisorId}",
+                    studentId, approve ? "approved" : "rejected", supervisorId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
             }
             catch (Exception ex)
             {

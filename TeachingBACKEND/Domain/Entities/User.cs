@@ -28,6 +28,7 @@ namespace TeachingBACKEND.Domain.Entities
 
         // Supervisor-Specific Fields (formerly School)
         public string? School { get; set; }
+        public string? Notes { get; set; }
         public string? PhoneNumber { get; set; }
         public string? Profession { get; set; }
         public string? City { get; set; }
