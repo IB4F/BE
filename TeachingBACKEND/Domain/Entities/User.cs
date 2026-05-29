@@ -58,6 +58,8 @@ namespace TeachingBACKEND.Domain.Entities
         public ICollection<Payment> Payments { get; set; } = new List<Payment>(); // Navigation
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
         public Guid? ParentUserId { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime? LastLoginAt { get; set; }
         
         // Subscription Fields
         public Guid? ActiveSubscriptionId { get; set; }

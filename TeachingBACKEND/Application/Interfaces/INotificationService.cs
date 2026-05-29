@@ -17,5 +17,7 @@
         Task SendNewPasswordSetEmail(string studentEmail, string studentName, string newPassword);
         Task SendStudentPasswordResetRequestToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, Guid resetToken);
         Task SendNewPasswordToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, string newPassword);
+        Task SendChildPasswordResetToParent(string parentEmail, string parentName, string childName, string childEmail, string newPassword);
+        Task SendNewChildrenCredentialsToParent(string parentEmail, string parentName, List<(string Name, string Email, string Password)> credentials);
     }
 }

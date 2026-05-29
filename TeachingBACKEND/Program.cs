@@ -142,7 +142,7 @@ builder.Services.AddCors(options =>
                 "http://localhost:4200",
                 "https://localhost:4200"
             )
-            .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .AllowAnyHeader()
             .AllowCredentials();
     });
@@ -228,6 +228,7 @@ builder.Services.AddScoped<ISubscriptionPackageService, SubscriptionPackageServi
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 builder.Services.AddScoped<ISupervisorService, SupervisorService>();
+builder.Services.AddScoped<IFamilyService, FamilyService>();
 builder.Services.AddScoped<IStudentProgressService, StudentProgressService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
 builder.Services.AddScoped<FamilyPricingService>();

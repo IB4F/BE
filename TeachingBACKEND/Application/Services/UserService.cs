@@ -218,6 +218,11 @@ namespace TeachingBACKEND.Application.Services
                 throw new Exception("Email is not verified! Please check your inbox.");
             }
 
+            if (!user.IsActive)
+            {
+                throw new Exception("This account has been deactivated.");
+            }
+
             // Check if this is a first-time login for supervisor-created user
             bool isFirstTimeLogin = user.Role == UserRole.Student && user.SupervisorId.HasValue && !user.IsOneTimeLoginUsed;
 
@@ -233,6 +238,7 @@ namespace TeachingBACKEND.Application.Services
             // Store the hash — never the raw token
             user.RefreshToken = _passwordService.HashRefreshToken(refreshToken);
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            user.LastLoginAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
@@ -302,16 +308,27 @@ namespace TeachingBACKEND.Application.Services
                 Role = entity.Role
             };
 
-            // Calculate counts based on user role
             if (entity.Role == UserRole.Family)
             {
-                // For family members, count children (students with ParentUserId = this user's ID)
-                userDetails.ChildrenCount = await _context.Users
-                    .CountAsync(u => u.ParentUserId == entity.Id && u.Role == UserRole.Student);
+                var children = await _context.Users
+                    .Where(u => u.ParentUserId == entity.Id)
+                    .Select(u => new ChildSummaryDto
+                    {
+                        Id = u.Id,
+                        FirstName = u.FirstName,
+                        LastName = u.LastName,
+                        Email = u.Email,
+                        CurrentClass = u.CurrentClass,
+                        LastLogin = u.LastLoginAt,
+                        IsActive = u.IsActive
+                    })
+                    .ToListAsync();
+
+                userDetails.Children = children;
+                userDetails.ChildrenCount = children.Count;
             }
             else if (entity.Role == UserRole.Supervisor)
             {
-                // For supervisors, count supervised students
                 userDetails.StudentsCount = await _context.Users
                     .CountAsync(u => u.SupervisorId == entity.Id && u.Role == UserRole.Student);
             }

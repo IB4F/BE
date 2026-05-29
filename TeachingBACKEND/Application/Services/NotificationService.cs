@@ -352,4 +352,51 @@ public class NotificationService : INotificationService
         var body = GenerateHtml(title, content, "", "", footerText);
         await SendEmail(supervisorEmail, "Fjalëkalimi i ri i nxënësit është gjeneruar", body);
     }
+
+    public async Task SendChildPasswordResetToParent(string parentEmail, string parentName, string childName, string childEmail, string newPassword)
+    {
+        _logger.LogInformation("Sending child password reset to parent {ParentEmail} for child {ChildEmail}", parentEmail, childEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Fjalëkalimi i ri i fëmijës suaj";
+        var content = $@"
+        <p>Përshëndetje {parentName},</p>
+        <p>Ju keni kërkuar rivendosjen e fjalëkalimit për fëmijën tuaj. Këtu janë kredencialet e reja:</p>
+        <ul>
+            <li><strong>Emri:</strong> {childName}</li>
+            <li><strong>Email:</strong> {childEmail}</li>
+            <li><strong>Fjalëkalimi i ri:</strong> {newPassword}</li>
+        </ul>
+        <p><em>Ju lutemi jepni këto kredenciale fëmijës suaj.</em></p>";
+
+        var body = GenerateHtml(title, content, "", "", footerText);
+        await SendEmail(parentEmail, "Fjalëkalimi i ri i fëmijës suaj", body);
+    }
+
+    public async Task SendNewChildrenCredentialsToParent(string parentEmail, string parentName, List<(string Name, string Email, string Password)> credentials)
+    {
+        _logger.LogInformation("Sending new children credentials to parent {ParentEmail}", parentEmail);
+        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+
+        var title = "Kredencialet e fëmijëve tuaj";
+        var content = $@"
+        <p>Përshëndetje {parentName},</p>
+        <p>Llogaritë e fëmijëve tuaj janë krijuar me sukses. Këtu janë kredencialet:</p>
+        <ul>";
+
+        foreach (var (name, email, password) in credentials)
+        {
+            content += $@"
+            <li><strong>{name}:</strong><br/>
+                Email: {email}<br/>
+                Fjalëkalimi: {password}</li>";
+        }
+
+        content += @"
+        </ul>
+        <p><em>Ju lutemi jepni këto kredenciale fëmijëve tuaj.</em></p>";
+
+        var body = GenerateHtml(title, content, "", "", footerText);
+        await SendEmail(parentEmail, "Kredencialet e fëmijëve tuaj", body);
+    }
 }

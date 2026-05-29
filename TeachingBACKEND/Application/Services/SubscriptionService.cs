@@ -948,7 +948,7 @@ namespace TeachingBACKEND.Application.Services
                 Id = Guid.NewGuid(),
                 Email = dto.Email,
                 PasswordHash = _passwordService.HashPassword(dto.Password),
-                Role = UserRole.Student, // Main family user is also a student
+                Role = UserRole.Family,
                 ApprovalStatus = ApprovalStatus.Approved,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
