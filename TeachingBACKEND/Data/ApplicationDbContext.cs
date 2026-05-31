@@ -36,6 +36,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<DragMatchPair> DragMatchPairs { get; set; }
     public DbSet<StudentQuizResult> StudentQuizResults { get; set; }
     public DbSet<OrphanedFile> OrphanedFiles { get; set; }
+    public DbSet<ConceptTag> ConceptTags { get; set; }
+    public DbSet<UserConceptMastery> UserConceptMastery { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -757,6 +759,35 @@ public class ApplicationDbContext : DbContext
             new QuizType { Id = Guid.Parse("c2c2c2c2-c2c2-2222-2222-222222222222"), Name = "DragOrder" },
             new QuizType { Id = Guid.Parse("c3c3c3c3-c3c3-3333-3333-333333333333"), Name = "DragMatch" }
         );
+
+        modelBuilder.Entity<ConceptTag>(entity =>
+        {
+            entity.HasKey(ct => ct.Id);
+            entity.Property(ct => ct.Name).IsRequired().HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<UserConceptMastery>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+
+            entity.HasOne(m => m.User)
+                .WithMany()
+                .HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.ConceptTag)
+                .WithMany(ct => ct.UserMasteries)
+                .HasForeignKey(m => m.ConceptTagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(m => new { m.UserId, m.ConceptTagId }).IsUnique();
+        });
+
+        modelBuilder.Entity<Quizz>()
+            .HasOne(q => q.ConceptTag)
+            .WithMany(ct => ct.Quizzes)
+            .HasForeignKey(q => q.ConceptTagId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // DragSpellPayload — 1-to-1 with Quizz
         modelBuilder.Entity<DragSpellPayload>()

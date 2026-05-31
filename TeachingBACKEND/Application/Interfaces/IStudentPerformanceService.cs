@@ -24,9 +24,9 @@ public interface IStudentPerformanceService
     Task<StudentQuizSimpleResponseDTO> GetQuizzesWithPerformance(Guid linkId, Guid studentId);
     
     /// <summary>
-    /// Get a single quiz by ID (for students)
+    /// Get a single quiz by ID (for students), with review/concept context for the given student
     /// </summary>
-    Task<StudentQuizDTO?> GetSingleQuiz(Guid quizId);
+    Task<StudentQuizDTO?> GetSingleQuiz(Guid quizId, Guid studentId);
     
     /// <summary>
     /// Get detailed performance analytics for a student

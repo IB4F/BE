@@ -49,8 +49,15 @@ namespace TeachingBACKEND.Api.Controllers
         [HttpDelete("Delete-Link")]
         public async Task<IActionResult> DeleteLink([FromQuery] Guid id)
         {
-            await _learnHubService.DeleteLink(id);
-            return Ok(new { message = "Link u fshi" }); 
+            try
+            {
+                await _learnHubService.DeleteLink(id);
+                return Ok(new { message = "Link u fshi" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
     }

@@ -47,8 +47,15 @@ public class QuizzesController : ControllerBase
     [HttpDelete("Delete-Quiz")]
     public async Task<IActionResult> DeleteQuizz([FromQuery] Guid id)
     {
-        await _learnHubService.DeleteQuizz(id);
-        return Ok(new { message = "Quiz deleted successfully", quizId = id });
+        try
+        {
+            await _learnHubService.DeleteQuizz(id);
+            return Ok(new { message = "Quiz deleted successfully", quizId = id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("Get-Paginated-Quizzes")]

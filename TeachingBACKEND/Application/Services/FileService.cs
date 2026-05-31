@@ -81,14 +81,15 @@ namespace TeachingBACKEND.Application.Services
             if (file == null)
                 return false;
 
-            // Check if file is referenced by any quizzes or options
-            var isReferencedByQuizzes = await _context.Quizzes
-                .AnyAsync(q => q.QuestionAudioId == id || q.ExplanationAudioId == id);
+            // Check if file is referenced by quizzes, options, or DnD payloads
+            var isReferenced = await _context.Quizzes.AnyAsync(q =>
+                    q.QuestionAudioId == id || q.QuestionImageId == id ||
+                    q.ExplanationAudioId == id || q.ExplanationImageId == id)
+                || await _context.Options.AnyAsync(o => o.OptionImageId == id)
+                || await _context.DragSpellPayloads.AnyAsync(d => d.ImageFileId == id)
+                || await _context.DragMatchPairs.AnyAsync(p => p.ImageFileId == id);
 
-            var isReferencedByOptions = await _context.Options
-                .AnyAsync(o => o.OptionImageId == id);
-
-            if (isReferencedByQuizzes || isReferencedByOptions)
+            if (isReferenced)
             {
                 throw new InvalidOperationException("Cannot delete file because it is referenced by quizzes or options. Please remove the references first.");
             }

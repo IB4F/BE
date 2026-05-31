@@ -20,6 +20,7 @@ namespace TeachingBACKEND.Application.Services
             await using var ctx1 = await _contextFactory.CreateDbContextAsync();
             await using var ctx2 = await _contextFactory.CreateDbContextAsync();
             await using var ctx3 = await _contextFactory.CreateDbContextAsync();
+            await using var ctx4 = await _contextFactory.CreateDbContextAsync();
 
             var learnHubsTask = ctx1.LearnHubs
                 .AsNoTracking()
@@ -42,21 +43,43 @@ namespace TeachingBACKEND.Application.Services
                         .ThenInclude(l => l.LearnHub)
                 .ToListAsync();
 
-            await Task.WhenAll(learnHubsTask, studentPerformancesTask, quizPerformancesTask);
+            var conceptMasteryTask = ctx4.UserConceptMastery
+                .AsNoTracking()
+                .Where(m => m.UserId == studentId)
+                .Include(m => m.ConceptTag)
+                .OrderBy(m => m.MasteryLevel)
+                .ToListAsync();
+
+            await Task.WhenAll(learnHubsTask, studentPerformancesTask, quizPerformancesTask, conceptMasteryTask);
 
             var learnHubs = learnHubsTask.Result;
             var studentPerformances = studentPerformancesTask.Result;
             var quizPerformances = quizPerformancesTask.Result;
+            var conceptMastery = conceptMasteryTask.Result;
 
             var stats = CalculateDashboardStats(learnHubs, studentPerformances, quizPerformances);
             var latestLearnHubs = GetLatestLearnHubsWithProgress(studentId, learnHubs, studentPerformances, quizPerformances);
             var weeklyActivity = CalculateWeeklyActivity(quizPerformances);
 
+            var today = DateTime.UtcNow.Date;
+
             return new DashboardDTO
             {
                 Stats = stats,
                 LatestLearnHubs = latestLearnHubs,
-                WeeklyActivity = weeklyActivity
+                WeeklyActivity = weeklyActivity,
+                ConceptMastery = conceptMastery.Select(m => new UserConceptMasteryDTO
+                {
+                    ConceptTagId    = m.ConceptTagId,
+                    ConceptTagName  = m.ConceptTag?.Name,
+                    MasteryLevel    = m.MasteryLevel,
+                    TotalAttempts   = m.TotalAttempts,
+                    CorrectAttempts = m.CorrectAttempts,
+                    NextReviewDate  = m.NextReviewDate,
+                    LastAttemptAt   = m.LastAttemptAt
+                }).ToList(),
+                PendingReviews = conceptMastery.Count(m =>
+                    m.NextReviewDate.HasValue && m.NextReviewDate.Value.Date <= today)
             };
         }
 

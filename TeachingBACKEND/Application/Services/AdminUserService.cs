@@ -101,7 +101,21 @@ namespace TeachingBACKEND.Application.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null) throw new Exception("User not found");
 
-            _context.Users.Remove(user);
+            var hasHistory = await _context.StudentQuizPerformances.AnyAsync(p => p.StudentId == id)
+                          || await _context.StudentQuizResults.AnyAsync(r => r.StudentId == id)
+                          || await _context.StudentQuizSessions.AnyAsync(s => s.StudentId == id)
+                          || await _context.StudentPerformanceSummaries.AnyAsync(s => s.StudentId == id)
+                          || await _context.UserConceptMastery.AnyAsync(m => m.UserId == id);
+
+            if (hasHistory)
+            {
+                user.IsActive = false;
+            }
+            else
+            {
+                _context.Users.Remove(user);
+            }
+
             await _context.SaveChangesAsync();
         }
     }

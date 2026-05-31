@@ -13,6 +13,8 @@
         public string QuizType { get; set; }
         public string? ParentQuizId { get; set; }
 
+        public Guid? ConceptTagId { get; set; }
+
         // DnD payloads — only one will be set per request, matching the quiz type
         public DragSpellInputDTO? DndSpell { get; set; }
         public DragOrderInputDTO? DndOrder { get; set; }

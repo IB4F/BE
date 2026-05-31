@@ -16,6 +16,7 @@ namespace TeachingBACKEND.Domain.DTOs
         public DateTime? FirstActivityAt { get; set; }
         public DateTime? LastActivityAt { get; set; }
         public List<LinkProgressDTO> LinkProgress { get; set; } = new List<LinkProgressDTO>();
+        public List<UserConceptMasteryDTO> ConceptMastery { get; set; } = new List<UserConceptMasteryDTO>();
         public string? GeneratedPassword { get; set; } // Only included if user hasn't logged in yet
         public string? Notes { get; set; }
         public string? FirstName { get; set; }

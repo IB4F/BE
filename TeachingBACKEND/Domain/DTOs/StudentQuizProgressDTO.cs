@@ -27,6 +27,7 @@ public class StudentQuizListResponseDTO
 public class StudentQuizSimpleResponseDTO
 {
     public List<Guid> ParentQuizIds { get; set; } = new List<Guid>();
+    public List<Guid> ReviewQuizIds { get; set; } = new List<Guid>();
     public StudentProgressSummaryDTO Progress { get; set; }
 }
 

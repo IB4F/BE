@@ -766,12 +766,24 @@ namespace TeachingBACKEND.Application.Services
                     throw new ArgumentException("Student not found or not under this supervisor");
                 }
 
-                // Remove the student from the database
-                _context.Users.Remove(student);
-                await _context.SaveChangesAsync();
+                var hasHistory = await _context.StudentQuizPerformances.AnyAsync(p => p.StudentId == studentId)
+                              || await _context.StudentQuizResults.AnyAsync(r => r.StudentId == studentId)
+                              || await _context.StudentQuizSessions.AnyAsync(s => s.StudentId == studentId)
+                              || await _context.StudentPerformanceSummaries.AnyAsync(s => s.StudentId == studentId)
+                              || await _context.UserConceptMastery.AnyAsync(m => m.UserId == studentId);
 
-                _logger.LogInformation("Student {StudentId} deleted by supervisor {SupervisorId}", 
-                    studentId, supervisorId);
+                if (hasHistory)
+                {
+                    student.IsActive = false;
+                    _logger.LogInformation("Soft-deleted student {StudentId} (has history) by supervisor {SupervisorId}", studentId, supervisorId);
+                }
+                else
+                {
+                    _context.Users.Remove(student);
+                    _logger.LogInformation("Hard-deleted student {StudentId} (no history) by supervisor {SupervisorId}", studentId, supervisorId);
+                }
+
+                await _context.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)

@@ -12,6 +12,8 @@ namespace TeachingBACKEND.Domain.DTOs
         public string QuizzTypeName { get; set; }
         public Guid? ParentQuizId { get; set; }
         public bool MultipleAnswer { get; set; }
+        public bool IsReview { get; set; }
+        public string? ConceptTagName { get; set; }
 
         // DnD payloads — only the relevant one is populated based on quiz type
         public DragSpellStudentDTO? DndSpell { get; set; }

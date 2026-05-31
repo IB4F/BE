@@ -5,6 +5,8 @@ namespace TeachingBACKEND.Domain.DTOs
         public DashboardStatsDTO Stats { get; set; }
         public List<LearnHubProgressDTO> LatestLearnHubs { get; set; }
         public List<WeeklyActivityDayDTO> WeeklyActivity { get; set; }
+        public List<UserConceptMasteryDTO> ConceptMastery { get; set; } = new();
+        public int PendingReviews { get; set; }
     }
 
     public class DashboardStatsDTO

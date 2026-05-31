@@ -62,8 +62,12 @@ public class StudentController : ControllerBase
             if (quizId == Guid.Empty)
                 return BadRequest(new { error = "Valid quiz ID is required" });
 
-            var result = await _performanceService.GetSingleQuiz(quizId);
-            
+            var studentIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(studentIdClaim) || !Guid.TryParse(studentIdClaim, out var studentId))
+                return Unauthorized(new { error = "Invalid user authentication" });
+
+            var result = await _performanceService.GetSingleQuiz(quizId, studentId);
+
             if (result == null)
                 return NotFound(new { error = "Quiz not found" });
 

@@ -249,9 +249,21 @@ public class LearnHubService : ILearnHubService
                     .ThenInclude(q => q.ChildQuizzes)
                         .ThenInclude(cq => cq.Options)
             .FirstOrDefaultAsync(lh => lh.Id == id);
-            
+
         if (learnHub == null)
             throw new Exception("LearnHub not found");
+
+        var linkIds = learnHub.Links.Select(l => l.Id).ToList();
+        if (linkIds.Any())
+        {
+            var hasProgress = await _context.StudentPerformanceSummaries
+                .AnyAsync(s => linkIds.Contains(s.LinkId));
+            if (!hasProgress)
+                hasProgress = await _context.StudentQuizPerformances
+                    .AnyAsync(p => linkIds.Contains(p.LinkId));
+            if (hasProgress)
+                throw new InvalidOperationException("Ky modul nuk mund të fshihet sepse ka progres të nxënësve të regjistruar. Hiqni të gjitha të dhënat e nxënësve para se ta fshini.");
+        }
         
         var filesToDelete = new List<Guid>();
         
@@ -476,9 +488,17 @@ public class LearnHubService : ILearnHubService
             .Include(l => l.Quizzes)
                 .ThenInclude(q => q.Options)
             .FirstOrDefaultAsync(l => l.Id == id);
-            
+
         if (link == null)
             throw new Exception("Link not found");
+
+        var hasProgress = await _context.StudentPerformanceSummaries
+            .AnyAsync(s => s.LinkId == id);
+        if (!hasProgress)
+            hasProgress = await _context.StudentQuizPerformances
+                .AnyAsync(p => p.LinkId == id);
+        if (hasProgress)
+            throw new InvalidOperationException("Ky seksion nuk mund të fshihet sepse ka progres të nxënësve të regjistruar. Hiqni të gjitha të dhënat e nxënësve para se ta fshini.");
 
         // Collect all file IDs to delete before removing the link
         var filesToDelete = new List<Guid>();
@@ -574,6 +594,7 @@ public class LearnHubService : ILearnHubService
             ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null,
             ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null,
             ParentQuizId = parentQuizId,
+            ConceptTagId = dto.ConceptTagId,
             Options = dto.Options.Select(o => new Option
             {
                 OptionText = o.OptionText,
@@ -1057,6 +1078,7 @@ public class LearnHubService : ILearnHubService
         quizz.ExplanationAudioId = !string.IsNullOrEmpty(dto.ExplanationAudioId) ? Guid.Parse(dto.ExplanationAudioId) : null;
         quizz.ExplanationImageId = !string.IsNullOrEmpty(dto.ExplanationImageId) ? Guid.Parse(dto.ExplanationImageId) : null;
         quizz.ParentQuizId = parentQuizId;
+        quizz.ConceptTagId = dto.ConceptTagId;
 
         // Remove old options
         _context.Options.RemoveRange(quizz.Options);
@@ -1188,9 +1210,21 @@ public class LearnHubService : ILearnHubService
             .Include(q => q.ChildQuizzes)
                 .ThenInclude(cq => cq.Options)
             .FirstOrDefaultAsync(q => q.Id == id);
-            
+
         if (quizz == null)
             throw new Exception("Quizz not found");
+
+        // Collect all IDs (parent + children) to check student data
+        var allQuizIds = quizz.ChildQuizzes.Select(c => c.Id).ToList();
+        allQuizIds.Add(id);
+
+        var hasAttempts = await _context.StudentQuizPerformances
+            .AnyAsync(p => allQuizIds.Contains(p.QuizId));
+        if (!hasAttempts)
+            hasAttempts = await _context.StudentQuizResults
+                .AnyAsync(r => allQuizIds.Contains(r.QuizId));
+        if (hasAttempts)
+            throw new InvalidOperationException("Ky kuiz nuk mund të fshihet sepse ka tentativa të nxënësve të regjistruara. Hiqni të dhënat e nxënësve para se ta fshini.");
 
         // Collect all file IDs to delete (including child quizzes)
         var filesToDelete = new List<Guid>();

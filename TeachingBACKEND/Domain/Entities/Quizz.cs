@@ -21,6 +21,9 @@
         public Guid? ExplanationImageId { get; set; }
         public UploadedFile ExplanationImage { get; set; }
         
+        public Guid? ConceptTagId { get; set; }
+        public ConceptTag? ConceptTag { get; set; }
+
         // Parent-Child relationship properties
         public Guid? ParentQuizId { get; set; }
         public Quizz ParentQuiz { get; set; }

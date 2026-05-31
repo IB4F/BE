@@ -55,8 +55,15 @@ namespace TeachingBACKEND.Api.Controllers
         [HttpDelete("Delete-Learnhub")]
         public async Task<IActionResult> DeleteLearnHub(Guid id)
         {
-            await _learnHubService.DeleteLearnHub(id);
-            return Ok(new { message = "LearnHub u fshi" });    
+            try
+            {
+                await _learnHubService.DeleteLearnHub(id);
+                return Ok(new { message = "LearnHub u fshi" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPost("Get-Paginated-Learnhubs")]

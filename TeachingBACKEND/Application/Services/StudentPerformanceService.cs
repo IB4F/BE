@@ -334,6 +334,34 @@ namespace TeachingBACKEND.Application.Services;
             await _context.SaveChangesAsync();
         }
 
+        // Update UserConceptMastery only for parent quizzes — child quizzes inherit the concept from the parent
+        if (quiz.ConceptTagId.HasValue && quiz.ParentQuizId == null)
+        {
+            var mastery = await _context.UserConceptMastery
+                .FirstOrDefaultAsync(m => m.UserId == studentId && m.ConceptTagId == quiz.ConceptTagId.Value);
+
+            if (mastery == null)
+            {
+                mastery = new UserConceptMastery
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = studentId,
+                    ConceptTagId = quiz.ConceptTagId.Value,
+                };
+                _context.UserConceptMastery.Add(mastery);
+            }
+
+            mastery.TotalAttempts++;
+            if (isCorrect) mastery.CorrectAttempts++;
+            mastery.MasteryLevel = mastery.TotalAttempts > 0
+                ? (float)mastery.CorrectAttempts / mastery.TotalAttempts * 100f
+                : 0f;
+            mastery.NextReviewDate = CalculateNextReviewDate(mastery.MasteryLevel);
+            mastery.LastAttemptAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+        }
+
         return new StudentQuizSubmissionResponseDTO
         {
             Answer = isCorrect,
@@ -343,6 +371,14 @@ namespace TeachingBACKEND.Application.Services;
             ExplanationAudioUrl = isCorrect ? null : GetFullUrl(quiz.ExplanationAudio?.FileUrl),
             Progress = progressDto
         };
+    }
+
+    private static DateTime? CalculateNextReviewDate(float masteryLevel)
+    {
+        if (masteryLevel >= 85f) return null;
+        if (masteryLevel >= 70f) return DateTime.UtcNow.AddDays(30);
+        if (masteryLevel >= 40f) return DateTime.UtcNow.AddDays(7);
+        return DateTime.UtcNow.AddDays(3);
     }
 
     public async Task<StudentQuizSimpleResponseDTO> GetQuizzesWithPerformance(Guid linkId, Guid studentId)
@@ -389,14 +425,30 @@ namespace TeachingBACKEND.Application.Services;
 
         var parentQuizIds = parentQuizzes.Select(q => q.Id).ToList();
 
+        var today = DateTime.UtcNow.Date;
+        var reviewQuizIds = await _context.UserConceptMastery
+            .Where(m => m.UserId == studentId
+                     && m.NextReviewDate.HasValue
+                     && m.NextReviewDate.Value.Date <= today)
+            .OrderBy(m => m.MasteryLevel)
+            .Take(3)
+            .Join(_context.Quizzes.Where(q => q.ParentQuizId == null && q.ConceptTagId != null),
+                  m => m.ConceptTagId,
+                  q => q.ConceptTagId,
+                  (m, q) => q.Id)
+            .Distinct()
+            .Take(3)
+            .ToListAsync();
+
         return new StudentQuizSimpleResponseDTO
         {
             ParentQuizIds = parentQuizIds,
+            ReviewQuizIds = reviewQuizIds,
             Progress = progress
         };
     }
 
-    public async Task<StudentQuizDTO?> GetSingleQuiz(Guid quizId)
+    public async Task<StudentQuizDTO?> GetSingleQuiz(Guid quizId, Guid studentId)
     {
         var quiz = await _context.Quizzes
             .Include(q => q.Options)
@@ -405,6 +457,7 @@ namespace TeachingBACKEND.Application.Services;
             .Include(q => q.QuestionAudio)
             .Include(q => q.QuestionImage)
             .Include(q => q.ExplanationAudio)
+            .Include(q => q.ConceptTag)
             .Include(q => q.DragSpellPayload)
                 .ThenInclude(p => p.ImageFile)
             .Include(q => q.DragOrderPayload)
@@ -419,6 +472,21 @@ namespace TeachingBACKEND.Application.Services;
 
         var correctOptionsCount = quiz.Options.Count(o => o.IsCorrect);
         var multipleAnswer = correctOptionsCount > 1;
+
+        var isReview = false;
+        var conceptTagName = (string?)null;
+
+        if (quiz.ConceptTagId.HasValue)
+        {
+            conceptTagName = quiz.ConceptTag?.Name;
+            var today = DateTime.UtcNow.Date;
+            var mastery = await _context.UserConceptMastery
+                .FirstOrDefaultAsync(m => m.UserId == studentId
+                                       && m.ConceptTagId == quiz.ConceptTagId.Value
+                                       && m.NextReviewDate.HasValue
+                                       && m.NextReviewDate.Value.Date <= today);
+            isReview = mastery != null;
+        }
 
         return new StudentQuizDTO
         {
@@ -438,6 +506,8 @@ namespace TeachingBACKEND.Application.Services;
             QuizzTypeName = quiz.QuizzType.Name,
             ParentQuizId = quiz.ParentQuizId,
             MultipleAnswer = multipleAnswer,
+            IsReview = isReview,
+            ConceptTagName = conceptTagName,
             DndSpell = quiz.DragSpellPayload != null ? new DragSpellStudentDTO
             {
                 WordLength = quiz.DragSpellPayload.Word.Length,

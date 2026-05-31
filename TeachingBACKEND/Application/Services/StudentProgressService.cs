@@ -169,6 +169,12 @@ namespace TeachingBACKEND.Application.Services
                 var overallProgress = await CalculateStudentProgressAsync(studentId);
                 var averageScore = totalPossiblePoints > 0 ? (double)totalPointsEarned / totalPossiblePoints * 100 : 0;
 
+                var conceptMastery = await _context.UserConceptMastery
+                    .Where(m => m.UserId == studentId)
+                    .Include(m => m.ConceptTag)
+                    .OrderBy(m => m.MasteryLevel)
+                    .ToListAsync();
+
                 return new StudentProgressDetailDTO
                 {
                     StudentId = studentId,
@@ -184,7 +190,17 @@ namespace TeachingBACKEND.Application.Services
                     TotalTimeSpentMinutes = totalTimeSpent,
                     FirstActivityAt = firstActivity,
                     LastActivityAt = lastActivity,
-                    LinkProgress = linkProgressList
+                    LinkProgress = linkProgressList,
+                    ConceptMastery = conceptMastery.Select(m => new UserConceptMasteryDTO
+                    {
+                        ConceptTagId    = m.ConceptTagId,
+                        ConceptTagName  = m.ConceptTag?.Name,
+                        MasteryLevel    = m.MasteryLevel,
+                        TotalAttempts   = m.TotalAttempts,
+                        CorrectAttempts = m.CorrectAttempts,
+                        NextReviewDate  = m.NextReviewDate,
+                        LastAttemptAt   = m.LastAttemptAt
+                    }).ToList()
                 };
             }
             catch (Exception ex)
