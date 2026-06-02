@@ -137,7 +137,7 @@ public class NotificationService : INotificationService
     public async Task SendWelcomeEmail(string email, string? userName = null)
     {
         _logger.LogInformation("Sending welcome email to {Email}", email);
-        var dashboardUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/login";
+        var dashboardUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/hyr";
         var body = RenderBrandedTemplate(_welcomeTemplate, dashboardUrl, userName);
         await SendEmail(email, "Mirë se vini në Brain Gain · Welcome to Brain Gain", body);
     }
@@ -268,7 +268,7 @@ public class NotificationService : INotificationService
     public async Task SendSupervisorCredentialsEmail(string supervisorEmail, string supervisorName, string temporaryPassword)
     {
         _logger.LogInformation("Supervisor credentials email for {SupervisorEmail}", supervisorEmail);
-        var loginUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/login";
+        var loginUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/hyr";
         var html = _tplSupervisorCredentials
             .Replace("{{SUPERVISOR_NAME}}",  supervisorName)
             .Replace("{{SUPERVISOR_EMAIL}}", supervisorEmail)
