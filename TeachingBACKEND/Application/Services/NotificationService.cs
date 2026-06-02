@@ -61,8 +61,8 @@ public class NotificationService : INotificationService
         html
             .Replace("{{LOGO_WHITE_URL}}", _configuration["AppSettings:LogoWhiteUrl"] ?? "")
             .Replace("{{LOGO_COLOR_URL}}", _configuration["AppSettings:LogoColorUrl"] ?? "")
-            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/help")
-            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privacy")
+            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/ndihma")
+            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privatesia")
             .Replace("{{YEAR}}",           DateTime.UtcNow.Year.ToString());
 
     // Strips everything between <!-- OPTIONAL: ... --> and <!-- END OPTIONAL -->
@@ -104,8 +104,8 @@ public class NotificationService : INotificationService
             .Replace("{{ACTION_URL}}",     actionUrl)
             .Replace("{{USER_NAME}}",      string.IsNullOrWhiteSpace(userName) ? "" : " " + userName.Trim())
             .Replace("{{EXPIRY_HOURS}}",   expiry)
-            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/help")
-            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privacy")
+            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/ndihma")
+            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privatesia")
             .Replace("{{YEAR}}",           DateTime.UtcNow.Year.ToString());
     }
 

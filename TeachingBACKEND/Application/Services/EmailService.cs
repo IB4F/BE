@@ -95,8 +95,8 @@ namespace TeachingBACKEND.Application.Services
             html
                 .Replace("{{LOGO_WHITE_URL}}", _configuration["AppSettings:LogoWhiteUrl"] ?? "")
                 .Replace("{{LOGO_COLOR_URL}}", _configuration["AppSettings:LogoColorUrl"] ?? "")
-                .Replace("{{HELP_URL}}",        _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/help")
-                .Replace("{{PRIVACY_URL}}",     _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privacy")
+                .Replace("{{HELP_URL}}",        _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/ndihma")
+                .Replace("{{PRIVACY_URL}}",     _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privatesia")
                 .Replace("{{YEAR}}",            DateTime.UtcNow.Year.ToString());
     }
 }

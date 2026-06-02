@@ -237,7 +237,7 @@ namespace TeachingBACKEND.Application.Services
 
             // Store the hash — never the raw token
             user.RefreshToken = _passwordService.HashRefreshToken(refreshToken);
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(model.RememberMe ? 30 : 7);
             user.LastLoginAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -246,6 +246,7 @@ namespace TeachingBACKEND.Application.Services
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
+                RememberMe = model.RememberMe,
                 IsFirstTimeLogin = isFirstTimeLogin,
                 MustChangePassword = user.MustChangePasswordOnNextLogin
             };

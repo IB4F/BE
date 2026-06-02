@@ -304,16 +304,21 @@ namespace TeachingBACKEND.Controllers
         {
             try
             {
-                LoginResponseDTO response = await _userService.Login(model);
-                return Ok(new 
+                var result = await _userService.Login(model);
+                SetRefreshTokenCookie(result.RefreshToken, result.RememberMe);
+                return Ok(new
                 {
                     Message = "Login të suksesshëm!",
-                    Data = response
+                    Data = new
+                    {
+                        result.AccessToken,
+                        result.MustChangePassword,
+                        result.IsFirstTimeLogin
+                    }
                 });
             }
             catch (Exception ex)
             {
-
                 return BadRequest(new { Message = ex.Message });
             }
         }
@@ -448,26 +453,64 @@ namespace TeachingBACKEND.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            // read userId from JWT
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var msg = await _userService.Logout(userId);
+            ClearRefreshTokenCookie();
             return Ok(new { message = msg });
         }
 
-
+        [AllowAnonymous]
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDTO model)
+        public async Task<IActionResult> Refresh()
         {
             try
             {
-                var tokens = await _passwordService.RefreshTokenAsync(model);
-                return Ok(tokens);
+                var rawCookie = Request.Cookies["refreshToken"];
+                if (string.IsNullOrEmpty(rawCookie) || !Guid.TryParse(rawCookie, out var rawToken))
+                    return Unauthorized(new { error = "Missing or invalid refresh token" });
+
+                var result = await _passwordService.RefreshTokenAsync(rawToken);
+                SetRefreshTokenCookie(result.RefreshToken, result.RememberMe);
+
+                return Ok(new
+                {
+                    result.AccessToken,
+                    result.MustChangePassword
+                });
             }
             catch (Exception ex)
             {
-
-                return BadRequest(new {error = ex.Message});
+                ClearRefreshTokenCookie();
+                return Unauthorized(new { error = ex.Message });
             }
+        }
+
+        // ── Cookie helpers ────────────────────────────────────────────────────
+
+        private void SetRefreshTokenCookie(Guid rawToken, bool rememberMe)
+        {
+            var options = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure   = true,
+                SameSite = SameSiteMode.Strict,
+                Path     = "/api/Auth/refresh"
+            };
+            if (rememberMe)
+                options.MaxAge = TimeSpan.FromDays(30);
+            Response.Cookies.Append("refreshToken", rawToken.ToString(), options);
+        }
+
+        private void ClearRefreshTokenCookie()
+        {
+            Response.Cookies.Append("refreshToken", string.Empty, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure   = true,
+                SameSite = SameSiteMode.Strict,
+                Path     = "/api/Auth/refresh",
+                MaxAge   = TimeSpan.Zero
+            });
         }
 
 

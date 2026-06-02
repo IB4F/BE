@@ -246,40 +246,34 @@ namespace TeachingBACKEND.Application.Services
         {
             return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
         }
-        public async Task<LoginResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO model)
+        public async Task<LoginResponseDTO> RefreshTokenAsync(Guid rawCookieToken)
         {
-            var principal = GetPrincipalFromExpiredToken(model.AccessToken);
-            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                            ?? throw new SecurityTokenException("Invalid token claims");
+            var hash = HashRefreshToken(rawCookieToken);
 
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+                .FirstOrDefaultAsync(u => u.RefreshToken == hash && u.RefreshTokenExpiry > DateTime.UtcNow);
 
-            var incomingHash = HashRefreshToken(model.RefreshToken);
-
-            if (user == null
-           || user.RefreshToken != incomingHash
-           || user.RefreshTokenExpiry <= DateTime.UtcNow)
-            {
+            if (user == null)
                 throw new SecurityTokenException("Invalid or expired refresh token");
-            }
 
-            //generate new tokens
-            var newAccessToken = GenerateAccessToken(principal.Claims);
+            // If expiry > 8 days from now the original session was created with rememberMe=true (30-day token).
+            // Regular sessions use 7 days so they never exceed 8 days remaining after the first rotation.
+            bool wasRememberMe = user.RefreshTokenExpiry > DateTime.UtcNow.AddDays(8);
+
+            var newAccessToken = GenerateJwtToken(user);
             var newRefreshToken = GenerateRefreshToken();
 
-            //persist — store hash, never the raw token
             user.RefreshToken = HashRefreshToken(newRefreshToken);
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(wasRememberMe ? 30 : 7);
             await _context.SaveChangesAsync();
-
 
             return new LoginResponseDTO
             {
                 AccessToken = newAccessToken,
                 RefreshToken = newRefreshToken,
+                RememberMe = wasRememberMe,
+                MustChangePassword = user.MustChangePasswordOnNextLogin
             };
-
         }
         public Guid GenerateVerificationToken()
         {
