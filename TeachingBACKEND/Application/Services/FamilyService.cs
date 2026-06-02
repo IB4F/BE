@@ -95,9 +95,9 @@ namespace TeachingBACKEND.Application.Services
             var child = await GetVerifiedChildAsync(parentId, childId);
 
             if (!string.IsNullOrWhiteSpace(dto.FirstName))
-                child.FirstName = dto.FirstName;
+                child.FirstName = dto.FirstName.Trim();
             if (!string.IsNullOrWhiteSpace(dto.LastName))
-                child.LastName = dto.LastName;
+                child.LastName = dto.LastName.Trim();
             if (dto.CurrentClass != null)
                 child.CurrentClass = dto.CurrentClass;
 
@@ -219,7 +219,9 @@ namespace TeachingBACKEND.Application.Services
 
         private async Task<(User child, string password)> CreateChildEntityAsync(User parent, CreateChildInputDto input)
         {
-            var email = await GenerateUniqueEmailAsync(input.FirstName, input.LastName);
+            var firstName = input.FirstName.Trim();
+            var lastName = input.LastName.Trim();
+            var email = await GenerateUniqueEmailAsync(firstName, lastName);
             var password = _passwordService.GenerateRandomPassword();
 
             var child = new User
@@ -229,8 +231,8 @@ namespace TeachingBACKEND.Application.Services
                 PasswordHash = _passwordService.HashPassword(password),
                 Role = UserRole.Student,
                 ApprovalStatus = ApprovalStatus.Approved,
-                FirstName = input.FirstName,
-                LastName = input.LastName,
+                FirstName = firstName,
+                LastName = lastName,
                 CurrentClass = input.CurrentClass,
                 ParentUserId = parent.Id,
                 IsEmailVerified = true,

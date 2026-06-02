@@ -156,6 +156,8 @@ namespace TeachingBACKEND.Application.Services
 
             await _context.SaveChangesAsync();
 
+            await _notificationService.SendWelcomeEmail(user.Email, user.FirstName);
+
             return "Email verified successfully.";
         }
         public string GenerateJwtToken(User user)

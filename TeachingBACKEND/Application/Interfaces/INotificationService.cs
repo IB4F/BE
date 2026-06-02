@@ -2,7 +2,8 @@
 {
     public interface INotificationService
     {
-        Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null);
+        Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null, string? userName = null);
+        Task SendWelcomeEmail(string email, string? userName = null);
         Task SendPasswordResetEmail(string email, Guid resetToken);
         Task SendChildPasswordResetEmail(string parentEmail, string childFirstName, string childLastName, Guid resetToken);
         Task SendEmail(string email, string subject, string body);

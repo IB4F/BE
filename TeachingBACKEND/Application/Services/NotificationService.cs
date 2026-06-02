@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Mail;
 using TeachingBACKEND.Application.Interfaces;
 
@@ -6,12 +6,47 @@ public class NotificationService : INotificationService
 {
     private readonly ILogger<NotificationService> _logger;
     private readonly IConfiguration _configuration;
+
+    // ── Transactional templates (old + new branded) ───────────────────────────
     private static readonly string _emailTemplate;
+    private static readonly string _verifyEmailTemplate;
+    private static readonly string _welcomeTemplate;
+    private static readonly string _resetPasswordTemplate;
+
+    // ── System templates (14 new branded emails) ──────────────────────────────
+    private static readonly string _tplFamilyVerification;
+    private static readonly string _tplStudentCreated;
+    private static readonly string _tplChildrenCredentials;
+    private static readonly string _tplChildPasswordReset;
+    private static readonly string _tplSupervisorApplication;
+    private static readonly string _tplSupervisorApproval;
+    private static readonly string _tplSupervisorRejection;
+    private static readonly string _tplSupervisorCredentials;
+    private static readonly string _tplStudentPasswordSet;
+    private static readonly string _tplResetRequestToSupervisor;
+    private static readonly string _tplNewPasswordToSupervisor;
 
     static NotificationService()
     {
-        var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "Templates", "EmailVerificationTemplate.html");
-        _emailTemplate = File.ReadAllText(templatePath);
+        var dir = Path.Combine(Directory.GetCurrentDirectory(), "Templates");
+        var sys = Path.Combine(dir, "system");
+
+        _emailTemplate        = File.ReadAllText(Path.Combine(dir, "EmailVerificationTemplate.html"));
+        _verifyEmailTemplate  = File.ReadAllText(Path.Combine(dir, "verify-email.html"));
+        _welcomeTemplate      = File.ReadAllText(Path.Combine(dir, "welcome.html"));
+        _resetPasswordTemplate = File.ReadAllText(Path.Combine(dir, "reset-password.html"));
+
+        _tplFamilyVerification       = File.ReadAllText(Path.Combine(sys, "family-verification.html"));
+        _tplStudentCreated           = File.ReadAllText(Path.Combine(sys, "student-created.html"));
+        _tplChildrenCredentials      = File.ReadAllText(Path.Combine(sys, "children-credentials.html"));
+        _tplChildPasswordReset       = File.ReadAllText(Path.Combine(sys, "child-password-reset.html"));
+        _tplSupervisorApplication    = File.ReadAllText(Path.Combine(sys, "supervisor-application.html"));
+        _tplSupervisorApproval       = File.ReadAllText(Path.Combine(sys, "supervisor-approval.html"));
+        _tplSupervisorRejection      = File.ReadAllText(Path.Combine(sys, "supervisor-rejection.html"));
+        _tplSupervisorCredentials    = File.ReadAllText(Path.Combine(sys, "supervisor-credentials.html"));
+        _tplStudentPasswordSet       = File.ReadAllText(Path.Combine(sys, "student-password-set.html"));
+        _tplResetRequestToSupervisor = File.ReadAllText(Path.Combine(sys, "reset-request-to-supervisor.html"));
+        _tplNewPasswordToSupervisor  = File.ReadAllText(Path.Combine(sys, "new-password-to-supervisor.html"));
     }
 
     public NotificationService(ILogger<NotificationService> logger, IConfiguration configuration)
@@ -20,383 +55,303 @@ public class NotificationService : INotificationService
         _configuration = configuration;
     }
 
-    public async Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null)
+    // ── System template helpers ───────────────────────────────────────────────
+
+    private string ApplyGlobalTokens(string html) =>
+        html
+            .Replace("{{LOGO_WHITE_URL}}", _configuration["AppSettings:LogoWhiteUrl"] ?? "")
+            .Replace("{{LOGO_COLOR_URL}}", _configuration["AppSettings:LogoColorUrl"] ?? "")
+            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/help")
+            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privacy")
+            .Replace("{{YEAR}}",           DateTime.UtcNow.Year.ToString());
+
+    // Strips everything between <!-- OPTIONAL: ... --> and <!-- END OPTIONAL -->
+    private static string StripOptionalBlock(string html)
     {
-        _logger.LogInformation("Starting email-verification workflow for {Email}", email);
-        var verificationUrl = $"https://braingainalbania.al/verify-email?token={token}&verificationType={verificationType}";
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Verifikoni adresën tuaj të emailit";
-        var content = @"
-        <p>Përshëndetje,</p>
-        <p>Faleminderit që u regjistruat! Për të përfunduar procesin, ju lutemi klikoni butonin më poshtë për të verifikuar adresën tuaj të emailit.</p>";
-        
-        // Add password information if provided (for school-registered students)
-        if (!string.IsNullOrEmpty(password))
-        {
-            content += $@"
-            <p><strong>Fjalëkalimi juaj i gjeneruar automatikisht:</strong> {password}</p>
-            <p><em>Ju lutemi ruani këtë fjalëkalim dhe ndryshojeni pas verifikimit të emailit.</em></p>";
-        }
-        
-        var ctaText = "Verifiko Emailin Tani";
-
-        var body = GenerateHtml(title, content, ctaText, verificationUrl, footerText);
-        await SendEmail(email, "Verifikimi i emailit", body);
+        const string start = "<!-- OPTIONAL:";
+        const string end   = "<!-- END OPTIONAL -->";
+        var si = html.IndexOf(start, StringComparison.Ordinal);
+        if (si < 0) return html;
+        var ei = html.IndexOf(end, si, StringComparison.Ordinal);
+        if (ei < 0) return html;
+        return html.Remove(si, ei - si + end.Length);
     }
 
-    public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames,
-        string verificationType, List<(string Name, string Email, string Password)>? familyMemberCredentials = null)
+    // Replaces <!-- REPEAT ... <!-- END REPEAT --> with one rendered card per member
+    private static string ProcessRepeatBlock(string html, IEnumerable<(string Name, string Email, string Password)> members)
     {
-        _logger.LogInformation("Starting family email-verification workflow for {Email}", email);
-        var verificationUrl = $"https://braingainalbania.al//verify-email?token={token}&verificationType={verificationType}";
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+        const string startMarker = "<!-- REPEAT the card below once per family member / child -->";
+        const string endMarker   = "<!-- END REPEAT -->";
+        var si = html.IndexOf(startMarker, StringComparison.Ordinal);
+        var ei = html.IndexOf(endMarker, StringComparison.Ordinal);
+        if (si < 0 || ei < 0) return html;
+        var cardTpl = html[(si + startMarker.Length)..ei];
+        var cards = string.Concat(members.Select(m => cardTpl
+            .Replace("{{MEMBER_NAME}}",     m.Name)
+            .Replace("{{MEMBER_EMAIL}}",    m.Email)
+            .Replace("{{MEMBER_PASSWORD}}", m.Password)));
+        return html[..si] + cards + html[(ei + endMarker.Length)..];
+    }
 
-        var familyNamesFormatted = string.Join(", ", familyMemberNames);
+    // ── Old branded templates (verify / welcome / reset) ─────────────────────
 
-        var title = "Verifikimi i llogarisë familjare";
-        var content = $@"
-        <p>Përshëndetje,</p>
-        <p>Ju lutemi verifikoni llogarinë tuaj familjare duke klikuar butonin më poshtë. Kjo do të verifikojë ju dhe anëtarët e familjes në vijim: <strong>{familyNamesFormatted}</strong>.</p>";
+    private string RenderBrandedTemplate(string template, string actionUrl, string? userName = null, string? expiryHours = null)
+    {
+        var expiry = expiryHours ?? _configuration["AppSettings:EmailVerifyExpiryHours"] ?? "24";
+        return template
+            .Replace("{{LOGO_WHITE_URL}}", _configuration["AppSettings:LogoWhiteUrl"] ?? "")
+            .Replace("{{LOGO_COLOR_URL}}", _configuration["AppSettings:LogoColorUrl"] ?? "")
+            .Replace("{{ACTION_URL}}",     actionUrl)
+            .Replace("{{USER_NAME}}",      string.IsNullOrWhiteSpace(userName) ? "" : " " + userName.Trim())
+            .Replace("{{EXPIRY_HOURS}}",   expiry)
+            .Replace("{{HELP_URL}}",       _configuration["AppSettings:HelpUrl"] ?? "https://braingainalbania.al/help")
+            .Replace("{{PRIVACY_URL}}",    _configuration["AppSettings:PrivacyUrl"] ?? "https://braingainalbania.al/privacy")
+            .Replace("{{YEAR}}",           DateTime.UtcNow.Year.ToString());
+    }
 
-        // Add family member credentials if provided
-        if (familyMemberCredentials != null && familyMemberCredentials.Any())
+    // ── Transactional flows — branded templates ───────────────────────────────
+
+    public async Task SendEmailVerification(string email, Guid token, string verificationType, string? password = null, string? userName = null)
+    {
+        _logger.LogInformation("Starting email-verification workflow for {Email}", email);
+        var verifyUrl     = $"https://braingainalbania.al/verify-email?token={token}&verificationType={verificationType}";
+        var expiryHours   = _configuration["AppSettings:EmailVerifyExpiryHours"] ?? "24";
+
+        if (string.IsNullOrEmpty(password))
         {
-            content += @"
-            <p><strong>Kredencialet e anëtarëve të familjes:</strong></p>
-            <ul>";
-            
-            foreach (var (name, memberEmail, password) in familyMemberCredentials)
-            {
-                content += $@"
-                <li><strong>{name}:</strong><br/>
-                    Email: {memberEmail}<br/>
-                    Fjalëkalimi: {password}</li>";
-            }
-            
-            content += @"
-            </ul>
-            <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimet pas verifikimit të emailit.</em></p>";
+            var body = RenderBrandedTemplate(_verifyEmailTemplate, verifyUrl, userName, expiryHours);
+            await SendEmail(email, "Verifikimi i emailit · Verify your email", body);
         }
+        else
+        {
+            // Student with auto-generated password — use student-created system template
+            var html = _tplStudentCreated
+                .Replace("{{USER_NAME}}",     userName ?? $"{email.Split('@')[0]}")
+                .Replace("{{USER_EMAIL}}",    email)
+                .Replace("{{TEMP_PASSWORD}}", password)
+                .Replace("{{ACTION_URL}}",    verifyUrl);
+            await SendEmail(email, "Llogaria e nxënësit është krijuar · Your student account is ready", ApplyGlobalTokens(html));
+        }
+    }
 
-        var ctaText = "Verifiko Llogarinë Familjare";
-
-        var body = GenerateHtml(title, content, ctaText, verificationUrl, footerText);
-        await SendEmail(email, "Verifikimi i llogarisë familjare", body);
+    public async Task SendWelcomeEmail(string email, string? userName = null)
+    {
+        _logger.LogInformation("Sending welcome email to {Email}", email);
+        var dashboardUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/login";
+        var body = RenderBrandedTemplate(_welcomeTemplate, dashboardUrl, userName);
+        await SendEmail(email, "Mirë se vini në Brain Gain · Welcome to Brain Gain", body);
     }
 
     public async Task SendPasswordResetEmail(string email, Guid resetToken)
     {
         _logger.LogInformation("Starting password-reset workflow for {Email}", email);
-        var resetLink = $"https://braingainalbania.al//reset-password?token={resetToken}";
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Kërkesë për rivendosje të fjalëkalimit";
-        var content = @"
-        <p>Përshëndetje,</p>
-        <p>Ne morëm një kërkesë për të rivendosur fjalëkalimin tuaj. Për të vazhduar, ju lutemi klikoni butonin më poshtë.</p>";
-        var ctaText = "Rivendos Fjalëkalimin";
-
-        var body = GenerateHtml(title, content, ctaText, resetLink, footerText);
-        await SendEmail(email, "Rivendosja e Fjalëkalimit", body);
+        var resetLink   = $"https://braingainalbania.al/reset-password?token={resetToken}";
+        var expiryHours = _configuration["AppSettings:PasswordResetExpiryHours"] ?? "2";
+        var body = RenderBrandedTemplate(_resetPasswordTemplate, resetLink, null, expiryHours);
+        await SendEmail(email, "Rivendosja e fjalëkalimit · Reset your password", body);
     }
 
     public async Task SendChildPasswordResetEmail(string parentEmail, string childFirstName, string childLastName, Guid resetToken)
     {
-        _logger.LogInformation("Starting child password-reset workflow for parent {ParentEmail}, child {ChildFirstName} {ChildLastName}", parentEmail, childFirstName, childLastName);
-        var resetLink = $"https://braingainalbania.al//reset-password?token={resetToken}";
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
+        _logger.LogInformation("Starting child password-reset for parent {ParentEmail}", parentEmail);
+        var resetLink   = $"https://braingainalbania.al/reset-password?token={resetToken}";
+        var expiryHours = _configuration["AppSettings:PasswordResetExpiryHours"] ?? "2";
+        var body = RenderBrandedTemplate(_resetPasswordTemplate, resetLink, null, expiryHours);
+        await SendEmail(parentEmail, "Rivendosja e fjalëkalimit · Reset your password", body);
+    }
 
-        var title = "Kërkesë për rivendosje të fjalëkalimit të fëmijës";
-        var content = $@"
-        <p>Përshëndetje,</p>
-        <p>Ne morëm një kërkesë për të rivendosur fjalëkalimin e fëmijës tuaj <strong>{childFirstName} {childLastName}</strong>. Për të vazhduar, ju lutemi klikoni butonin më poshtë.</p>
-        <p><em>Shënim: Kjo kërkesë është dërguar tek ju sepse fëmija juaj ka një adresë email të krijuar automatikisht që nuk mund të marrë email-e.</em></p>";
-        var ctaText = "Rivendos Fjalëkalimin e Fëmijës";
+    // ── Family verification ───────────────────────────────────────────────────
 
-        var body = GenerateHtml(title, content, ctaText, resetLink, footerText);
-        await SendEmail(parentEmail, "Rivendosja e Fjalëkalimit të Fëmijës", body);
+    public async Task SendFamilyEmailVerification(string email, Guid token, List<string> familyMemberNames,
+        string verificationType, List<(string Name, string Email, string Password)>? familyMemberCredentials = null)
+    {
+        _logger.LogInformation("Starting family email-verification workflow for {Email}", email);
+        var verifyUrl    = $"https://braingainalbania.al/verify-email?token={token}&verificationType={verificationType}";
+        var memberNames  = string.Join(", ", familyMemberNames);
+
+        var html = _tplFamilyVerification.Replace("{{FAMILY_MEMBER_NAMES}}", memberNames);
+
+        if (familyMemberCredentials == null || !familyMemberCredentials.Any())
+        {
+            html = StripOptionalBlock(html);
+        }
+        else
+        {
+            html = ProcessRepeatBlock(html, familyMemberCredentials);
+        }
+
+        html = html.Replace("{{ACTION_URL}}", verifyUrl);
+        await SendEmail(email, "Verifikimi i llogarisë familjare", ApplyGlobalTokens(html));
     }
 
     public async Task SendStudentCreatedBySchoolEmail(string email, Guid token, string password, string firstName,
         string lastName, string verificationType)
     {
-        _logger.LogInformation("Starting student-creation email workflow for {Email}", email);
-        var verificationUrl = $"https://braingainalbania.al//verify-email?token={token}&verificationType={verificationType}";
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Llogaria e nxënësit është krijuar nga shkolla";
-        var content = $@"
-        <p>Përshëndetje {firstName} {lastName},</p>
-        <p>Llogaria juaj e nxënësit është krijuar nga shkolla juaj. Këtu janë kredencialet tuaja të hyrjes:</p>
-        <p><strong>Email:</strong> {email}</p>
-        <p><strong>Fjalëkalimi i përkohshëm:</strong> {password}</p>
-        <p>Ju lutemi klikoni butonin më poshtë për të verifikuar adresën tuaj të emailit dhe më pas ndërroni fjalëkalimin:</p>";
-        var ctaText = "Verifiko Adresën e Emailit";
-
-        var body = GenerateHtml(title, content, ctaText, verificationUrl, footerText);
-        await SendEmail(email, "Llogaria e nxënësit është krijuar", body);
+        _logger.LogInformation("Starting student-creation email for {Email}", email);
+        var verifyUrl = $"https://braingainalbania.al/verify-email?token={token}&verificationType={verificationType}";
+        var html = _tplStudentCreated
+            .Replace("{{USER_NAME}}",     $"{firstName} {lastName}")
+            .Replace("{{USER_EMAIL}}",    email)
+            .Replace("{{TEMP_PASSWORD}}", password)
+            .Replace("{{ACTION_URL}}",    verifyUrl);
+        await SendEmail(email, "Llogaria e nxënësit është krijuar", ApplyGlobalTokens(html));
     }
 
-    private string GenerateHtml(string title, string content, string ctaText, string ctaUrl, string footerText)
+    // ── Parent / child credential emails ─────────────────────────────────────
+
+    public async Task SendNewChildrenCredentialsToParent(string parentEmail, string parentName,
+        List<(string Name, string Email, string Password)> credentials)
     {
-        if (string.IsNullOrEmpty(_emailTemplate))
-            throw new InvalidOperationException(
-                "Template-i i emailit nuk është ngarkuar. Kontrolloni che il file HTML esista nel percorso specificato.");
-
-        var html = _emailTemplate
-            .Replace("{TEMPLATE_TITLE}", title)
-            .Replace("{TEMPLATE_CONTENT}", content)
-            .Replace("{TEMPLATE_CTA_TEXT}", ctaText)
-            .Replace("{TEMPLATE_CTA_URL}", ctaUrl)
-            .Replace("{TEMPLATE_FOOTER}", footerText); // Added footer replacement
-
-        return html;
+        _logger.LogInformation("Sending children credentials to parent {ParentEmail}", parentEmail);
+        var html = _tplChildrenCredentials.Replace("{{PARENT_NAME}}", parentName);
+        html = ProcessRepeatBlock(html, credentials);
+        await SendEmail(parentEmail, "Kredencialet e fëmijëve tuaj", ApplyGlobalTokens(html));
     }
+
+    public async Task SendChildPasswordResetToParent(string parentEmail, string parentName, string childName,
+        string childEmail, string newPassword)
+    {
+        _logger.LogInformation("Sending child password reset to parent {ParentEmail}", parentEmail);
+        var html = _tplChildPasswordReset
+            .Replace("{{PARENT_NAME}}",  parentName)
+            .Replace("{{CHILD_NAME}}",   childName)
+            .Replace("{{CHILD_EMAIL}}",  childEmail)
+            .Replace("{{NEW_PASSWORD}}", newPassword);
+        await SendEmail(parentEmail, "Fjalëkalimi i ri i fëmijës suaj", ApplyGlobalTokens(html));
+    }
+
+    // ── Supervisor flow emails ────────────────────────────────────────────────
+
+    public async Task SendSupervisorApplicationNotification(string supervisorEmail, string supervisorName, string schoolName)
+    {
+        _logger.LogInformation("Supervisor application notification for {SupervisorEmail}", supervisorEmail);
+        var adminUrl = _configuration["AppSettings:AdminPanelUrl"] ?? "https://braingainalbania.al/admin/supervisor-applications";
+        var html = _tplSupervisorApplication
+            .Replace("{{SUPERVISOR_NAME}}",  supervisorName)
+            .Replace("{{SUPERVISOR_EMAIL}}", supervisorEmail)
+            .Replace("{{SCHOOL_NAME}}",      schoolName)
+            .Replace("{{ACTION_URL}}",       adminUrl);
+        await SendEmail("fabiano.meoo98@gmail.com", "Aplikim i ri i Supervizorit", ApplyGlobalTokens(html));
+    }
+
+    public async Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName,
+        string packageSelectionLink, string? temporaryPassword = null)
+    {
+        _logger.LogInformation("Supervisor approval email for {SupervisorEmail}", supervisorEmail);
+        var html = _tplSupervisorApproval
+            .Replace("{{SUPERVISOR_NAME}}", supervisorName)
+            .Replace("{{ACTION_URL}}",      packageSelectionLink);
+
+        if (string.IsNullOrEmpty(temporaryPassword))
+        {
+            html = StripOptionalBlock(html);
+        }
+        else
+        {
+            html = html
+                .Replace("{{SUPERVISOR_EMAIL}}", supervisorEmail)
+                .Replace("{{TEMP_PASSWORD}}",    temporaryPassword);
+        }
+
+        await SendEmail(supervisorEmail, "Aplikimi juaj është pranuar", ApplyGlobalTokens(html));
+    }
+
+    public async Task SendSupervisorRejectionEmail(string supervisorEmail, string supervisorName, string reason)
+    {
+        _logger.LogInformation("Supervisor rejection email for {SupervisorEmail}", supervisorEmail);
+        var html = _tplSupervisorRejection
+            .Replace("{{SUPERVISOR_NAME}}", supervisorName)
+            .Replace("{{REJECT_REASON}}",   reason);
+        await SendEmail(supervisorEmail, "Aplikimi juaj nuk është pranuar", ApplyGlobalTokens(html));
+    }
+
+    public async Task SendSupervisorCredentialsEmail(string supervisorEmail, string supervisorName, string temporaryPassword)
+    {
+        _logger.LogInformation("Supervisor credentials email for {SupervisorEmail}", supervisorEmail);
+        var loginUrl = (_configuration["AppSettings:BaseUrl"] ?? "https://braingainalbania.al") + "/login";
+        var html = _tplSupervisorCredentials
+            .Replace("{{SUPERVISOR_NAME}}",  supervisorName)
+            .Replace("{{SUPERVISOR_EMAIL}}", supervisorEmail)
+            .Replace("{{TEMP_PASSWORD}}",    temporaryPassword)
+            .Replace("{{ACTION_URL}}",       loginUrl);
+        await SendEmail(supervisorEmail, "Kredencialet tuaja të hyrjes", ApplyGlobalTokens(html));
+    }
+
+    // ── Student password emails ───────────────────────────────────────────────
+
+    public async Task SendNewPasswordSetEmail(string studentEmail, string studentName, string newPassword)
+    {
+        _logger.LogInformation("New password set email for {StudentEmail}", studentEmail);
+        var html = _tplStudentPasswordSet
+            .Replace("{{STUDENT_NAME}}",  studentName)
+            .Replace("{{STUDENT_EMAIL}}", studentEmail)
+            .Replace("{{NEW_PASSWORD}}",  newPassword);
+        await SendEmail(studentEmail, "Fjalëkalimi juaj është rivendosur", ApplyGlobalTokens(html));
+    }
+
+    public async Task SendStudentPasswordResetRequestToSupervisor(string supervisorEmail, string supervisorName,
+        string studentName, string studentEmail, Guid resetToken)
+    {
+        _logger.LogInformation("Password reset request to supervisor {SupervisorEmail} for student {StudentEmail}", supervisorEmail, studentEmail);
+        var supervisorPanelUrl = _configuration["AppSettings:SupervisorPanelUrl"] ?? "https://braingainalbania.al/supervisor/password-reset-requests";
+        var html = _tplResetRequestToSupervisor
+            .Replace("{{SUPERVISOR_NAME}}", supervisorName)
+            .Replace("{{STUDENT_NAME}}",    studentName)
+            .Replace("{{STUDENT_EMAIL}}",   studentEmail)
+            .Replace("{{REQUEST_TIME}}",    DateTime.UtcNow.ToString("dd/MM/yyyy HH:mm"))
+            .Replace("{{ACTION_URL}}",      supervisorPanelUrl);
+        await SendEmail(supervisorEmail, "Kërkesë për rivendosje të fjalëkalimit të nxënësit", ApplyGlobalTokens(html));
+    }
+
+    public async Task SendNewPasswordToSupervisor(string supervisorEmail, string supervisorName,
+        string studentName, string studentEmail, string newPassword)
+    {
+        _logger.LogInformation("New password notification to supervisor {SupervisorEmail} for student {StudentEmail}", supervisorEmail, studentEmail);
+        var html = _tplNewPasswordToSupervisor
+            .Replace("{{SUPERVISOR_NAME}}", supervisorName)
+            .Replace("{{STUDENT_NAME}}",    studentName)
+            .Replace("{{STUDENT_EMAIL}}",   studentEmail)
+            .Replace("{{NEW_PASSWORD}}",    newPassword);
+        await SendEmail(supervisorEmail, "Fjalëkalimi i ri i nxënësit është gjeneruar", ApplyGlobalTokens(html));
+    }
+
+    // ── SMTP sender ───────────────────────────────────────────────────────────
 
     public async Task SendEmail(string email, string subject, string body)
     {
         var fromAddress = new MailAddress(
             Environment.GetEnvironmentVariable("EMAIL_FROM"),
-            "Your App"
+            "Brain Gain Albania"
         );
         var toAddress = new MailAddress(email);
 
-        using (var smtp = new SmtpClient
-               {
-                   Host = Environment.GetEnvironmentVariable("EMAIL_SMTP_SERVER"),
-                   Port = int.Parse(Environment.GetEnvironmentVariable("EMAIL_PORT") ?? "587"),
-                   EnableSsl = true,
-                   Credentials = new NetworkCredential(
-                       Environment.GetEnvironmentVariable("EMAIL_USERNAME"),
-                       Environment.GetEnvironmentVariable("EMAIL_PASSWORD")
-                   )
-               })
+        using var smtp = new SmtpClient
         {
-            using (var message = new MailMessage(fromAddress, toAddress)
-                   {
-                       Subject = subject,
-                       Body = body,
-                       IsBodyHtml = true
-                   })
-            {
-                try
-                {
-                    _logger.LogInformation("Sending email to {Email}", email);
-                    await smtp.SendMailAsync(message);
-                    Console.WriteLine($"Email sent to {email} successfully.");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to send email to {Email}", email);
-                    Console.WriteLine($"Email sending failed: {ex.Message}");
-                    throw;
-                }
-            }
-        }
-    }
+            Host        = Environment.GetEnvironmentVariable("EMAIL_SMTP_SERVER"),
+            Port        = int.Parse(Environment.GetEnvironmentVariable("EMAIL_PORT") ?? "587"),
+            EnableSsl   = true,
+            Credentials = new NetworkCredential(
+                Environment.GetEnvironmentVariable("EMAIL_USERNAME"),
+                Environment.GetEnvironmentVariable("EMAIL_PASSWORD")
+            )
+        };
 
-    // Supervisor Flow Methods
-    public async Task SendSupervisorApplicationNotification(string supervisorEmail, string supervisorName, string schoolName)
-    {
-        _logger.LogInformation("Starting supervisor application notification for {SupervisorEmail}", supervisorEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        // Get admin panel URL from configuration
-        var adminPanelUrl = _configuration["AppSettings:AdminPanelUrl"] ?? "https://braingainalbania.al/admin/supervisor-applications";
-        
-        var title = "Aplikim i ri i Supervizorit";
-        var content = $@"
-        <p>Përshëndetje Admin,</p>
-        <p>Një supervizor i ri ka aplikuar për të hyrë në platformë:</p>
-        <ul>
-            <li><strong>Emri:</strong> {supervisorName}</li>
-            <li><strong>Email:</strong> {supervisorEmail}</li>
-            <li><strong>Shkolla:</strong> {schoolName}</li>
-        </ul>
-        <p>Ju lutemi shqyrtoni aplikimin dhe merrni vendimin përkatës në panelin e administrimit.</p>";
-
-        var ctaText = "Shiko Aplikimet e Supervizorëve";
-        var body = GenerateHtml(title, content, ctaText, adminPanelUrl, footerText);
-        await SendEmail("fabiano.meoo98@gmail.com", "Aplikim i ri i Supervizorit", body);
-    }
-
-    public async Task SendSupervisorApprovalEmail(string supervisorEmail, string supervisorName, string packageSelectionLink, string? temporaryPassword = null)
-    {
-        _logger.LogInformation("Starting supervisor approval email for {SupervisorEmail}", supervisorEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Aplikimi juaj është pranuar!";
-        var content = $@"
-        <p>Përshëndetje {supervisorName},</p>
-        <p>Urime! Aplikimi juaj për të u bërë supervizor është pranuar nga administrata.</p>
-        <p>Tani mund të zgjidhni paketën e subscriptionit tuaj dhe të filloni të menaxhoni nxënësit tuaj.</p>";
-        
-        // Only include credentials if provided (for post-payment email)
-        if (!string.IsNullOrEmpty(temporaryPassword))
+        using var message = new MailMessage(fromAddress, toAddress)
         {
-            content += $@"
-            <p><strong>Kredencialet tuaja të hyrjes:</strong></p>
-            <ul>
-                <li><strong>Email:</strong> {supervisorEmail}</li>
-                <li><strong>Fjalëkalimi i përkohshëm:</strong> {temporaryPassword}</li>
-            </ul>
-            <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimin pas hyrjes së parë për siguri.</em></p>";
-        }
-        
-        var ctaText = "Zgjidh Paketën e Subscriptionit";
+            Subject    = subject,
+            Body       = body,
+            IsBodyHtml = true
+        };
 
-        var body = GenerateHtml(title, content, ctaText, packageSelectionLink, footerText);
-        await SendEmail(supervisorEmail, "Aplikimi juaj është pranuar", body);
-    }
-
-    public async Task SendSupervisorCredentialsEmail(string supervisorEmail, string supervisorName, string temporaryPassword)
-    {
-        _logger.LogInformation("Starting supervisor credentials email for {SupervisorEmail}", supervisorEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Kredencialet tuaja të hyrjes";
-        var content = $@"
-        <p>Përshëndetje {supervisorName},</p>
-        <p>Pagesa juaj u konfirmua me sukses! Tani mund të kyçeni në platformë duke përdorur kredencialet e mëposhtme:</p>
-        <p><strong>Kredencialet tuaja të hyrjes:</strong></p>
-        <ul>
-            <li><strong>Email:</strong> {supervisorEmail}</li>
-            <li><strong>Fjalëkalimi i përkohshëm:</strong> {temporaryPassword}</li>
-        </ul>
-        <p><em>Ju lutemi ruani këto kredenciale dhe ndryshoni fjalëkalimin pas hyrjes së parë për siguri.</em></p>
-        <p>Tani mund të filloni të menaxhoni nxënësit tuaj.</p>";
-        var ctaText = "Kyçu në Platformë";
-        var loginUrl = "https://braingainalbania.al/login";
-
-        var body = GenerateHtml(title, content, ctaText, loginUrl, footerText);
-        await SendEmail(supervisorEmail, "Kredencialet tuaja të hyrjes", body);
-    }
-
-    public async Task SendSupervisorRejectionEmail(string supervisorEmail, string supervisorName, string reason)
-    {
-        _logger.LogInformation("Starting supervisor rejection email for {SupervisorEmail}", supervisorEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Aplikimi juaj nuk është pranuar";
-        var content = $@"
-        <p>Përshëndetje {supervisorName},</p>
-        <p>Faleminderit për interesimin tuaj për të u bërë supervizor në platformën tonë.</p>
-        <p>Fatkeqësisht, aplikimi juaj nuk është pranuar për arsyen e mëposhtme:</p>
-        <p><strong>{reason}</strong></p>
-        <p>Nëse keni pyetje ose dëshironi të aplikoni përsëri në të ardhmen, ju lutemi na kontaktoni.</p>";
-
-        var body = GenerateHtml(title, content, "", "", footerText);
-        await SendEmail(supervisorEmail, "Aplikimi juaj nuk është pranuar", body);
-    }
-
-    public async Task SendNewPasswordSetEmail(string studentEmail, string studentName, string newPassword)
-    {
-        _logger.LogInformation("Starting new password set email for {StudentEmail}", studentEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Fjalëkalimi juaj është rivendosur";
-        var content = $@"
-        <p>Përshëndetje {studentName},</p>
-        <p>Supervizori juaj ka rivendosur fjalëkalimin tuaj. Këtu janë kredencialet tuaja të reja:</p>
-        <p><strong>Email:</strong> {studentEmail}</p>
-        <p><strong>Fjalëkalimi i ri:</strong> {newPassword}</p>
-        <p>Ju lutemi kyçuni në platformë dhe ndryshoni fjalëkalimin për siguri më të mirë.</p>";
-
-        var body = GenerateHtml(title, content, "", "", footerText);
-        await SendEmail(studentEmail, "Fjalëkalimi juaj është rivendosur", body);
-    }
-
-    public async Task SendStudentPasswordResetRequestToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, Guid resetToken)
-    {
-        _logger.LogInformation("Starting student password reset request notification for supervisor {SupervisorEmail}, student {StudentEmail}", supervisorEmail, studentEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        // Get supervisor panel URL from configuration
-        var supervisorPanelUrl = _configuration["AppSettings:SupervisorPanelUrl"] ?? "https://braingainalbania.al/supervisor/password-reset-requests";
-        
-        var title = "Kërkesë për rivendosje të fjalëkalimit të nxënësit";
-        var content = $@"
-        <p>Përshëndetje {supervisorName},</p>
-        <p>Një nxënës i juaj ka kërkuar rivendosje të fjalëkalimit:</p>
-        <ul>
-            <li><strong>Emri i nxënësit:</strong> {studentName}</li>
-            <li><strong>Email i nxënësit:</strong> {studentEmail}</li>
-            <li><strong>Data e kërkesës:</strong> {DateTime.UtcNow:dd/MM/yyyy HH:mm}</li>
-        </ul>
-        <p>Ju lutemi shqyrtoni kërkesën dhe merrni vendimin përkatës në panelin e supervizorit.</p>
-        <p><em>Shënim: Kjo kërkesë është dërguar tek ju sepse nxënësi ka një adresë email të krijuar automatikisht (@bga.al) që nuk mund të marrë email-e.</em></p>";
-
-        var ctaText = "Shiko Kërkesat për Rivendosje të Fjalëkalimit";
-        var body = GenerateHtml(title, content, ctaText, supervisorPanelUrl, footerText);
-        await SendEmail(supervisorEmail, "Kërkesë për rivendosje të fjalëkalimit të nxënësit", body);
-    }
-
-    public async Task SendNewPasswordToSupervisor(string supervisorEmail, string supervisorName, string studentName, string studentEmail, string newPassword)
-    {
-        _logger.LogInformation("Starting new password notification to supervisor {SupervisorEmail} for student {StudentEmail}", supervisorEmail, studentEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Fjalëkalimi i ri i nxënësit është gjeneruar";
-        var content = $@"
-        <p>Përshëndetje {supervisorName},</p>
-        <p>Ju keni miratuar kërkesën për rivendosje të fjalëkalimit për nxënësin tuaj. Këtu janë kredencialet e reja:</p>
-        <ul>
-            <li><strong>Emri i nxënësit:</strong> {studentName}</li>
-            <li><strong>Email i nxënësit:</strong> {studentEmail}</li>
-            <li><strong>Fjalëkalimi i ri:</strong> {newPassword}</li>
-        </ul>
-        <p><em>Ju lutemi jepni këto kredenciale nxënësit dhe këshillojeni që të ndryshojë fjalëkalimin pas hyrjes së parë për siguri.</em></p>
-        <p><strong>Shënim:</strong> Fjalëkalimi u dërgua tek ju sepse nxënësi ka një adresë email të krijuar automatikisht (@bga.al) që nuk mund të marrë email-e.</p>";
-
-        var body = GenerateHtml(title, content, "", "", footerText);
-        await SendEmail(supervisorEmail, "Fjalëkalimi i ri i nxënësit është gjeneruar", body);
-    }
-
-    public async Task SendChildPasswordResetToParent(string parentEmail, string parentName, string childName, string childEmail, string newPassword)
-    {
-        _logger.LogInformation("Sending child password reset to parent {ParentEmail} for child {ChildEmail}", parentEmail, childEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Fjalëkalimi i ri i fëmijës suaj";
-        var content = $@"
-        <p>Përshëndetje {parentName},</p>
-        <p>Ju keni kërkuar rivendosjen e fjalëkalimit për fëmijën tuaj. Këtu janë kredencialet e reja:</p>
-        <ul>
-            <li><strong>Emri:</strong> {childName}</li>
-            <li><strong>Email:</strong> {childEmail}</li>
-            <li><strong>Fjalëkalimi i ri:</strong> {newPassword}</li>
-        </ul>
-        <p><em>Ju lutemi jepni këto kredenciale fëmijës suaj.</em></p>";
-
-        var body = GenerateHtml(title, content, "", "", footerText);
-        await SendEmail(parentEmail, "Fjalëkalimi i ri i fëmijës suaj", body);
-    }
-
-    public async Task SendNewChildrenCredentialsToParent(string parentEmail, string parentName, List<(string Name, string Email, string Password)> credentials)
-    {
-        _logger.LogInformation("Sending new children credentials to parent {ParentEmail}", parentEmail);
-        var footerText = "&copy; 2025 Brain Gain. Të gjitha të drejtat e rezervuara.";
-
-        var title = "Kredencialet e fëmijëve tuaj";
-        var content = $@"
-        <p>Përshëndetje {parentName},</p>
-        <p>Llogaritë e fëmijëve tuaj janë krijuar me sukses. Këtu janë kredencialet:</p>
-        <ul>";
-
-        foreach (var (name, email, password) in credentials)
+        try
         {
-            content += $@"
-            <li><strong>{name}:</strong><br/>
-                Email: {email}<br/>
-                Fjalëkalimi: {password}</li>";
+            _logger.LogInformation("Sending email to {Email}", email);
+            await smtp.SendMailAsync(message);
         }
-
-        content += @"
-        </ul>
-        <p><em>Ju lutemi jepni këto kredenciale fëmijëve tuaj.</em></p>";
-
-        var body = GenerateHtml(title, content, "", "", footerText);
-        await SendEmail(parentEmail, "Kredencialet e fëmijëve tuaj", body);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {Email}", email);
+            throw;
+        }
     }
 }
