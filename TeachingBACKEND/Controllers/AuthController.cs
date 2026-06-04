@@ -10,6 +10,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
+using TeachingBACKEND.Domain.Exceptions;
 
 namespace TeachingBACKEND.Controllers
 {
@@ -325,6 +326,14 @@ namespace TeachingBACKEND.Controllers
                         result.IsFirstTimeLogin,
                         result.RequiresTermsReAcceptance
                     }
+                });
+            }
+            catch (AccountLockedException ex)
+            {
+                return StatusCode(429, new
+                {
+                    Message = "Llogaria u bllokua përkohësisht.",
+                    LockedUntil = ex.LockedUntil
                 });
             }
             catch (Exception ex)

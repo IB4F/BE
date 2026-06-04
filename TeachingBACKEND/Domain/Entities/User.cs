@@ -65,6 +65,10 @@ namespace TeachingBACKEND.Domain.Entities
         public DateTime? TermsAcceptedAt { get; set; }
         public string? TermsVersion { get; set; }
 
+        // Brute Force Protection
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTime? LockoutUntil { get; set; }
+
         // Subscription Fields
         public Guid? ActiveSubscriptionId { get; set; }
         public Subscription? ActiveSubscription { get; set; }

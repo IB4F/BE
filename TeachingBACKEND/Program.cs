@@ -150,14 +150,14 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddRateLimiter(options =>
 {
-    // POST /api/auth/login — max 5 per minute per IP
+    // POST /api/auth/login — max 10 per 5 minutes per IP
     options.AddPolicy("login_limit", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));

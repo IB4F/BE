@@ -7,6 +7,7 @@ using TeachingBACKEND.Data;
 using TeachingBACKEND.Domain.DTOs;
 using TeachingBACKEND.Domain.Entities;
 using TeachingBACKEND.Domain.Enums;
+using TeachingBACKEND.Domain.Exceptions;
 using System.Text.Json;
 
 namespace TeachingBACKEND.Application.Services
@@ -209,29 +210,44 @@ namespace TeachingBACKEND.Application.Services
         public async Task<LoginResponseDTO> Login(LoginDTO model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+
+            if (user != null && user.LockoutUntil.HasValue && user.LockoutUntil > DateTime.UtcNow)
+                throw new AccountLockedException(user.LockoutUntil.Value);
+
             if (user == null || !_passwordService.VerifyPassword(model.Password, user.PasswordHash))
             {
-                throw new Exception("Invalid email or password");
+                if (user != null)
+                {
+                    user.FailedLoginAttempts++;
+                    user.LockoutUntil = user.FailedLoginAttempts switch
+                    {
+                        >= 15 => DateTime.UtcNow.AddHours(24),
+                        >= 10 => DateTime.UtcNow.AddHours(1),
+                        >= 5  => DateTime.UtcNow.AddMinutes(15),
+                        _     => null
+                    };
+                    await _context.SaveChangesAsync();
+
+                    if (user.LockoutUntil.HasValue)
+                        throw new AccountLockedException(user.LockoutUntil.Value);
+                }
+
+                throw new Exception("Email ose fjalëkalim i gabuar");
             }
 
             if (!user.IsEmailVerified)
-            {
-                throw new Exception("Email is not verified! Please check your inbox.");
-            }
+                throw new Exception("Email nuk është verifikuar! Ju lutemi kontrolloni kutinë tuaj postare.");
 
             if (!user.IsActive)
-            {
-                throw new Exception("This account has been deactivated.");
-            }
+                throw new Exception("Ky llogari është çaktivizuar.");
 
-            // Check if this is a first-time login for supervisor-created user
+            user.FailedLoginAttempts = 0;
+            user.LockoutUntil = null;
+
             bool isFirstTimeLogin = user.Role == UserRole.Student && user.SupervisorId.HasValue && !user.IsOneTimeLoginUsed;
 
-            // If this is a student created by a supervisor who hasn't logged in before, mark the one-time login as used
             if (isFirstTimeLogin)
-            {
                 user.IsOneTimeLoginUsed = true;
-            }
 
             var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
             bool requiresTermsReAcceptance = user.TermsVersion != currentTermsVersion;
@@ -239,7 +255,6 @@ namespace TeachingBACKEND.Application.Services
             var accessToken = _passwordService.GenerateJwtToken(user);
             var refreshToken = _passwordService.GenerateRefreshToken();
 
-            // Store the hash — never the raw token
             user.RefreshToken = _passwordService.HashRefreshToken(refreshToken);
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(model.RememberMe ? 30 : 7);
             user.LastLoginAt = DateTime.UtcNow;
