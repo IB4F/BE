@@ -7,5 +7,6 @@
         public bool RememberMe { get; set; }     // internal only — used by controller for cookie
         public bool IsFirstTimeLogin { get; set; }
         public bool MustChangePassword { get; set; }
+        public bool RequiresTermsReAcceptance { get; set; }
     }
 }

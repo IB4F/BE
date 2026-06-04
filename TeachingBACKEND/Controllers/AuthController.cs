@@ -44,6 +44,9 @@ namespace TeachingBACKEND.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            if (!model.TermsAccepted)
+                return BadRequest(new { error = "Duhet të pranoni Kushtet e Shërbimit." });
+
             try
             {
                 // Validate the subscription package
@@ -94,6 +97,9 @@ namespace TeachingBACKEND.Controllers
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (!model.TermsAccepted)
+                return BadRequest(new { error = "Duhet të pranoni Kushtet e Shërbimit." });
 
             try
             {
@@ -146,10 +152,10 @@ namespace TeachingBACKEND.Controllers
         public async Task<IActionResult> RegisterFamily([FromBody] FamilyRegistrationDTO model)
         {
             using var activity = _logger.BeginScope("RegisterFamily");
-            
+
             try
             {
-                _logger.LogInformation("Starting family registration for email: {Email} with {FamilyMemberCount} family members", 
+                _logger.LogInformation("Starting family registration for email: {Email} with {FamilyMemberCount} family members",
                     model.Email, model.FamilyMembers?.Count ?? 0);
 
                 if (!ModelState.IsValid)
@@ -157,6 +163,9 @@ namespace TeachingBACKEND.Controllers
                     _logger.LogWarning("Model validation failed for family registration. Errors: {@ModelState}", ModelState);
                     return BadRequest(ModelState);
                 }
+
+                if (!model.TermsAccepted)
+                    return BadRequest(new { error = "Duhet të pranoni Kushtet e Shërbimit." });
 
                 _logger.LogInformation("Model validation passed for family registration");
 
@@ -313,7 +322,8 @@ namespace TeachingBACKEND.Controllers
                     {
                         result.AccessToken,
                         result.MustChangePassword,
-                        result.IsFirstTimeLogin
+                        result.IsFirstTimeLogin,
+                        result.RequiresTermsReAcceptance
                     }
                 });
             }
@@ -547,6 +557,24 @@ namespace TeachingBACKEND.Controllers
                 return Ok(new { message = "Email verified successfully." });
             }
             return BadRequest(new { message = "Invalid or already verified token." });
+        }
+
+        [Authorize]
+        [HttpPost("accept-terms")]
+        [SwaggerOperation(Summary = "Accept current Terms of Service version")]
+        public async Task<IActionResult> AcceptTerms()
+        {
+            try
+            {
+                var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+                await _userService.AcceptTermsAsync(userId);
+                return Ok(new { message = "Kushtet e Shërbimit u pranuan me sukses." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error accepting terms for user");
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [AllowAnonymous]

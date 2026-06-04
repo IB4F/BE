@@ -17,5 +17,6 @@ namespace TeachingBACKEND.Application.Interfaces
         Task<UserDetails> GetUserDetails(ClaimsPrincipal user);
         Task<bool> VerifyFamilyEmailAsync(Guid token);
         Task<List<object>> GetAvailableClasses();
+        Task AcceptTermsAsync(Guid userId);
     }
 }

@@ -40,5 +40,9 @@ namespace TeachingBACKEND.Domain.DTOs
         public Guid SubscriptionPackageId { get; set; }
 
         public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
+
+        [Required]
+        [JsonPropertyName("TermsAccepted")]
+        public bool TermsAccepted { get; set; }
     }
 }

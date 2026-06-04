@@ -61,6 +61,10 @@ namespace TeachingBACKEND.Domain.Entities
         public bool IsActive { get; set; } = true;
         public DateTime? LastLoginAt { get; set; }
         
+        // Terms of Service
+        public DateTime? TermsAcceptedAt { get; set; }
+        public string? TermsVersion { get; set; }
+
         // Subscription Fields
         public Guid? ActiveSubscriptionId { get; set; }
         public Subscription? ActiveSubscription { get; set; }

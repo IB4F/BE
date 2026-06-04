@@ -18,6 +18,7 @@ namespace TeachingBACKEND.Application.Services
         private readonly IPasswordService _passwordService;
         private readonly ILogger<UserService> _logger;
         private readonly ISubscriptionService _subscriptionService;
+        private readonly IConfiguration _configuration;
 
         public UserService(
             ApplicationDbContext context,
@@ -28,11 +29,11 @@ namespace TeachingBACKEND.Application.Services
             ILogger<UserService> logger)
         {
             _context = context;
+            _configuration = configuration;
             _notificationService = notificationService;
             _passwordService = passwordService;
             _logger = logger;
             _subscriptionService = subscriptionService;
-
         }
 
         /// <summary>
@@ -232,6 +233,9 @@ namespace TeachingBACKEND.Application.Services
                 user.IsOneTimeLoginUsed = true;
             }
 
+            var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
+            bool requiresTermsReAcceptance = user.TermsVersion != currentTermsVersion;
+
             var accessToken = _passwordService.GenerateJwtToken(user);
             var refreshToken = _passwordService.GenerateRefreshToken();
 
@@ -248,7 +252,8 @@ namespace TeachingBACKEND.Application.Services
                 RefreshToken = refreshToken,
                 RememberMe = model.RememberMe,
                 IsFirstTimeLogin = isFirstTimeLogin,
-                MustChangePassword = user.MustChangePasswordOnNextLogin
+                MustChangePassword = user.MustChangePasswordOnNextLogin,
+                RequiresTermsReAcceptance = requiresTermsReAcceptance
             };
         }
         public async Task<User> GetUserByEmail(string email)
@@ -382,6 +387,19 @@ namespace TeachingBACKEND.Application.Services
                 .ToListAsync();
             
             return classes.Cast<object>().ToList();
+        }
+
+        public async Task AcceptTermsAsync(Guid userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
+            user.TermsAcceptedAt = DateTime.UtcNow;
+            user.TermsVersion = currentTermsVersion;
+
+            await _context.SaveChangesAsync();
         }
 
         // Note: Payment-First Registration Methods removed - registration now handled by AuthController using SubscriptionService

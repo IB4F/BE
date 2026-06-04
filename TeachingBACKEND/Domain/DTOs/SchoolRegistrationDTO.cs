@@ -30,5 +30,8 @@ namespace TeachingBACKEND.Domain.DTOs
         public List<CreateStudentBySchoolDTO> Students { get; set; }
 
         public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
+
+        [Required]
+        public bool TermsAccepted { get; set; }
     }
 }

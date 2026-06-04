@@ -818,6 +818,7 @@ namespace TeachingBACKEND.Application.Services
             if (existing != null)
                 return existing;
 
+            var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -833,7 +834,9 @@ namespace TeachingBACKEND.Application.Services
                 IsEmailVerified = false,
                 EmailVerificationToken = Guid.NewGuid(),
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddDays(7),
-                CreateAt = DateTime.UtcNow
+                CreateAt = DateTime.UtcNow,
+                TermsAcceptedAt = DateTime.UtcNow,
+                TermsVersion = currentTermsVersion
             };
 
             _context.Users.Add(user);
@@ -858,6 +861,7 @@ namespace TeachingBACKEND.Application.Services
             // Generate a temporary password for school users
             var tempPassword = Guid.NewGuid().ToString("N")[..8];
 
+            var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
             var schoolUser = new User
             {
                 Id = Guid.NewGuid(),
@@ -875,7 +879,9 @@ namespace TeachingBACKEND.Application.Services
                 IsEmailVerified = false,
                 EmailVerificationToken = Guid.NewGuid(),
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddDays(7),
-                CreateAt = DateTime.UtcNow
+                CreateAt = DateTime.UtcNow,
+                TermsAcceptedAt = DateTime.UtcNow,
+                TermsVersion = currentTermsVersion
             };
 
             _context.Users.Add(schoolUser);
@@ -943,6 +949,7 @@ namespace TeachingBACKEND.Application.Services
                 return existingMainUser;
             
             // Create the main family user (parent/guardian)
+            var currentTermsVersion = _configuration["AppSettings:CurrentTermsVersion"] ?? "2025-06-01";
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -956,7 +963,9 @@ namespace TeachingBACKEND.Application.Services
                 IsEmailVerified = false,
                 EmailVerificationToken = Guid.NewGuid(),
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddDays(7),
-                CreateAt = DateTime.UtcNow
+                CreateAt = DateTime.UtcNow,
+                TermsAcceptedAt = DateTime.UtcNow,
+                TermsVersion = currentTermsVersion
             };
 
             _context.Users.Add(user);

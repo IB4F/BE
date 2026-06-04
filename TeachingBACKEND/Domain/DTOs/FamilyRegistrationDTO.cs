@@ -31,4 +31,7 @@ public class FamilyRegistrationDTO
     public List<FamilyMemberInput> FamilyMembers { get; set; } // family members to create
     public string? PhoneNumber { get; set; }
     public PaymentProvider Provider { get; set; } = PaymentProvider.Stripe;
+
+    [Required]
+    public bool TermsAccepted { get; set; }
 }
