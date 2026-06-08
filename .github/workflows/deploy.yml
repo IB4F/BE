@@ -58,7 +58,24 @@ jobs:
         shell: powershell
 
       # ─────────────────────────────────────────
-      # 6. EF CORE MIGRATIONS
+      # 6. BACKUP PRE-DEPLOY
+      # ─────────────────────────────────────────
+      - name: Backup DB pre-deploy
+        run: |
+          $sha     = "${{ github.sha }}".Substring(0, 7)
+          $date    = Get-Date -Format "yyyyMMdd_HHmmss"
+          $file    = "C:\Backups\SQL\predeploy_${date}_${sha}.bak"
+          Invoke-Sqlcmd `
+            -ServerInstance "WIN-HUFFLG584VP\SQLEXPRESS" `
+            -Username "sa" `
+            -Password "${{ secrets.SA_PASSWORD }}" `
+            -Query "BACKUP DATABASE [TeachingBACKEND] TO DISK = N'$file' WITH STATS = 10" `
+            -QueryTimeout 300
+          Write-Host "Backup pre-deploy creato: $file"
+        shell: powershell
+
+      # ─────────────────────────────────────────
+      # 7. EF CORE MIGRATIONS
       # ─────────────────────────────────────────
       - name: Install EF Core tools
         run: |
